@@ -50,6 +50,50 @@ VIRTUAL_ENV=$PWD/.venv maturin develop
 cargo test                       # Rust unit tests
 ```
 
+## LaTeX requirements
+
+ikat emits standard LaTeX; it never bundles classes or packages.
+You need a working TeX installation with `pdflatex` (and `bibtex`
+if you stage a `.bib`). TeX Live `scheme-full` covers everything;
+minimal schemes (TinyTeX included) need at least:
+
+| what | packages | needed when |
+|---|---|---|
+| base document | `amsmath amssymb tabularx graphicx hyperref lmodern textcomp` + your document class (`IEEEtran`, …) | always |
+| inline diagrams | `pgf` (`tikz`) + TikZ libraries `shapes.geometric arrows.meta positioning` | any woven `tikzpicture` |
+| data plots | `pgfplots` (compat 1.18) | any woven `axis` environment |
+
+Precompiled-PDF figures need nothing beyond the base set — one
+reason to prefer them for journal submissions.
+
+```bash
+tlmgr install amsmath amssymb tabularx graphicx hyperref lmodern \
+  textcomp pgf pgfplots IEEEtran
+```
+
+Ask ikat what a given body needs instead of guessing:
+
+```python
+from ikat import tex_requirements
+tex_requirements(has_tikz=True, has_plots=False)
+# ['\\usepackage{tikz}',
+#  '\\usetikzlibrary{shapes.geometric,arrows.meta,positioning}']
+```
+
+The document builder does this automatically: `build_document`
+scans the woven body and injects only the packages it contains.
+
+Notes:
+
+- If `tlmgr` fails (broken mirror/GPG — seen in the wild),
+  install from a TeX Live archive instead: unpack
+  `systems/texlive/tlnet/archive/<pkg>.tar.xz`, copy its `tex/`
+  tree into your texmf-local tree, run `mktexlsr`. That is how the
+  dev setup gained `IEEEtran` and `pgfplots`.
+- arXiv's TeX Live ships everything above, so an ikat bundle
+  (`.tex` + `.bbl` + figure PDFs, no class/style files) compiles
+  there as-is.
+
 ## License
 
 MIT OR Apache-2.0.
