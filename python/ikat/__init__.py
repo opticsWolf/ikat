@@ -12,6 +12,7 @@ from ._core import (
     flowchart_to_tikz,
     lineplot_to_tikz,
     parse_config,
+    tex_requirements,
 )
 from .compile import compile_pdf
 from .document import BuildResult, BuildSpec, DiagramEntry, build_document
@@ -43,5 +44,6 @@ __all__ = [
     "lineplot_to_tikz",
     "parse_config",
     "resolve_span",
+    "tex_requirements",
     "weave_fragment",
 ]

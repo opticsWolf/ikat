@@ -41,9 +41,10 @@ shows only intended improvements; resulting PDF compiles with
   whiskers from min/max, refline, footnote text.
 - **M2.2 regeneration.** The 4 paper plots rebuilt through ikat;
   side-by-side visual diff against the matplotlib PDFs.
-- **M2.3 local pgfplots.** Manual `pgfplots.sty` install into the
-  TinyTeX texmf tree (same trick as IEEEtran; `tlmgr` GPG is broken
-  on this mirror chain) so plot output compiles locally.
+- **M2.3 local pgfplots.** ✅ DONE 2026-10-06 — tlnet `pgfplots.tar.xz`
+  extracted into the TinyTeX texmf tree (`tlmgr` GPG is broken on
+  this mirror chain); `tex_requirements()` auto-detects TikZ/pgfplots
+  needs from the woven body so preambles stay minimal.
 
 *Acceptance:* `paper/figs/` producible with no matplotlib import
 anywhere in the loop.

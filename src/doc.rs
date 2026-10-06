@@ -114,6 +114,23 @@ fn strip_section_number(head: &str) -> String {
     head.to_string()
 }
 
+/// LaTeX packages a woven body needs, detected from what it contains.
+/// Precompiled PDF figures need nothing; inline `tikzpicture`s need
+/// TikZ + shape/arrow libraries; pgfplots `axis` environments need
+/// pgfplots. Everything named here ships in TeX Live (and arXiv's).
+pub fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
+    let mut req = Vec::new();
+    if has_tikz {
+        req.push("\\usepackage{tikz}".to_string());
+        req.push("\\usetikzlibrary{shapes.geometric,arrows.meta,positioning}".to_string());
+    }
+    if has_plots {
+        req.push("\\usepackage{pgfplots}".to_string());
+        req.push("\\pgfplotsset{compat=1.18}".to_string());
+    }
+    req
+}
+
 pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(String, String, usize, usize), String> {
     let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
     let mut out: Vec<String> = Vec::new();
@@ -288,7 +305,9 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     }
     let paths: String = spec.graphicspaths.iter().map(|p| format!("{{{p}}}")).collect();
     let opts = cfg.document.class_options.join(",");
-    let doc = [
+    let has_tikz = body.contains("\\begin{tikzpicture}");
+    let has_plots = body.contains("\\begin{axis}");
+    let mut head = vec![
         format!("\\documentclass[{opts}]{{{}}}", cfg.document.class),
         "\\usepackage[utf8]{inputenc}".to_string(),
         "\\usepackage{lmodern}".to_string(),
@@ -296,6 +315,9 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         "\\usepackage{amsmath,amssymb}".to_string(),
         "\\usepackage{tabularx}".to_string(),
         "\\usepackage{graphicx}".to_string(),
+    ];
+    head.extend(tex_requirements(has_tikz, has_plots));
+    head.extend([
         "\\usepackage[hidelinks]{hyperref}".to_string(),
         format!("\\graphicspath{{{paths}}}"),
         format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks),
@@ -307,8 +329,8 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         format!("\\bibliography{{{}}}", spec.bib_name),
         "\\end{document}".to_string(),
         String::new(),
-    ]
-    .join("\n");
+    ]);
+    let doc = head.join("\n");
     Ok(BuildResult {
         title,
         body: body.clone(),
@@ -352,8 +374,21 @@ mod tests {
         assert!(r.tex.contains("\\section{Intro}"));
         assert!(r.tex.contains("\\cite{k}"));
         assert!(r.tex.contains("\\begin{tikzpicture}"));
+        assert!(r.tex.contains("\\usepackage{tikz}"));
+        assert!(r.tex.contains("\\usetikzlibrary{shapes.geometric,arrows.meta,positioning}"));
+        assert!(!r.tex.contains("pgfplots"));
         assert!(r.tex.contains("\\begin{tabularx}"));
         assert_eq!((r.n_diagrams, r.n_tables), (1, 1));
+    }
+
+    #[test]
+    fn requirements_only_what_is_used() {
+        assert!(tex_requirements(false, false).is_empty());
+        let tikz = tex_requirements(true, false);
+        assert_eq!(tikz.len(), 2);
+        assert!(tikz[0].contains("usepackage{tikz}"));
+        let plots = tex_requirements(false, true);
+        assert!(plots.iter().any(|l| l.contains("pgfplots")));
     }
 
     #[test]

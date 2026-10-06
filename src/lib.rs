@@ -130,6 +130,13 @@ fn bib_keys(bib_src: &str) -> Vec<String> {
     v
 }
 
+/// LaTeX packages a woven body needs: TikZ for inline diagrams,
+/// pgfplots for data plots. Precompiled PDFs need neither.
+#[pyfunction]
+fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
+    doc::tex_requirements(has_tikz, has_plots)
+}
+
 /// ikat core (Rust): mermaid→TikZ, data→pgfplots, document config.
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -140,5 +147,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_document, m)?)?;
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
     m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
+    m.add_function(wrap_pyfunction!(tex_requirements, m)?)?;
     Ok(())
 }
