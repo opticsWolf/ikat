@@ -1,0 +1,73 @@
+"""End-to-end tests for the thin layer (run against maturin develop)."""
+
+import ikat
+from ikat import (
+    barchart_to_tikz,
+    config_spans,
+    figure_env,
+    flowchart_to_tikz,
+    resolve_span,
+    weave_fragment,
+)
+
+READ_Q = """graph TD
+%% caption: The three read operations answer different questions by construction.
+%% label: fig:read-questions
+q{"Which question?"}
+q -->|"true at v"| av["as_of_valid(v)<br/>L's current state"]
+av -->|compose| both["both instants"]
+"""
+
+
+def test_mermaid_end_to_end():
+    tikz = flowchart_to_tikz(READ_Q)
+    assert "\\begin{tikzpicture}" in tikz
+    assert tikz.count("\\node") == 3
+    assert "as\\_of\\_valid(v)" in tikz
+    assert "[dia]" in tikz
+
+
+def test_barchart_end_to_end():
+    tikz = barchart_to_tikz(
+        "t",
+        "latency (ms)",
+        True,
+        ["R1", "Q3"],
+        ["trunk", "branch"],
+        [[7.4, 0.47], [28.0, 66.0]],
+        [[6.9, 0.46], [25.0, 60.0]],
+        [[8.1, 0.48], [31.0, 72.0]],
+        (2.8, 3.2, 66.0, "zero-write fork"),
+    )
+    assert "ymode=log" in tikz
+    assert "\\addlegendentry{branch}" in tikz
+    assert "\\draw[dashed]" in tikz
+
+
+def test_config_defaults_and_override():
+    spans = config_spans("")
+    assert spans["span_diagram"] == "figure*"
+    assert spans["span_plot"] == "figure"
+    assert resolve_span("diagram", None, spans) == "wide"
+    assert resolve_span("plot", "wide", spans) == "wide"
+    assert resolve_span("plot", None, spans) == "column"
+
+
+def test_figure_env_widths():
+    wide = figure_env("figs/a.pdf", "C", "fig:x", "wide")
+    assert "\\begin{figure*}" in wide and "\\textwidth" in wide
+    col = figure_env("figs/a.pdf", "C", "fig:a", "column")
+    assert "\\begin{figure}" in col and "\\includegraphics[width=\\columnwidth]{figs/a.pdf}" in col
+    tikz = figure_env(flowchart_to_tikz("graph TD\na[x]-->b[y]"), "C", "fig:t", "wide")
+    assert "tikzpicture" in tikz and "includegraphics" not in tikz
+
+
+def test_weave_fragment():
+    md = "text\n\n```mermaid {span=column}\n" + READ_Q + "```\n"
+    (el,) = weave_fragment(md)
+    assert el.kind == "diagram"
+    assert el.span == "column"  # local override beats wide default
+    assert el.label == "fig:read-questions"
+    assert el.body_tex.startswith("\\begin{tikzpicture}")
+    (el2,) = weave_fragment("```mermaid\n" + READ_Q + "```\n")
+    assert el2.span == "wide"  # configured kind default

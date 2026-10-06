@@ -1,0 +1,365 @@
+//! Block parsing and document assembly: headings, fences, tables,
+//! paragraphs, abstract, appendix, preamble. Byte-parity with the
+//! paper build's `convert()` + `main()` is the contract.
+
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+
+use crate::config::{Config, Span};
+use crate::esc::inline;
+use crate::mermaid::flowchart_to_tikz;
+use crate::table::table_block;
+
+/// One mermaid fence, in source order.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagramEntry {
+    pub key: String,
+    pub caption: String,
+    #[serde(default = "default_mode")]
+    pub mode: String,
+    #[serde(default = "default_prefix")]
+    pub path_prefix: String,
+}
+
+fn default_mode() -> String {
+    "precompiled".to_string()
+}
+fn default_prefix() -> String {
+    "figs/tikz/".to_string()
+}
+
+/// Everything document-specific that ikat.toml doesn't cover.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildSpec {
+    #[serde(default)]
+    pub diagrams: Vec<DiagramEntry>,
+    #[serde(default)]
+    pub plots: Vec<(String, String)>,
+    #[serde(default = "default_plot_dir")]
+    pub plot_dir: String,
+    #[serde(default)]
+    pub table_captions: Vec<String>,
+    #[serde(default)]
+    pub table_specs: HashMap<String, String>,
+    #[serde(default)]
+    pub plot_insert_before: String,
+    #[serde(default)]
+    pub title_thanks: String,
+    #[serde(default = "default_author")]
+    pub author: String,
+    #[serde(default = "default_bib")]
+    pub bib_name: String,
+    #[serde(default = "default_paths")]
+    pub graphicspaths: Vec<String>,
+    #[serde(default)]
+    pub bib_keys: HashSet<String>,
+}
+
+fn default_plot_dir() -> String {
+    "figs/".to_string()
+}
+fn default_author() -> String {
+    "opticsWolf".to_string()
+}
+fn default_bib() -> String {
+    "refs-paper".to_string()
+}
+fn default_paths() -> Vec<String> {
+    ["./", "figs/", "figs/tikz/"].iter().map(|s| s.to_string()).collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildResult {
+    pub title: String,
+    pub body: String,
+    pub tex: String,
+    pub n_diagrams: usize,
+    pub n_tables: usize,
+}
+
+fn figure_block(body_tex: &str, caption: &str, label: &str, span: Span) -> String {
+    let (env, width) = match span {
+        Span::Column => ("figure", "\\columnwidth"),
+        Span::Wide => ("figure*", "\\textwidth"),
+    };
+    let body = if body_tex.trim_start().starts_with("\\begin{tikzpicture}") {
+        body_tex.to_string()
+    } else {
+        format!("\\includegraphics[width={width}]{{{body_tex}}}")
+    };
+    format!("\\begin{{{env}}}[t]\n\\centering\n{body}\n\\caption{{{caption}}}\n\\label{{{label}}}\n\\end{{{env}}}")
+}
+
+fn strip_section_number(head: &str) -> String {
+    // Strip a leading `N. ` or `N.M ` marker (IEEE classes number
+    // sections themselves). Anything else passes through untouched.
+    let b = head.as_bytes();
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0 && i < b.len() && b[i] == b'.' {
+        let mut j = i + 1;
+        let mut k = j;
+        while k < b.len() && b[k].is_ascii_digit() {
+            k += 1;
+        }
+        if k > j {
+            j = k;
+        }
+        if j < b.len() && b[j] == b' ' {
+            return head[j + 1..].to_string();
+        }
+    }
+    head.to_string()
+}
+
+pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(String, String, usize, usize), String> {
+    let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
+    let mut out: Vec<String> = Vec::new();
+    let mut para: Vec<String> = Vec::new();
+    let mut title = String::new();
+    let mut in_abstract = false;
+    let mut diagram_idx = 0usize;
+    let mut table_idx = 0usize;
+
+    let flush = |out: &mut Vec<String>, para: &mut Vec<String>| -> Result<(), String> {
+        if !para.is_empty() {
+            let mut text = inline(&para.join(" "), keys)?;
+            if text.starts_with("\\dag{}") {
+                text = format!("\\textit{{Note: }}{}", &text["\\dag{}".len()..]);
+            }
+            out.push(text + "\n");
+            para.clear();
+        }
+        Ok(())
+    };
+
+    let mut i = 0;
+    while i < lines.len() {
+        let s = lines[i].trim();
+        if s.is_empty() {
+            flush(&mut out, &mut para)?;
+            i += 1;
+            continue;
+        }
+        if s.starts_with('>') {
+            i += 1;
+            continue;
+        }
+        if s.starts_with("```") {
+            flush(&mut out, &mut para)?;
+            if s.contains("mermaid") {
+                if diagram_idx >= spec.diagrams.len() {
+                    return Err(format!("mermaid fence #{diagram_idx} has no registry entry"));
+                }
+                let mut fence = Vec::new();
+                let mut j = i + 1;
+                while j < lines.len() && !lines[j].trim().starts_with("```") {
+                    fence.push(lines[j].trim_end_matches('\n').to_string());
+                    j += 1;
+                }
+                let entry = &spec.diagrams[diagram_idx];
+                let mode = if s.contains("{inline}") { "inline" } else { entry.mode.as_str() };
+                let span = cfg.spans.for_kind("diagram");
+                let body = if mode == "inline" {
+                    flowchart_to_tikz(&fence.join("\n"))?
+                } else {
+                    format!("{}{}", entry.path_prefix, entry.key)
+                };
+                out.push(
+                    figure_block(
+                        &body,
+                        &inline(&entry.caption, keys)?,
+                        &format!("fig:{}", entry.key),
+                        span,
+                    ) + "\n",
+                );
+                diagram_idx += 1;
+                i = j + 1;
+                continue;
+            }
+            i += 1;
+            while i < lines.len() && !lines[i].trim().starts_with("```") {
+                i += 1;
+            }
+            i += 1;
+            continue;
+        }
+        if s.starts_with('|') {
+            flush(&mut out, &mut para)?;
+            let mut rows = Vec::new();
+            while i < lines.len() && lines[i].trim().starts_with('|') {
+                rows.push(lines[i].trim().to_string());
+                i += 1;
+            }
+            if table_idx >= spec.table_captions.len() {
+                return Err(format!("table #{table_idx} has no caption"));
+            }
+            out.push(
+                table_block(
+                    &rows,
+                    &spec.table_captions[table_idx],
+                    keys,
+                    spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
+                )? + "\n",
+            );
+            table_idx += 1;
+            continue;
+        }
+        if s.starts_with("## Appendix") {
+            flush(&mut out, &mut para)?;
+            out.push("\\appendix\n\\section{Claim-to-decision map}\n".to_string());
+            i += 1;
+            continue;
+        }
+        if s.starts_with("## Abstract") {
+            flush(&mut out, &mut para)?;
+            out.push("\\begin{abstract}\n".to_string());
+            in_abstract = true;
+            i += 1;
+            continue;
+        }
+        if s.starts_with("## ") {
+            flush(&mut out, &mut para)?;
+            if in_abstract {
+                out.push("\\end{abstract}\n".to_string());
+                in_abstract = false;
+            }
+            let head = strip_section_number(&s[3..]);
+            out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
+            i += 1;
+            continue;
+        }
+        if s.starts_with("### ") {
+            flush(&mut out, &mut para)?;
+            let head = strip_section_number(&s[4..]);
+            out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
+            i += 1;
+            continue;
+        }
+        if s.starts_with("# ") {
+            title = inline(&s[2..], keys)?;
+            i += 1;
+            continue;
+        }
+        para.push(s.to_string());
+        i += 1;
+    }
+    flush(&mut out, &mut para)?;
+    if in_abstract {
+        out.push("\\end{abstract}\n".to_string());
+    }
+    Ok((title, out.join("\n"), diagram_idx, table_idx))
+}
+
+pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<BuildResult, String> {
+    let cfg = Config::from_toml(toml_src)?;
+    let lines: Vec<String> = md_text.lines().map(|l| l.to_string()).collect();
+    let (title, mut body, n_diagrams, n_tables) = convert(&lines, spec, &cfg)?;
+    if n_diagrams != spec.diagrams.len() {
+        return Err(format!(
+            "{n_diagrams} fences vs {} registry entries",
+            spec.diagrams.len()
+        ));
+    }
+    if n_tables != spec.table_captions.len() {
+        return Err(format!(
+            "{n_tables} tables vs {} captions",
+            spec.table_captions.len()
+        ));
+    }
+    if !spec.plots.is_empty() {
+        let mut figs = Vec::new();
+        for (key, cap) in &spec.plots {
+            figs.push(figure_block(
+                &format!("{}{}", spec.plot_dir, key),
+                cap,
+                &format!("fig:{key}"),
+                cfg.spans.for_kind("plot"),
+            ));
+        }
+        let plot_figs = figs.join("\n");
+        if !spec.plot_insert_before.is_empty() && body.contains(&spec.plot_insert_before) {
+            body = body.replacen(&spec.plot_insert_before, &format!("{plot_figs}\n{}", spec.plot_insert_before), 1);
+        } else {
+            body = format!("{body}\n{plot_figs}\n");
+        }
+    }
+    let paths: String = spec.graphicspaths.iter().map(|p| format!("{{{p}}}")).collect();
+    let opts = cfg.document.class_options.join(",");
+    let doc = [
+        format!("\\documentclass[{opts}]{{{}}}", cfg.document.class),
+        "\\usepackage[utf8]{inputenc}".to_string(),
+        "\\usepackage{lmodern}".to_string(),
+        "\\usepackage{textcomp}".to_string(),
+        "\\usepackage{amsmath,amssymb}".to_string(),
+        "\\usepackage{tabularx}".to_string(),
+        "\\usepackage{graphicx}".to_string(),
+        "\\usepackage[hidelinks]{hyperref}".to_string(),
+        format!("\\graphicspath{{{paths}}}"),
+        format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks),
+        format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author),
+        "\\begin{document}".to_string(),
+        "\\maketitle".to_string(),
+        body.clone(),
+        "\\bibliographystyle{IEEEtran}".to_string(),
+        format!("\\bibliography{{{}}}", spec.bib_name),
+        "\\end{document}".to_string(),
+        String::new(),
+    ]
+    .join("\n");
+    Ok(BuildResult {
+        title,
+        body: body.clone(),
+        tex: doc,
+        n_diagrams,
+        n_tables,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn spec() -> BuildSpec {
+        BuildSpec {
+            diagrams: vec![DiagramEntry {
+                key: "fig-x".into(),
+                caption: "Cap $r$.".into(),
+                mode: "inline".into(),
+                path_prefix: "figs/tikz/".into(),
+            }],
+            plots: vec![],
+            plot_dir: "figs/".into(),
+            table_captions: vec!["T.".into()],
+            table_specs: HashMap::new(),
+            plot_insert_before: String::new(),
+            title_thanks: "th".into(),
+            author: "opticsWolf".into(),
+            bib_name: "refs-paper".into(),
+            graphicspaths: vec!["./".into()],
+            bib_keys: HashSet::new(),
+        }
+    }
+
+    #[test]
+    fn mini_doc() {
+        let md = "# Title here\n\n## Abstract\n\nAbs text.\n\n## 1. Intro\n\nHello [`k`] world.\n\n```mermaid\ngraph TD\na[x]-->b[y]\n```\n\n| A |\n|---|\n| 1 |\n";
+        let r = build_document(md, "", &spec()).unwrap();
+        assert!(r.tex.contains("\\title{Title here\\thanks{th}}"));
+        assert!(r.tex.contains("\\begin{abstract}"));
+        assert!(r.tex.contains("\\section{Intro}"));
+        assert!(r.tex.contains("\\cite{k}"));
+        assert!(r.tex.contains("\\begin{tikzpicture}"));
+        assert!(r.tex.contains("\\begin{tabularx}"));
+        assert_eq!((r.n_diagrams, r.n_tables), (1, 1));
+    }
+
+    #[test]
+    fn fence_count_mismatch() {
+        let mut s = spec();
+        s.diagrams.clear();
+        assert!(build_document("```mermaid\ngraph TD\na[x]\n```\n", "", &s).is_err());
+    }
+}

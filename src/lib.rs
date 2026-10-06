@@ -1,0 +1,144 @@
+//! ikat core: Rust compute for the md→tex/pdf pipeline, exposed to
+//! Python through PyO3. Thin wrappers live in `python/ikat/`; all
+//! parsing, layout, and code generation lives here.
+
+use pyo3::prelude::*;
+
+mod config;
+mod doc;
+mod esc;
+mod mermaid;
+mod plot;
+mod table;
+
+/// Convert a mermaid flowchart block to a standalone `tikzpicture`.
+///
+/// Raises `ValueError` on empty input, unknown directions, or
+/// unparsable edges.
+#[pyfunction]
+fn flowchart_to_tikz(src: &str) -> PyResult<String> {
+    mermaid::flowchart_to_tikz(src)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+}
+
+/// Bar chart with min/max whiskers → `tikzpicture` (pgfplots).
+///
+/// `values/mins/maxs` are per-series lists over groups:
+/// `values[s][i]` is series `s` at group `i`.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn barchart_to_tikz(
+    title: &str,
+    ylabel: &str,
+    log_y: bool,
+    group_labels: Vec<String>,
+    series_names: Vec<String>,
+    values: Vec<Vec<f64>>,
+    mins: Vec<Vec<f64>>,
+    maxs: Vec<Vec<f64>>,
+    refline: Option<(f64, f64, f64, String)>,
+) -> PyResult<String> {
+    plot::barchart(
+        title,
+        ylabel,
+        log_y,
+        &group_labels,
+        &series_names,
+        &values,
+        &mins,
+        &maxs,
+        refline,
+    )
+    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+}
+
+/// Line plot with symmetric error bars → `tikzpicture` (pgfplots).
+#[pyfunction]
+fn lineplot_to_tikz(
+    title: &str,
+    xlabel: &str,
+    ylabel: &str,
+    xs: Vec<f64>,
+    names: Vec<String>,
+    yss: Vec<Vec<f64>>,
+    errs: Vec<Vec<f64>>,
+) -> PyResult<String> {
+    if names.len() != yss.len() || names.len() != errs.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "lineplot: names/yss/errs length mismatch",
+        ));
+    }
+    let series: Vec<(&str, Vec<f64>, Vec<f64>)> = names
+        .iter()
+        .zip(yss.into_iter())
+        .zip(errs.into_iter())
+        .map(|((n, y), e)| (n.as_str(), y, e))
+        .collect();
+    plot::lineplot(title, xlabel, ylabel, &xs, &series)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+}
+
+/// Parse an `ikat.toml` document config. Returns the resolved
+/// per-kind spans plus document settings as a dict.
+#[pyfunction]
+fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>> {
+    let cfg = config::Config::from_toml(src)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+    let mut m = std::collections::HashMap::new();
+    m.insert("class".to_string(), cfg.document.class.clone());
+    m.insert(
+        "class_options".to_string(),
+        cfg.document.class_options.join(","),
+    );
+    m.insert("columns".to_string(), cfg.document.columns.to_string());
+    m.insert("margins".to_string(), cfg.document.margins.clone());
+    for kind in ["diagram", "plot", "table", "default"] {
+        let span = cfg.spans.for_kind(kind);
+        m.insert(format!("span_{kind}"), span.latex_env().to_string());
+        m.insert(format!("width_{kind}"), span.latex_width().to_string());
+    }
+    Ok(m)
+}
+
+/// Full document build: Markdown + ikat.toml + spec JSON → result JSON.
+///
+/// `spec_json` carries diagrams/plots/table captions, thanks, author,
+/// bibliography name, graphicspaths, and the validated `.bib` keyset.
+/// Returns `{"title","body","tex","n_diagrams","n_tables"}`.
+#[pyfunction]
+fn build_document(md_text: &str, toml_src: &str, spec_json: &str) -> PyResult<String> {
+    let spec: doc::BuildSpec = serde_json::from_str(spec_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("spec: {e}")))?;
+    let r = doc::build_document(md_text, toml_src, &spec)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    serde_json::to_string(&r)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+}
+
+/// BibTeX-safe derivative of a `.bib` source (brace bare authors,
+/// escape specials outside author/url/doi fields).
+#[pyfunction]
+fn bib_safe(bib_src: &str) -> String {
+    table::bib_safe(bib_src)
+}
+
+/// Every `@type{key,` entry key in a `.bib` source.
+#[pyfunction]
+fn bib_keys(bib_src: &str) -> Vec<String> {
+    let mut v: Vec<String> = table::bib_keys_of(bib_src).into_iter().collect();
+    v.sort();
+    v
+}
+
+/// ikat core (Rust): mermaid→TikZ, data→pgfplots, document config.
+#[pymodule]
+fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(flowchart_to_tikz, m)?)?;
+    m.add_function(wrap_pyfunction!(barchart_to_tikz, m)?)?;
+    m.add_function(wrap_pyfunction!(lineplot_to_tikz, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_config, m)?)?;
+    m.add_function(wrap_pyfunction!(build_document, m)?)?;
+    m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
+    m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
+    Ok(())
+}

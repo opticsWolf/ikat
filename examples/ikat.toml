@@ -1,0 +1,11 @@
+[document]
+class = "IEEEtran"
+class_options = ["conference"]
+columns = 2
+margins = "0.75in"
+
+[spans]
+diagram = "wide"
+plot = "column"
+table = "column"
+default = "column"
