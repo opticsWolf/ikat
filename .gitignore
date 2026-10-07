@@ -10,6 +10,7 @@ __pycache__/
 dist/
 .pytest_cache/
 examples/demo-out/
+examples/ikat-paper/out/
 *.aux
 *.log
 *.out

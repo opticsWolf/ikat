@@ -1,0 +1,16 @@
+[spans]
+diagram = "wide"
+plot = "column"
+table = "column"
+
+[floats]
+pos_default = "top"
+topfraction = 0.9
+bottomfraction = 0.7
+textfraction = 0.1
+topnumber = 3
+bottomnumber = 2
+
+[template]
+skeleton = "skel.tex"
+abstract_before_maketitle = true

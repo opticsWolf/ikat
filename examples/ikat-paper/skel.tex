@@ -1,0 +1,32 @@
+% skeleton-plain.tex — level-3 starting point: the whole document.
+% Tokens: {{title}} {{author}} {{thanks}} (use \thanks{{{thanks}}},
+% triple braces, so empty thanks vanish) {{abstract}} {{body}}
+% {{bibliography}}. {{body}} exactly once; {{bibliography}} exactly
+% once unless bib_name is empty; {{abstract}} exactly once when the
+% manuscript has an abstract. Without one the env renders empty
+% (tokens substitute, they do not branch) — delete it or keep
+% abstracts in-body instead.
+\documentclass[11pt,twocolumn]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+% placeins/float ship loaded so pos=barrier/force work out of the
+% box (the generated head auto-adds them; a skeleton states them).
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+\begin{document}
+\title{{{title}}}
+\author{{{author}}}
+\maketitle
+% {{abstract}} carries the whole woven env (needs the manuscript's
+% ## Abstract + abstract_before_maketitle); no wrapper here.
+{{abstract}}
+{{body}}
+{{bibliography}}
+\end{document}
