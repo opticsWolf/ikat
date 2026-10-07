@@ -30,11 +30,12 @@ fn flowchart_to_tikz(src: &str) -> PyResult<String> {
 ///
 /// `values/mins/maxs` are per-series lists over groups:
 /// `values[s][i]` is series `s` at group `i`. `legend` is a position
-/// keyword (`below` default, `top-left`, `top-right`, `bottom-left`,
+/// keyword (`auto` default: first collision-free inside corner, else
+/// below; `below`, `top-left`, `top-right`, `bottom-left`,
 /// `bottom-right`, `outside-right`).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (title, ylabel, log_y, group_labels, series_names, values, mins, maxs, refline, legend="below"))]
+#[pyo3(signature = (title, ylabel, log_y, group_labels, series_names, values, mins, maxs, refline, legend="auto"))]
 fn barchart_to_tikz(
     title: &str,
     ylabel: &str,
@@ -67,7 +68,7 @@ fn barchart_to_tikz(
 /// Line plot with symmetric error bars → `tikzpicture` (pgfplots).
 /// `legend` is a position keyword (see `barchart_to_tikz`).
 #[pyfunction]
-#[pyo3(signature = (title, xlabel, ylabel, xs, names, yss, errs, legend="below"))]
+#[pyo3(signature = (title, xlabel, ylabel, xs, names, yss, errs, legend="auto"))]
 fn lineplot_to_tikz(
     title: &str,
     xlabel: &str,

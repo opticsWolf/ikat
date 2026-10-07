@@ -33,13 +33,16 @@ fn esc_tick(s: &str) -> String {
         .replace('_', "\\_")
 }
 
-/// Legend placement keyword. `below` (the default) sits under the
-/// axis and can never cover data; the corners are for sparse plots
-/// whose empty corner is known; `outside-right` puts the legend
-/// beside the plot (plot area shrinks). Anything else is an error —
-/// a misspelled position must fail here, not as a silent default.
+/// Legend placement keyword. `auto` (the default) tries the four
+/// inside corners in `AUTO_ORDER`, testing each against the drawn
+/// data, and falls back to `below` when every corner is occupied. The corners can
+/// never touch axis labels (labels live outside the axis box); the
+/// `below` row clears tick labels by construction (`at 0.5,-0.18`).
+/// Anything outside the seven words is an error — a misspelled
+/// position must fail here, not as a silent default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LegendPos {
+    Auto,
     Below,
     TopLeft,
     TopRight,
@@ -48,9 +51,118 @@ pub enum LegendPos {
     OutsideRight,
 }
 
+/// Corner trial order for `Auto`: top row first (the classic spot
+/// above the data), left before right, then the bottom row.
+const AUTO_ORDER: [LegendPos; 4] = [
+    LegendPos::TopLeft,
+    LegendPos::TopRight,
+    LegendPos::BottomRight,
+    LegendPos::BottomLeft,
+];
+
+/// Something drawn that a legend must not cover: a line segment or
+/// a filled rect, in axis data coordinates (log-mapped for log-y
+/// bar charts, so the test matches what the eye sees).
+#[derive(Debug, Clone, Copy)]
+enum Obstacle {
+    Seg(f64, f64, f64, f64),
+    Bar((f64, f64, f64, f64)),
+}
+
+fn pt_in_rect(x: f64, y: f64, r: (f64, f64, f64, f64)) -> bool {
+    x >= r.0 && x <= r.2 && y >= r.1 && y <= r.3
+}
+
+fn orient(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> f64 {
+    (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+}
+
+fn on_seg(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> bool {
+    cx >= ax.min(bx) && cx <= ax.max(bx) && cy >= ay.min(by) && cy <= ay.max(by)
+}
+
+fn segs_cross(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
+    let (o1, o2, o3, o4) = (
+        orient(a.0, a.1, b.0, b.1, c.0, c.1),
+        orient(a.0, a.1, b.0, b.1, d.0, d.1),
+        orient(c.0, c.1, d.0, d.1, a.0, a.1),
+        orient(c.0, c.1, d.0, d.1, b.0, b.1),
+    );
+    ((o1 > 0.0) != (o2 > 0.0) && (o3 > 0.0) != (o4 > 0.0))
+        || (o1 == 0.0 && on_seg(a.0, a.1, b.0, b.1, c.0, c.1))
+        || (o2 == 0.0 && on_seg(a.0, a.1, b.0, b.1, d.0, d.1))
+        || (o3 == 0.0 && on_seg(c.0, c.1, d.0, d.1, a.0, a.1))
+        || (o4 == 0.0 && on_seg(c.0, c.1, d.0, d.1, b.0, b.1))
+}
+
+fn seg_hits_rect(x1: f64, y1: f64, x2: f64, y2: f64, r: (f64, f64, f64, f64)) -> bool {
+    pt_in_rect(x1, y1, r)
+        || pt_in_rect(x2, y2, r)
+        || segs_cross((x1, y1), (x2, y2), (r.0, r.1), (r.2, r.1))
+        || segs_cross((x1, y1), (x2, y2), (r.2, r.1), (r.2, r.3))
+        || segs_cross((x1, y1), (x2, y2), (r.2, r.3), (r.0, r.3))
+        || segs_cross((x1, y1), (x2, y2), (r.0, r.3), (r.0, r.1))
+}
+
+fn rects_overlap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
+    a.0 < b.2 && a.2 > b.0 && a.1 < b.3 && a.3 > b.1
+}
+
+/// Candidate legend box for a corner, on the *visual* axis ranges
+/// (see callers). Deliberately oversized — 30% of the x-range by
+/// 25% of the y-range — so a "free" verdict really means empty.
+/// Degenerate ranges (single point) yield `None`: no inside corner
+/// is testable, fall back below.
+fn corner_box(
+    corner: LegendPos,
+    vx0: f64,
+    vx1: f64,
+    vy0: f64,
+    vy1: f64,
+) -> Option<(f64, f64, f64, f64)> {
+    let (dx, dy) = (vx1 - vx0, vy1 - vy0);
+    if !(dx > 0.0) || !(dy > 0.0) {
+        return None;
+    }
+    let (w, h) = (0.30 * dx, 0.25 * dy);
+    Some(match corner {
+        LegendPos::TopLeft => (vx0, vy1 - h, vx0 + w, vy1),
+        LegendPos::TopRight => (vx1 - w, vy1 - h, vx1, vy1),
+        LegendPos::BottomLeft => (vx0, vy0, vx0 + w, vy0 + h),
+        LegendPos::BottomRight => (vx1 - w, vy0, vx1, vy0 + h),
+        _ => return None,
+    })
+}
+
+/// First free corner in `AUTO_ORDER`, else `Below`. `vx`/`vy` are
+/// the visual axis ranges (data ranges plus the padding pgfplots
+/// adds — overestimated on purpose, so verdicts stay conservative).
+fn pick_auto(
+    vx0: f64,
+    vx1: f64,
+    vy0: f64,
+    vy1: f64,
+    obstacles: &[Obstacle],
+) -> LegendPos {
+    for corner in AUTO_ORDER {
+        let Some(b) = corner_box(corner, vx0, vx1, vy0, vy1) else {
+            return LegendPos::Below;
+        };
+        let hit = obstacles.iter().any(|o| match *o {
+            Obstacle::Seg(x1, y1, x2, y2) => seg_hits_rect(x1, y1, x2, y2, b),
+            Obstacle::Bar(r) => rects_overlap(r, b),
+        });
+        if !hit {
+            return corner;
+        }
+    }
+    LegendPos::Below
+}
+
 impl LegendPos {
     pub fn parse(s: &str) -> Result<Self, String> {
         match s {
+            "auto" => Ok(Self::Auto),
             "below" => Ok(Self::Below),
             "top-left" => Ok(Self::TopLeft),
             "top-right" => Ok(Self::TopRight),
@@ -58,14 +170,17 @@ impl LegendPos {
             "bottom-right" => Ok(Self::BottomRight),
             "outside-right" => Ok(Self::OutsideRight),
             _ => Err(format!(
-                "legend must be below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
+                "legend must be auto|below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
             )),
         }
     }
 
-    /// The pgfplots legend line for this position.
+    /// The pgfplots legend line for this position. `Auto` has no
+    /// line of its own — resolve it against the data first (the
+    /// emitters do this via `pick_auto`).
     pub fn latex(&self) -> &'static str {
         match self {
+            Self::Auto => unreachable!("LegendPos::Auto must be resolved with data before latex()"),
             Self::Below => "legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},",
             Self::TopLeft => "legend style={at={(0.02,0.98)},anchor=north west,font=\\footnotesize},",
             Self::TopRight => "legend style={at={(0.98,0.98)},anchor=north east,font=\\footnotesize},",
@@ -111,6 +226,71 @@ pub fn barchart(
     if log_y {
         out.push_str("  ymode=log, log origin=infty,\n");
     }
+    // Collision model for `Auto`: bars fill the whole slot from the
+    // axis floor to the whisker top, in log-mapped space for log-y
+    // (that is what the eye sees). Visual ranges overestimate
+    // pgfplots' padding on purpose, so verdicts stay conservative.
+    let ty = |y: f64| {
+        if log_y {
+            if y > 0.0 {
+                y.log10()
+            } else {
+                f64::NEG_INFINITY
+            }
+        } else {
+            y
+        }
+    };
+    let (vx0, vx1) = (
+        1.0 - 0.25 * (n_groups as f64 - 1.0),
+        n_groups as f64 + 0.25 * (n_groups as f64 - 1.0),
+    );
+    let (mut lymin, mut lymax) = (f64::INFINITY, f64::NEG_INFINITY);
+    for col in maxs.iter().chain(mins.iter()) {
+        for v in col {
+            let t = ty(*v);
+            if t.is_finite() {
+                lymin = lymin.min(t);
+                lymax = lymax.max(t);
+            }
+        }
+    }
+    if let Some((_, _, y, _)) = &refline {
+        let t = ty(*y);
+        if t.is_finite() {
+            lymin = lymin.min(t);
+            lymax = lymax.max(t);
+        }
+    }
+    if !lymin.is_finite() {
+        // No positive data on a log axis (or empty): nothing testable.
+        lymin = 0.0;
+        lymax = 1.0;
+    }
+    if !log_y {
+        lymin = lymin.min(0.0); // bars start at the axis floor
+    }
+    let ldy = (lymax - lymin).max(1e-9);
+    let (vy0, vy1) = (lymin - 0.15 * ldy, lymax + 0.15 * ldy);
+    let mut obstacles: Vec<Obstacle> = Vec::with_capacity(n_groups * n_series + 1);
+    for s in 0..n_series {
+        for i in 0..n_groups {
+            let top = ty(maxs[s][i]);
+            if top.is_finite() {
+                obstacles.push(Obstacle::Bar((i as f64 + 0.5, vy0, i as f64 + 1.5, top)));
+            }
+        }
+    }
+    if let Some((x0, x1, y, _)) = &refline {
+        let t = ty(*y);
+        if t.is_finite() {
+            obstacles.push(Obstacle::Seg(*x0, t, *x1, t));
+        }
+    }
+    let legend = match legend {
+        LegendPos::Auto => pick_auto(vx0, vx1, vy0, vy1, &obstacles),
+        fixed => fixed,
+    };
     out.push_str("  xtick=data,\n  x tick label style={rotate=45,anchor=east},\n  xticklabels={");
     out.push_str(
         &group_labels
@@ -184,6 +364,32 @@ pub fn lineplot(
     // Pin the axis to the data: pgfplots otherwise starts at zero,
     // leaving a meaningless gap before the first commit (or sample).
     out.push_str(&format!("  xmin={}, xmax={},\n", xmin.floor(), xmax.ceil()));
+    // Collision model for `Auto`: polyline segments plus the
+    // vertical error-bar whiskers. x limits are explicit (exact);
+    // y padding overestimates pgfplots' default, conservatively.
+    let (vx0, vx1) = (xmin.floor(), xmax.ceil());
+    let (mut dymin, mut dymax) = (f64::INFINITY, f64::NEG_INFINITY);
+    for (_, ys, es) in series {
+        for (y, e) in ys.iter().zip(es.iter()) {
+            dymin = dymin.min(y - e);
+            dymax = dymax.max(y + e);
+        }
+    }
+    let ddy = (dymax - dymin).max(1e-9);
+    let (vy0, vy1) = (dymin - 0.15 * ddy, dymax + 0.15 * ddy);
+    let mut obstacles: Vec<Obstacle> = Vec::new();
+    for (_, ys, es) in series {
+        for w in 0..xs.len() {
+            obstacles.push(Obstacle::Seg(xs[w], ys[w] - es[w], xs[w], ys[w] + es[w]));
+            if w + 1 < xs.len() {
+                obstacles.push(Obstacle::Seg(xs[w], ys[w], xs[w + 1], ys[w + 1]));
+            }
+        }
+    }
+    let legend = match legend {
+        LegendPos::Auto => pick_auto(vx0, vx1, vy0, vy1, &obstacles),
+        fixed => fixed,
+    };
     out.push_str("  ");
     out.push_str(legend.latex());
     out.push_str("\n");
@@ -207,6 +413,59 @@ pub fn lineplot(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legend_auto_picks_free_corner() {
+        // Rising line: top-right is crossed by the last segment,
+        // top-left is empty -> first in AUTO_ORDER that is free.
+        let got = lineplot(
+            "t", "x", "y",
+            &[1.0, 2.0, 3.0, 4.0],
+            &[("s", vec![1.0, 2.0, 3.0, 4.0], vec![0.0, 0.0, 0.0, 0.0])],
+            LegendPos::Auto,
+        )
+        .unwrap();
+        assert!(got.contains("anchor=north west"), "expected top-left");
+    }
+
+    #[test]
+    fn legend_auto_falls_below_when_full() {
+        // Rising + falling series occupy all four corners.
+        let got = lineplot(
+            "t", "x", "y",
+            &[1.0, 2.0, 3.0, 4.0],
+            &[
+                ("up", vec![1.0, 2.0, 3.0, 4.0], vec![0.0, 0.0, 0.0, 0.0]),
+                ("dn", vec![4.0, 3.0, 2.0, 1.0], vec![0.0, 0.0, 0.0, 0.0]),
+            ],
+            LegendPos::Auto,
+        )
+        .unwrap();
+        assert!(got.contains("anchor=north,legend columns=-1"), "expected below");
+    }
+
+    #[test]
+    fn legend_auto_bar_skips_tall_group() {
+        // Tall first bar kills top-left; short rest leave top-right.
+        let gl = vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()];
+        let sn = vec!["s".to_string()];
+        let v = vec![vec![100.0, 10.0, 10.0, 10.0]];
+        let got = barchart("t", "y", false, &gl, &sn, &v, &v, &v, None, LegendPos::Auto).unwrap();
+        assert!(got.contains("anchor=north east"), "expected top-right");
+    }
+
+    #[test]
+    fn legend_auto_degenerate_point_falls_below() {
+        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])], LegendPos::Auto).unwrap();
+        assert!(got.contains("anchor=north,legend columns=-1"), "expected below");
+    }
+
+    #[test]
+    fn legend_auto_parses_and_errors_name_set() {
+        assert_eq!(LegendPos::parse("auto").unwrap(), LegendPos::Auto);
+        let err = LegendPos::parse("center").unwrap_err();
+        assert!(err.contains("auto|below|top-left"), "{err}");
+    }
 
     #[test]
     fn legend_keywords_all_positions() {

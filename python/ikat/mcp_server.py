@@ -70,18 +70,19 @@ def flowchart_to_tikz(src: str) -> str:
 def barchart_to_tikz(title: str, ylabel: str, log_y: bool, group_labels: list[str],
                      series_names: list[str], values: list[list[float]],
                      mins: list[list[float]], maxs: list[list[float]],
-                     legend: str = "below") -> str:
+                     legend: str = "auto") -> str:
     """Grouped bar chart with min/max whiskers -> tikzpicture (pgfplots).
 
-    `legend`: below (default, never over data) | top-left | top-right
-    | bottom-left | bottom-right | outside-right."""
+    `legend`: auto (default: first collision-free inside corner,
+    else below) | below | top-left | top-right | bottom-left
+    | bottom-right | outside-right."""
     return _bar(title, ylabel, log_y, group_labels, series_names, values, mins, maxs, None, legend)
 
 
 @mcp.tool()
 def lineplot_to_tikz(title: str, xlabel: str, ylabel: str, xs: list[float],
                      names: list[str], yss: list[list[float]],
-                     errs: list[list[float]], legend: str = "below") -> str:
+                     errs: list[list[float]], legend: str = "auto") -> str:
     """Line plot with symmetric error bars -> tikzpicture (pgfplots).
 
     `legend`: same keywords as `barchart_to_tikz`."""

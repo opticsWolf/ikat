@@ -110,7 +110,9 @@ def test_legend_keyword_positions():
 
     base = dict(title="t", xlabel="x", ylabel="y", xs=[1.0, 2.0],
                 names=["s"], yss=[[2.0, 3.0]], errs=[[0.1, 0.1]])
-    assert "anchor=north,legend columns=-1" in lineplot_to_tikz(**base)
+    # Default is auto: rising stub leaves top-left free.
+    assert "anchor=north west" in lineplot_to_tikz(**base)
+    assert "anchor=north,legend columns=-1" in lineplot_to_tikz(**base, legend="below")
     assert "anchor=north east" in lineplot_to_tikz(**base, legend="top-right")
     assert "outer north east" in lineplot_to_tikz(**base, legend="outside-right")
     try:

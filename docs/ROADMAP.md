@@ -52,14 +52,21 @@ shows only intended improvements; resulting PDF compiles with
   extracted into the TinyTeX texmf tree (`tlmgr` GPG is broken on
   this mirror chain); `tex_requirements()` auto-detects TikZ/pgfplots
   needs from the woven body so preambles stay minimal.
-- **M2.4 legend positioning.** ✅ DONE 2026-10-07 (`4c6c9f8`) —
-  `plot::LegendPos` keyword on both emitters: `below` (default,
-  a horizontal row under the axis that cannot cover data),
-  `top-left` / `top-right` / `bottom-left` / `bottom-right`
-  in-axis corners, `outside-right` beside the plot; unknown words
-  are `ValueError`s naming the set. Threaded Rust core → PyO3
-  (keyword-with-default, backward compatible) → MCP tools;
-  `outside-right` compile-proven to PDF.
+- **M2.4 legend positioning.** ✅ DONE 2026-10-07 (keyword;
+  `auto` resolver follows) — `plot::LegendPos`: `auto` (the
+  default) tries the inside corners in top-left, top-right,
+  bottom-right, bottom-left order, testing each against the drawn
+  data — polyline + error-bar segments for lines, whole-slot bar
+  rects to the whisker top (log-mapped for log-y) plus the refline
+  — on visual ranges that overestimate pgfplots' padding, and falls
+  back to the under-axis row when every corner is occupied.
+  Inside corners cannot touch axis labels (labels live outside the
+  axis box); the below row clears tick labels by construction.
+  Explicit `below`, four corners, and `outside-right` place it by
+  hand; unknown words are `ValueError`s naming the set. Threaded
+  Rust core → PyO3 (keyword-with-default, backward compatible) →
+  MCP tools; showcase figs prove it (LOC → top-right, growth →
+  top-left).
 - **M2.5 emitter polish.** ✅ DONE 2026-10-07 — mermaid edge
   labels get `fill=white` knockout (diagonal edges no longer
   strike through `column`/`wide`); barchart x ticks rotate 45°;
