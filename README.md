@@ -5,6 +5,10 @@ pipeline whose compute core is Rust (via PyO3/maturin) with thin Python
 wrappers: Markdown documents go in, conference-ready PDFs come out, and
 every figure is generated — never screenshotted.
 
+Version 0.2.0 · MIT OR Apache-2.0 · `https://github.com/opticsWolf/ikat`
+Tagged `v*` releases ship to PyPI and crates.io from CI
+(`.github/workflows/release.yml`).
+
 The name is a fabric pattern: in *ikat* weaving, threads are patterned
 **before** they reach the loom, so the design is carried by the material
 itself. Likewise, an ikat document carries its figures as data and
@@ -36,11 +40,20 @@ no font mismatch between text and figures.
 
 ```text
 ikat/
-  src/            Rust core (pyo3): mermaid.rs, plot.rs, config.rs
-  python/ikat/    thin wrappers: pipeline.py, compile.py
+  src/            Rust core (pyo3): mermaid.rs (flowcharts), plot.rs
+                  (pgfplots + legend auto-placement), table.rs, doc.rs,
+                  esc.rs (unicode/citations), config.rs (ikat.toml),
+                  texenv.rs (package scan), tectonic.rs (engine),
+                  md_spike.rs (parser-spike harness, tests only)
+  python/ikat/    thin wrappers: pipeline.py (fences/spans/floats),
+                  document.py (BuildSpec assembly), compile.py (pdflatex
+                  driver), texenv.py (kpsewhich/tlmgr), cli.py (`ikat`
+                  script), mcp_server.py (FastMCP stdio),
+                  templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
-  docs/           ARCHITECTURE.md, RESEARCH.md
-  examples/       ikat.toml + mini.md starter document
+  docs/           ARCHITECTURE.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
+  examples/       mini.md starter + ikat-paper/ showcase (6-page paper
+                  built by ikat itself), plot/float/skeleton proofs
 ```
 
 ## Develop
@@ -66,6 +79,7 @@ ikat check doc.tex [--install]                 # missing packages (-> exit 1)
 ikat templates | ikat template arxiv --show-preset
 ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
+echo '{"title":"t",...}' | ikat barchart - [--legend top-left]
 ikat version
 ```
 
@@ -210,15 +224,6 @@ whatever the generated tail cannot express. `skeleton-plain.tex`
 (article + the tokens, `placeins`/`float` preloaded) is the
 starting point, compile-proven to PDF; level-1 heads stay the
 recommended path.
-
-Requires Rust (cargo) and Python ≥ 3.10.
-
-```bash
-uv venv .venv && uv pip install -p .venv maturin pytest
-VIRTUAL_ENV=$PWD/.venv maturin develop
-.venv/Scripts/pytest tests/      # windows
-cargo test                       # Rust unit tests
-```
 
 ## LaTeX requirements
 

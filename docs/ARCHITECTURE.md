@@ -1,5 +1,13 @@
 # ikat architecture
 
+Version 0.2.0 · 2026-10-07 · 59 cargo + 45 pytest green.
+
+Per-module test counts are deliberately not recorded here — they go
+stale every release that adds a test, which is every release.
+Regenerate them: `cargo test` (Rust) and
+`VIRTUAL_ENV=$PWD/.venv maturin develop && .venv/Scripts/pytest tests/`
+(Python, against the built module).
+
 ```
 mini.md + ikat.toml
       │  fences, tables, citations
@@ -52,29 +60,32 @@ graphics hold a column.
 
 | piece | lives in | tested by |
 |---|---|---|
-| flowchart grammar + layout + TikZ | `src/mermaid.rs` | `cargo test` (10) |
-| tables / bib utils | `src/table.rs` | `cargo test` (4) |
-| block parse + document assembly | `src/doc.rs` | `cargo test` (2) + golden |
-| inline / citations / escaping | `src/esc.rs` | `cargo test` (5) |
-| bar/line + whiskers + log-y + refline | `src/plot.rs` | `cargo test` |
-| `ikat.toml` model | `src/config.rs` | `cargo test` |
+| flowchart grammar + layout + TikZ | `src/mermaid.rs` | cargo test |
+| legend auto-placement + geometry | `src/plot.rs` (`LegendPos`, collision test) | cargo test |
+| tables / bib utils | `src/table.rs` | cargo test |
+| block parse + document assembly | `src/doc.rs` | cargo test + golden |
+| inline / citations / escaping | `src/esc.rs` | cargo test |
+| bar/line + whiskers + log-y + refline | `src/plot.rs` | cargo test |
+| `ikat.toml` model + validation | `src/config.rs` | cargo test |
 | PyO3 bindings | `src/lib.rs` | pytest |
+| preamble scan + file→tlmgr map | `src/texenv.rs` | cargo test |
+| tectonic engine cascade | `src/tectonic.rs` | cargo test |
+| pulldown-cmark spike (tests only) | `src/md_spike.rs` | cargo test |
 | Element / spans / fences / floats | `python/ikat/pipeline.py` | pytest |
-| pdflatex/bibtex driver | `python/ikat/compile.py` | manual (needs TeX) |
-| preamble scan + file→tlmgr map | `src/texenv.rs` | `cargo test` (6) |
-| kpsewhich/tlmgr probe + install | `python/ikat/texenv.py` | pytest (7+fakes) |
-| shipped heads + presets | `python/ikat/templates/` + `template_preset` | pytest + headsproof (needs TeX) |
+| BuildSpec assembly + templates | `python/ikat/document.py` | pytest |
+| pdflatex/bibtex driver | `python/ikat/compile.py` | manual + CI tex job |
+| kpsewhich/tlmgr probe + install | `python/ikat/texenv.py` | pytest |
+| shipped heads + presets + skeletons | `python/ikat/templates/` + `template_preset` | pytest + headsproof |
 | unified CLI | `python/ikat/cli.py` (`ikat` script) | pytest test_surface |
 | MCP server (FastMCP stdio) | `python/ikat/mcp_server.py` | pytest test_surface (skips w/o extra) |
 
 ## Roadmap
 
-1. Port the paper's `build-paper.py` stages (tables, citations,
-   unicode, sectioning) onto `Element`s — pipeline.py grows, Rust
-   untouched.
-2. Plot presets from benchmark JSON (the paper's `results/*.json`
-   shape → `barchart_to_tikz` directly).
-3. Standalone-TikZ export (`\documentclass[tikz]`) for arXiv-safe
-   precompiled figures.
-4. Sequence/state mermaid subsets, behind the same `flowchart_to_tikz`
-   entry point.
+The plan of record is `docs/ROADMAP.md` (milestones M1–M6 with
+acceptance gates). Done: pipeline parity + golden master (M1, M4.4),
+floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity (M4.2, M4.8),
+legend auto-placement (M2.4), CI + release workflows (M4.2b).
+The open frontier: benchmark-JSON presets and plot regeneration
+(M2.1, M2.2), figure subsets + layout (M3), the pulldown-cmark
+switch (M5.4), line-numbered errors (M4.1), and shipping itself
+(M4.3 — names claimed, tokens pending).
