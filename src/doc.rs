@@ -53,6 +53,13 @@ pub struct BuildSpec {
     pub graphicspaths: Vec<String>,
     #[serde(default)]
     pub bib_keys: HashSet<String>,
+    /// Literal `.tex` head replacing the generated preamble (file
+    /// *content* of `[template] preamble_file`; empty = none).
+    #[serde(default)]
+    pub preamble_override: String,
+    /// Extra preamble lines, appended just before `\begin{document}`.
+    #[serde(default)]
+    pub preamble_append: Vec<String>,
 }
 
 fn default_plot_dir() -> String {
@@ -112,6 +119,38 @@ fn strip_section_number(head: &str) -> String {
         }
     }
     head.to_string()
+}
+
+/// A user-supplied preamble head must carry a document class and
+/// every package the woven body provably needs; otherwise the
+/// failure would surface as a cryptic TeX log, far from its cause.
+pub fn validate_template(override_tex: &str, body: &str) -> Result<(), String> {
+    if crate::texenv::document_class(override_tex).is_none() {
+        return Err("template preamble_file has no \\documentclass".to_string());
+    }
+    let mut required: Vec<&str> = Vec::new();
+    if body.contains("\\includegraphics") {
+        required.push("graphicx");
+    }
+    if body.contains("\\begin{tikzpicture}") {
+        required.push("tikz");
+    }
+    if body.contains("\\begin{axis}") {
+        required.push("pgfplots");
+    }
+    if body.contains("\\begin{tabularx}") {
+        required.push("tabularx");
+    }
+    let have = crate::texenv::used_packages(override_tex);
+    let missing: Vec<&&str> = required.iter().filter(|r| !have.iter().any(|h| h == **r)).collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "template preamble_file drops packages the body needs: {}",
+            missing.into_iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
+        ))
+    }
 }
 
 /// LaTeX packages a woven body needs, detected from what it contains.
@@ -307,21 +346,30 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     let opts = cfg.document.class_options.join(",");
     let has_tikz = body.contains("\\begin{tikzpicture}");
     let has_plots = body.contains("\\begin{axis}");
-    let mut head = vec![
-        format!("\\documentclass[{opts}]{{{}}}", cfg.document.class),
-        "\\usepackage[utf8]{inputenc}".to_string(),
-        "\\usepackage{lmodern}".to_string(),
-        "\\usepackage{textcomp}".to_string(),
-        "\\usepackage{amsmath,amssymb}".to_string(),
-        "\\usepackage{tabularx}".to_string(),
-        "\\usepackage{graphicx}".to_string(),
-    ];
-    head.extend(tex_requirements(has_tikz, has_plots));
+    let mut head: Vec<String> = if spec.preamble_override.is_empty() {
+        let mut generated = vec![
+            format!("\\documentclass[{opts}]{{{}}}", cfg.document.class),
+            "\\usepackage[utf8]{inputenc}".to_string(),
+            "\\usepackage{lmodern}".to_string(),
+            "\\usepackage{textcomp}".to_string(),
+            "\\usepackage{amsmath,amssymb}".to_string(),
+            "\\usepackage{tabularx}".to_string(),
+            "\\usepackage{graphicx}".to_string(),
+        ];
+        generated.extend(tex_requirements(has_tikz, has_plots));
+        generated.extend([
+            "\\usepackage[hidelinks]{hyperref}".to_string(),
+            format!("\\graphicspath{{{paths}}}"),
+            format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks),
+            format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author),
+        ]);
+        generated
+    } else {
+        validate_template(&spec.preamble_override, &body)?;
+        vec![spec.preamble_override.clone()]
+    };
+    head.extend(spec.preamble_append.clone());
     head.extend([
-        "\\usepackage[hidelinks]{hyperref}".to_string(),
-        format!("\\graphicspath{{{paths}}}"),
-        format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks),
-        format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author),
         "\\begin{document}".to_string(),
         "\\maketitle".to_string(),
         body.clone(),
@@ -362,6 +410,8 @@ mod tests {
             bib_name: "refs-paper".into(),
             graphicspaths: vec!["./".into()],
             bib_keys: HashSet::new(),
+            preamble_override: String::new(),
+            preamble_append: Vec::new(),
         }
     }
 
@@ -389,6 +439,40 @@ mod tests {
         assert!(tikz[0].contains("usepackage{tikz}"));
         let plots = tex_requirements(false, true);
         assert!(plots.iter().any(|l| l.contains("pgfplots")));
+    }
+
+    #[test]
+    fn template_override_replaces_head() {
+        let md = "# T\n\n## 1. I\n\nHi.\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        s.preamble_override =
+            "\\documentclass{article}\n\\usepackage{lmodern}\n\\title{T}\n\\author{A}".to_string();
+        s.preamble_append = vec!["\\usepackage{natbib}".to_string()];
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\documentclass{article}"));
+        assert!(!r.tex.contains("documentclass[conference]{IEEEtran}"));
+        assert!(!r.tex.contains("\\usepackage{tabularx}"));
+        let head = r.tex.split("\\begin{document}").next().unwrap();
+        assert!(head.contains("\\usepackage{natbib}"));
+        assert!(head.contains("\\usepackage{lmodern}"));
+    }
+
+    #[test]
+    fn template_missing_package_is_an_error() {
+        let md = "# T\n\n## 1. I\n\nHi.\n\n```mermaid\ngraph TD\na[x]-->b[y]\n```\n";
+        let mut s = spec();
+        s.table_captions.clear();
+        s.preamble_override = "\\documentclass{article}\n\\title{T}".to_string();
+        let err = build_document(md, "", &s).unwrap_err();
+        assert!(err.contains("tikz"), "unexpected: {err}");
+    }
+
+    #[test]
+    fn template_without_class_is_an_error() {
+        let err = validate_template("\\usepackage{tikz}\n", "plain").unwrap_err();
+        assert!(err.contains("documentclass"));
     }
 
     #[test]

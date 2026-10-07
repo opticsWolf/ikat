@@ -70,12 +70,16 @@ their mermaid fences with no hand-tuning.
 - **M4.2b CI compile check.** Docker TeX Live job compiling the
   demo and the paper on every push (backend verification, not a
   user-facing backend).
-- **M4.3 ensure-packages helper.** ✅ DONE 2026-10-06 — the
+- **M4.5 ensure-packages helper.** ✅ DONE 2026-10-06 — the
   texliveonfly trick: `src/texenv.rs` scans any preamble into
   `(probe file, tlmgr package)` needs, `python/ikat/texenv.py`
   probes via one `kpsewhich` call and `tlmgr install`s what's
   missing; `compile_pdf(..., ensure_packages=True)` gates the
   build on it.
+- **M4.6 user templates.** ✅ DONE 2026-10-06 — `[template]`
+  `preamble_file` replaces the generated head, `preamble_append`
+  adds lines before `\\begin{document}`; Rust validates the
+  replacement carries a class + every package the body needs.
 - **M4.3 claim the names.** Publish 0.1.0 to crates.io + PyPI early —
   both `ikat` names are currently free and publishing reserves them.
 - **M4.4 self-hosting.** The next paper revision is built with ikat

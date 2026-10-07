@@ -39,7 +39,29 @@ ikat/
   examples/       ikat.toml + mini.md starter document
 ```
 
-## Develop
+## Templates
+
+The generated preamble fits the common case; journals are not
+the common case. `[template]` in `ikat.toml` hands you the head:
+
+```toml
+[template]
+preamble_file = "journal-head.tex"      # replaces the generated head
+preamble_append = ["\\usepackage{natbib}"]  # extra lines before \\begin{document}
+```
+
+- `preamble_file` (resolved relative to the toml) replaces
+  everything before `\begin{document}` — class, packages, title,
+  author. The body tail (`\maketitle` … bibliography …
+  `\end{document}`) stays generated.
+- Safety over silence: ikat validates the replacement carries a
+  `\documentclass` and every package the woven body provably
+  needs (`tikz` for diagrams, `pgfplots` for plots, `graphicx`
+  for precompiled figures, `tabularx` for tables). A head that
+  drops one fails fast naming it, instead of dying in a TeX log.
+- Path-based builds resolve it for you:
+  `build_from_paths(md, toml, spec)`; `spec.preamble_override`
+  set directly beats the toml value.
 
 Requires Rust (cargo) and Python ≥ 3.10.
 

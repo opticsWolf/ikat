@@ -124,6 +124,24 @@ impl Spans {
     }
 }
 
+/// `[template]` table: user-supplied preamble pieces.
+///
+/// ```toml
+/// [template]
+/// preamble_file = "journal-head.tex"  # replaces the generated head
+/// preamble_append = ["\\usepackage{natbib}"]  # extra lines before \\begin{document}
+/// ```
+///
+/// `preamble_file` is resolved by Python relative to the toml file;
+/// Rust only ever sees file *content* (via `BuildSpec`).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Template {
+    #[serde(default)]
+    pub preamble_file: String,
+    #[serde(default)]
+    pub preamble_append: Vec<String>,
+}
+
 /// Whole-file configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -131,6 +149,8 @@ pub struct Config {
     pub document: Document,
     #[serde(default)]
     pub spans: Spans,
+    #[serde(default)]
+    pub template: Template,
 }
 
 impl Config {
@@ -162,6 +182,17 @@ mod tests {
         assert_eq!(cfg.spans.for_kind("plot").latex_env(), "figure*");
         assert_eq!(cfg.spans.for_kind("table").latex_env(), "figure");
         assert_eq!(cfg.spans.for_kind("diagram").latex_width(), "\\columnwidth");
+    }
+
+    #[test]
+    fn template_table_parses() {
+        let cfg = Config::from_toml(
+            "[template]\npreamble_file = \"head.tex\"\npreamble_append = [\"\\\\usepackage{natbib}\"]\n",
+        )
+        .unwrap();
+        assert_eq!(cfg.template.preamble_file, "head.tex");
+        assert_eq!(cfg.template.preamble_append, vec!["\\usepackage{natbib}"]);
+        assert!(Config::from_toml("").unwrap().template.preamble_append.is_empty());
     }
 
     #[test]

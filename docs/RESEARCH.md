@@ -32,8 +32,9 @@ own flowchart-subset parser.
   document classes). Hard-requires `minted`, which needs
   `-shell-escape` + Pygments — arXiv-hostile and heavier than our
   whole pipeline. No citations/bib, no figures-from-data, no
-  spanning model. Borrow-worthy: user template overrides (a future
-  `[template]` key) and quote-style options.
+  spanning model. Borrowed: user template overrides (shipped as
+  `[template]`, roadmap M4.6); quote-style options declined —
+  generated preambles shouldn't need them.
 - **lbeckman314/md2tex** (Rust 0.1.3, crates.io): small md→tex/pdf
   via tectonic, forked from md2pdf for mdbook chapters, used by
   mdbook-latex. Unmaintained (Travis era). Scope is book prose:

@@ -10,11 +10,13 @@ JSON over the PyO3 boundary; `src/doc.rs` does the rest and returns
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
+from pathlib import Path
 
 from ._core import bib_keys as _bib_keys
 from ._core import bib_safe as _bib_safe
 from ._core import build_document as _build_document
+from ._core import parse_config as _parse_config
 
 
 @dataclass
@@ -38,6 +40,8 @@ class BuildSpec:
     bib_name: str = "refs-paper"
     graphicspaths: tuple[str, ...] = ("./", "figs/", "figs/tikz/")
     bib_keys: set = field(default_factory=set)
+    preamble_override: str = ""
+    preamble_append: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
@@ -59,6 +63,33 @@ class BuildResult:
 def build_document(md_text: str, toml_src: str, spec: BuildSpec) -> BuildResult:
     r = json.loads(_build_document(md_text, toml_src, spec.to_json()))
     return BuildResult(r["title"], r["body"], r["tex"], r["n_diagrams"], r["n_tables"])
+
+
+def read_template(toml_dir: str | Path, toml_src: str) -> tuple[str, list[str]]:
+    """Resolve `[template]` keys: read `preamble_file` relative to the
+    toml directory, split `preamble_append` lines. Returns
+    `(override_content, append_lines)`; empty when unconfigured."""
+    cfg = _parse_config(toml_src)
+    rel = cfg.get("template_preamble_file", "")
+    override = (Path(toml_dir) / rel).read_text(encoding="utf-8") if rel else ""
+    raw = cfg.get("template_preamble_append", "")
+    return override, raw.splitlines() if raw else []
+
+
+def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec) -> BuildResult:
+    """Path-based build: reads md + toml, resolves `[template]` files
+    relative to the toml, and weaves. `spec.preamble_*` already set
+    take precedence over toml values."""
+    toml_path = Path(toml_path)
+    toml_src = toml_path.read_text(encoding="utf-8")
+    override, append = read_template(toml_path.parent, toml_src)
+    spec = replace(
+        spec,
+        preamble_override=spec.preamble_override or override,
+        preamble_append=[*spec.preamble_append, *append],
+    )
+    md_text = Path(md_path).read_text(encoding="utf-8")
+    return build_document(md_text, toml_src, spec)
 
 
 def bib_keys(bib_src: str) -> set:
