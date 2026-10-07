@@ -1,5 +1,13 @@
 # ikat
 
+[![CI](https://github.com/opticsWolf/ikat/actions/workflows/ci.yml/badge.svg)](https://github.com/opticsWolf/ikat/actions)
+[![PyPI](https://img.shields.io/pypi/v/ikat?logo=pypi)](https://pypi.org/project/ikat/)
+[![crates.io](https://img.shields.io/crates/v/ikat?logo=rust)](https://crates.io/crates/ikat)
+[![License](https://img.shields.io/github/license/opticsWolf/ikat)](https://github.com/opticsWolf/ikat)
+[![Last commit](https://img.shields.io/github/last-commit/opticsWolf/ikat)](https://github.com/opticsWolf/ikat/commits/main)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue?logo=python)](https://www.python.org/)
+[![Rust](https://img.shields.io/badge/rust-2021-orange?logo=rust)](https://www.rust-lang.org/)
+
 **Weave Markdown into camera-ready LaTeX.** `ikat` is an md→tex/pdf
 pipeline whose compute core is Rust (via PyO3/maturin) with thin Python
 wrappers: Markdown documents go in, conference-ready PDFs come out, and
