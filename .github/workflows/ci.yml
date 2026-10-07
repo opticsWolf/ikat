@@ -67,7 +67,7 @@ jobs:
       - name: Build demo
         run: "$VENV_BIN"/ikat build examples/mini.md --outdir /tmp/demo-out
       - name: Build showcase paper
-        run: python examples/ikat-paper/build.py
+        run: "$VENV_BIN"/python examples/ikat-paper/build.py
       - name: No undefined citations
         run: |
           if grep -rE "There were undefined references|Citation .* undefined|Undefined control sequence" \
