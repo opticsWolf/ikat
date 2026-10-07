@@ -34,11 +34,25 @@ def _run(exe: str, args: list[str], workdir: Path) -> str:
     return p.stdout
 
 
-def compile_pdf(workdir: str | Path, main_tex: str) -> Path:
-    """Compile `main_tex` inside `workdir`; return the PDF path."""
+def compile_pdf(workdir: str | Path, main_tex: str, ensure_packages: bool = False) -> Path:
+    """Compile `main_tex` inside `workdir`; return the PDF path.
+
+    With `ensure_packages=True`, probe the preamble first and `tlmgr
+    install` what's missing (the texliveonfly trick); raises
+    `CompileError` with a fix-it hint if packages are still missing.
+    """
     if shutil.which("pdflatex") is None:
         raise CompileError("pdflatex not on PATH")
     workdir = Path(workdir)
+    if ensure_packages:
+        from .texenv import ensure as _ensure
+
+        rep = _ensure((workdir / main_tex).read_text(encoding="utf-8"))
+        if not rep["ok"]:
+            raise CompileError(
+                f"missing TeX packages for {main_tex}: "
+                f"{rep['missing']} {rep['unprobed']} {rep['hint']}"
+            )
     stem = Path(main_tex).stem
     has_bib = any(workdir.glob("*.bib"))
     _run("pdflatex", ["-halt-on-error", "-interaction=nonstopmode", main_tex], workdir)

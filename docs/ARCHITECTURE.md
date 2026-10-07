@@ -61,6 +61,8 @@ graphics hold a column.
 | PyO3 bindings | `src/lib.rs` | pytest |
 | Element / spans / fences / floats | `python/ikat/pipeline.py` | pytest |
 | pdflatex/bibtex driver | `python/ikat/compile.py` | manual (needs TeX) |
+| preamble scan + file→tlmgr map | `src/texenv.rs` | `cargo test` (6) |
+| kpsewhich/tlmgr probe + install | `python/ikat/texenv.py` | pytest (7+fakes) |
 
 ## Roadmap
 

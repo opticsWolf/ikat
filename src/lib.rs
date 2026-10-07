@@ -10,6 +10,7 @@ mod esc;
 mod mermaid;
 mod plot;
 mod table;
+mod texenv;
 
 /// Convert a mermaid flowchart block to a standalone `tikzpicture`.
 ///
@@ -137,6 +138,27 @@ fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
     doc::tex_requirements(has_tikz, has_plots)
 }
 
+/// Scan any `.tex` preamble for `\usepackage` names (comments
+/// stripped, TikZ/pgfplots use inferred). Pure scan; probing the
+/// disk stays in `texenv.py`.
+#[pyfunction]
+fn used_packages(tex: &str) -> Vec<String> {
+    texenv::used_packages(tex)
+}
+
+/// The `\documentclass` name in a `.tex` source, if any.
+#[pyfunction]
+fn document_class(tex: &str) -> Option<String> {
+    texenv::document_class(tex)
+}
+
+/// Map LaTeX names + optional class to `(probe file, tlmgr package)`
+/// pairs, deduplicated in first-use order.
+#[pyfunction]
+fn package_needs(names: Vec<String>, class: Option<String>) -> Vec<(String, String)> {
+    texenv::package_needs(&names, class.as_deref())
+}
+
 /// ikat core (Rust): mermaid→TikZ, data→pgfplots, document config.
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -148,5 +170,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
     m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
     m.add_function(wrap_pyfunction!(tex_requirements, m)?)?;
+    m.add_function(wrap_pyfunction!(used_packages, m)?)?;
+    m.add_function(wrap_pyfunction!(document_class, m)?)?;
+    m.add_function(wrap_pyfunction!(package_needs, m)?)?;
     Ok(())
 }

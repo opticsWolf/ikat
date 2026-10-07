@@ -83,6 +83,20 @@ tex_requirements(has_tikz=True, has_plots=False)
 The document builder does this automatically: `build_document`
 scans the woven body and injects only the packages it contains.
 
+Never debug a missing `.sty` by hand again — the texliveonfly-style
+helper probes any `.tex` preamble and installs what's absent:
+
+```python
+from ikat import check_tex_env, ensure_tex_packages
+check_tex_env(open("doc.tex").read())
+# {'missing': ['pgfplots.sty'], 'unprobed': [], 'ok': False, ...}
+ensure_tex_packages(open("doc.tex").read())  # tlmgr install + re-probe
+```
+
+`compile_pdf(workdir, main, ensure_packages=True)` runs the same
+check before compiling and raises with a fix-it hint (manual
+texmf install or MiKTeX Portable) instead of a cryptic TeX error.
+
 Notes:
 
 - If `tlmgr` fails (broken mirror/GPG — seen in the wild),
