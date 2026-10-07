@@ -75,7 +75,7 @@ pub fn barchart(
             .collect::<Vec<_>>()
             .join(","),
     );
-    out.push_str("},\n  legend style={at={(0.02,0.98)},anchor=north west,font=\\footnotesize},\n");
+    out.push_str("},\n  legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},\n");
     out.push_str("  error bars/y dir=both, error bars/y explicit,\n]\n");
 
     for (s, name) in series_names.iter().enumerate() {
@@ -137,7 +137,7 @@ pub fn lineplot(
     // Pin the axis to the data: pgfplots otherwise starts at zero,
     // leaving a meaningless gap before the first commit (or sample).
     out.push_str(&format!("  xmin={}, xmax={},\n", xmin.floor(), xmax.ceil()));
-    out.push_str("  legend style={at={(0.02,0.98)},anchor=north west,font=\\footnotesize},\n");
+    out.push_str("  legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},\n");
     out.push_str("  error bars/y dir=both, error bars/y explicit,\n]\n");
     for (name, ys, es) in series {
         out.push_str("  \\addplot+[error bars/.cd,y explicit] coordinates {\n");
@@ -158,6 +158,15 @@ pub fn lineplot(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legend_sits_below_data() {
+        // Legends live below the axis (never over data): anchored
+        // north at y<0 with one horizontal row.
+        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])]).unwrap();
+        assert!(got.contains("at={(0.5,-0.18)},anchor=north,legend columns=-1"));
+        assert!(!got.contains("anchor=north west"));
+    }
 
     #[test]
     fn lineplot_error_bars_parse() {
