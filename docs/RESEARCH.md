@@ -47,6 +47,8 @@ float tables, IEEE sectioning) where figures are *generated* from
 source (mermaid/TikZ, data/pgfplots) in the same build, with
 per-element column spanning and arXiv-safe output.
 
+## Strategy decisions
+
 1. **Emit pgfplots, don't plot.** The paper range (bars+whiskers,
    log-y, lines+error bands, reflines, footnotes) is small; a ~150-line
    emitter gives byte-level control (IEEE-safe tick labels, `$\sim$`
@@ -58,3 +60,33 @@ per-element column spanning and arXiv-safe output.
    option (roadmap §3), but default keeps one TeX run → one font set.
 4. **arXiv fit.** Output is plain `tikzpicture`/pgfplots + standard
    packages — no shell-escape, no externalized PDFs, no JS.
+
+## Tectonic backend evaluation (checked 2026-10-06)
+
+[Tectonic](https://tectonic-typesetting.github.io/en-US/) (crate
+`tectonic` 0.17.0, maintained, ~196k downloads) is a complete
+XeTeX-based TeX engine as an embeddable Rust library: no system TeX,
+support files auto-downloaded as content-addressed bundles, an
+all-in-one `latex_to_pdf` plus a `driver` module, and BibTeX via
+`tectonic_engine_bibtex`. No usable Python bindings exist on PyPI —
+but ikat is already Rust+PyO3, so wrapping it ourselves is natural.
+
+Fit for ikat: **yes, as an optional engine, not the default.**
+
+- For: zero-install builds (no TinyTeX wrestling like the
+  IEEEtran/pgfplots episodes); pinned bundle ⇒ reproducible PDFs
+  across machines; single `compile_pdf(engine="tectonic")` path.
+- Against: engine is XeTeX, not pdfTeX — our `[utf8]{inputenc}`
+  preamble needs an engine-conditional branch; the bundle is a
+  TeX Live *snapshot* that will drift from arXiv's live tree, so
+  arXiv preview remains the submission authority; first builds
+  need network + cache (offline requires a pre-seeded bundle);
+  linking C/C++ engines balloons maturin wheels.
+- Design: `tectonic` cargo feature, **off by default** (lean
+  default wheels); `compile` module in Rust wrapping the driver
+  with bibtex passes; Python only threads `engine=` through.
+  IEEEtran/pgfplots ship in the bundle (full TeX Live snapshot).
+
+Not implemented yet: tectonic's C build is slow and its CDN may be
+unreachable from some sandboxes — prototype on a networked machine
+first, behind the feature flag.
