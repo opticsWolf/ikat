@@ -103,3 +103,19 @@ def test_tectonic_engine_errors_helpfully_without_backend(monkeypatch, tmp_path)
         assert "tectonic" in str(e).lower()
     else:  # pragma: no cover - embedded binding present (feature build)
         pass
+
+
+def test_legend_keyword_positions():
+    from ikat import lineplot_to_tikz
+
+    base = dict(title="t", xlabel="x", ylabel="y", xs=[1.0, 2.0],
+                names=["s"], yss=[[2.0, 3.0]], errs=[[0.1, 0.1]])
+    assert "anchor=north,legend columns=-1" in lineplot_to_tikz(**base)
+    assert "anchor=north east" in lineplot_to_tikz(**base, legend="top-right")
+    assert "outer north east" in lineplot_to_tikz(**base, legend="outside-right")
+    try:
+        lineplot_to_tikz(**base, legend="center")
+    except ValueError as e:
+        assert "below|" in str(e)
+    else:  # pragma: no cover
+        raise AssertionError("bad legend keyword accepted")

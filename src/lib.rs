@@ -26,12 +26,15 @@ fn flowchart_to_tikz(src: &str) -> PyResult<String> {
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
 }
 
-/// Bar chart with min/max whiskers → `tikzpicture` (pgfplots).
+/// Grouped bar chart with min/max whiskers → `tikzpicture` (pgfplots).
 ///
 /// `values/mins/maxs` are per-series lists over groups:
-/// `values[s][i]` is series `s` at group `i`.
+/// `values[s][i]` is series `s` at group `i`. `legend` is a position
+/// keyword (`below` default, `top-left`, `top-right`, `bottom-left`,
+/// `bottom-right`, `outside-right`).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (title, ylabel, log_y, group_labels, series_names, values, mins, maxs, refline, legend="below"))]
 fn barchart_to_tikz(
     title: &str,
     ylabel: &str,
@@ -42,7 +45,10 @@ fn barchart_to_tikz(
     mins: Vec<Vec<f64>>,
     maxs: Vec<Vec<f64>>,
     refline: Option<(f64, f64, f64, String)>,
+    legend: &str,
 ) -> PyResult<String> {
+    let legend = plot::LegendPos::parse(legend)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
     plot::barchart(
         title,
         ylabel,
@@ -53,12 +59,15 @@ fn barchart_to_tikz(
         &mins,
         &maxs,
         refline,
+        legend,
     )
     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
 }
 
 /// Line plot with symmetric error bars → `tikzpicture` (pgfplots).
+/// `legend` is a position keyword (see `barchart_to_tikz`).
 #[pyfunction]
+#[pyo3(signature = (title, xlabel, ylabel, xs, names, yss, errs, legend="below"))]
 fn lineplot_to_tikz(
     title: &str,
     xlabel: &str,
@@ -67,7 +76,10 @@ fn lineplot_to_tikz(
     names: Vec<String>,
     yss: Vec<Vec<f64>>,
     errs: Vec<Vec<f64>>,
+    legend: &str,
 ) -> PyResult<String> {
+    let legend = plot::LegendPos::parse(legend)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
     if names.len() != yss.len() || names.len() != errs.len() {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "lineplot: names/yss/errs length mismatch",
@@ -79,7 +91,7 @@ fn lineplot_to_tikz(
         .zip(errs.into_iter())
         .map(|((n, y), e)| (n.as_str(), y, e))
         .collect();
-    plot::lineplot(title, xlabel, ylabel, &xs, &series)
+    plot::lineplot(title, xlabel, ylabel, &xs, &series, legend)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
 }
 

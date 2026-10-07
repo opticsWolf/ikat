@@ -22,6 +22,9 @@ no font mismatch between text and figures.
 - **Data → pgfplots** (`ikat._core`, Rust): bar charts with
   min/max whiskers, log axes, line plots → `tikzpicture` code compiled
   by your LaTeX installation, so figure fonts always match the paper.
+  Legend placement is a keyword (`below` default — never over data —
+  plus `top-left`, `top-right`, `bottom-left`, `bottom-right`,
+  `outside-right`); anything else is a build error.
 - **Per-element spanning** (`ikat.toml`): one/two-column layout is not
   global — each element kind (diagram, plot, table) declares
   `column` or `wide`, overridable per element from Markdown.

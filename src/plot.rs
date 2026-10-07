@@ -33,6 +33,49 @@ fn esc_tick(s: &str) -> String {
         .replace('_', "\\_")
 }
 
+/// Legend placement keyword. `below` (the default) sits under the
+/// axis and can never cover data; the corners are for sparse plots
+/// whose empty corner is known; `outside-right` puts the legend
+/// beside the plot (plot area shrinks). Anything else is an error —
+/// a misspelled position must fail here, not as a silent default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegendPos {
+    Below,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+    OutsideRight,
+}
+
+impl LegendPos {
+    pub fn parse(s: &str) -> Result<Self, String> {
+        match s {
+            "below" => Ok(Self::Below),
+            "top-left" => Ok(Self::TopLeft),
+            "top-right" => Ok(Self::TopRight),
+            "bottom-left" => Ok(Self::BottomLeft),
+            "bottom-right" => Ok(Self::BottomRight),
+            "outside-right" => Ok(Self::OutsideRight),
+            _ => Err(format!(
+                "legend must be below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
+            )),
+        }
+    }
+
+    /// The pgfplots legend line for this position.
+    pub fn latex(&self) -> &'static str {
+        match self {
+            Self::Below => "legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},",
+            Self::TopLeft => "legend style={at={(0.02,0.98)},anchor=north west,font=\\footnotesize},",
+            Self::TopRight => "legend style={at={(0.98,0.98)},anchor=north east,font=\\footnotesize},",
+            Self::BottomLeft => "legend style={at={(0.02,0.02)},anchor=south west,font=\\footnotesize},",
+            Self::BottomRight => "legend style={at={(0.98,0.02)},anchor=south east,font=\\footnotesize},",
+            Self::OutsideRight => "legend pos=outer north east,",
+        }
+    }
+}
+
 /// Bar chart with min/max whiskers, matching the paper's trunk-vs-branch
 /// figure: series drawn side by side, dashed reference line optional.
 ///
@@ -48,6 +91,7 @@ pub fn barchart(
     mins: &[Vec<f64>],
     maxs: &[Vec<f64>],
     refline: Option<(f64, f64, f64, String)>,
+    legend: LegendPos,
 ) -> Result<String, String> {
     if group_labels.is_empty() || series_names.is_empty() {
         return Err("barchart: no groups or no series".to_string());
@@ -75,7 +119,9 @@ pub fn barchart(
             .collect::<Vec<_>>()
             .join(","),
     );
-    out.push_str("},\n  legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},\n");
+    out.push_str("},\n  ");
+    out.push_str(legend.latex());
+    out.push_str("\n");
     out.push_str("  error bars/y dir=both, error bars/y explicit,\n]\n");
 
     for (s, name) in series_names.iter().enumerate() {
@@ -117,6 +163,7 @@ pub fn lineplot(
     ylabel: &str,
     xs: &[f64],
     series: &[(&str, Vec<f64>, Vec<f64>)],
+    legend: LegendPos,
 ) -> Result<String, String> {
     if xs.is_empty() || series.is_empty() {
         return Err("lineplot: empty data".to_string());
@@ -137,7 +184,9 @@ pub fn lineplot(
     // Pin the axis to the data: pgfplots otherwise starts at zero,
     // leaving a meaningless gap before the first commit (or sample).
     out.push_str(&format!("  xmin={}, xmax={},\n", xmin.floor(), xmax.ceil()));
-    out.push_str("  legend style={at={(0.5,-0.18)},anchor=north,legend columns=-1,font=\\footnotesize},\n");
+    out.push_str("  ");
+    out.push_str(legend.latex());
+    out.push_str("\n");
     out.push_str("  error bars/y dir=both, error bars/y explicit,\n]\n");
     for (name, ys, es) in series {
         out.push_str("  \\addplot+[error bars/.cd,y explicit] coordinates {\n");
@@ -160,17 +209,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legend_keywords_all_positions() {
+        for (word, want) in [
+            ("below", "anchor=north,legend columns=-1"),
+            ("top-left", "anchor=north west"),
+            ("top-right", "anchor=north east"),
+            ("bottom-left", "anchor=south west"),
+            ("bottom-right", "anchor=south east"),
+            ("outside-right", "legend pos=outer north east"),
+        ] {
+            let pos = LegendPos::parse(word).unwrap();
+            let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])], pos).unwrap();
+            assert!(got.contains(want), "{word}");
+        }
+        assert!(LegendPos::parse("center").is_err());
+        assert!(LegendPos::parse("").is_err());
+    }
+
+    #[test]
     fn legend_sits_below_data() {
         // Legends live below the axis (never over data): anchored
         // north at y<0 with one horizontal row.
-        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])]).unwrap();
+        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])], LegendPos::Below).unwrap();
         assert!(got.contains("at={(0.5,-0.18)},anchor=north,legend columns=-1"));
         assert!(!got.contains("anchor=north west"));
     }
 
     #[test]
     fn lineplot_error_bars_parse() {
-        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])]).unwrap();
+        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])], LegendPos::Below).unwrap();
         assert!(got.contains("(1,2) +- (0,0)"));
         assert!(!got.contains("+- (,"));
     }
@@ -188,7 +255,7 @@ mod tests {
     #[test]
     fn bar_emits_axis_and_whiskers() {
         let (gl, sn, v, lo, hi) = groups();
-        let tikz = barchart("t", "latency (ms, log, scale 3)", true, &gl, &sn, &v, &lo, &hi, None).unwrap();
+        let tikz = barchart("t", "latency (ms, log, scale 3)", true, &gl, &sn, &v, &lo, &hi, None, LegendPos::Below).unwrap();
         assert!(tikz.contains("\\begin{axis}"));
         assert!(tikz.contains("ymode=log"));
         assert!(tikz.contains("(1,7.4"));
@@ -209,12 +276,14 @@ mod tests {
             &lo,
             &hi,
             Some((2.8, 3.2, 66.0, "zero-write fork".to_string())),
+            LegendPos::TopRight,
         )
         .unwrap();
         assert!(tikz.contains("\\draw[dashed]"));
-        assert!(barchart("t", "y", false, &[], &sn, &v, &lo, &hi, None).is_err());
-        assert!(barchart("t", "y", false, &gl, &sn, &[vec![1.0]], &lo, &hi, None).is_err());
-        assert!(lineplot("t", "x", "y", &[], &[]).is_err());
+        assert!(tikz.contains("anchor=north east"));
+        assert!(barchart("t", "y", false, &[], &sn, &v, &lo, &hi, None, LegendPos::Below).is_err());
+        assert!(barchart("t", "y", false, &gl, &sn, &[vec![1.0]], &lo, &hi, None, LegendPos::Below).is_err());
+        assert!(lineplot("t", "x", "y", &[], &[], LegendPos::Below).is_err());
     }
 
     #[test]
@@ -225,6 +294,7 @@ mod tests {
             "branched traversal (ms)",
             &[1.0, 2.0, 5.0, 10.0],
             &[("scale 1", vec![3.0, 3.1, 5.5, 4.2], vec![0.5, 0.6, 1.0, 0.8])],
+            LegendPos::Below,
         )
         .unwrap();
         assert!(tikz.contains("\\addlegendentry{scale 1}"));
