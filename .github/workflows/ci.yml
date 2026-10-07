@@ -11,26 +11,39 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install build deps
-        run: pip install "maturin>=1.15,<2" "pytest>=8" "mcp>=1,<2"
+      - name: Venv + build deps
+        # maturin develop refuses a bare runner python: it wants a
+        # virtualenv. We make one and address it explicitly — no
+        # activation, so this works identically on all three shells.
+        run: |
+          python -m venv .venv
+          if [ -d .venv/Scripts ]; then echo "VENV_BIN=$PWD/.venv/Scripts" >> "$GITHUB_ENV";
+          else echo "VENV_BIN=$PWD/.venv/bin" >> "$GITHUB_ENV"; fi
+          "$VENV_BIN"/python -m pip install -q "maturin>=1.15,<2" "pytest>=8" "mcp>=1,<2"
       - name: Rust tests
         run: cargo test --locked
       - name: Build module
-        run: maturin develop
+        run: "$VENV_BIN"/python -m maturin develop
       - name: Python tests
-        run: python -m pytest tests/
+        run: "$VENV_BIN"/python -m pytest tests/
 
   tex:
     # Compile check on real TeX Live (Ubuntu apt packages):
     # the demo and the showcase paper must build with
     # zero undefined citations.
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,12 +56,16 @@ jobs:
           sudo apt-get install -y -q
           texlive-latex-base texlive-latex-recommended
           texlive-pictures texlive-publishers
-      - name: Install build deps
-        run: pip install "maturin>=1.15,<2" "mcp>=1,<2"
+      - name: Venv + build deps
+        run: |
+          python -m venv .venv
+          if [ -d .venv/Scripts ]; then echo "VENV_BIN=$PWD/.venv/Scripts" >> "$GITHUB_ENV";
+          else echo "VENV_BIN=$PWD/.venv/bin" >> "$GITHUB_ENV"; fi
+          "$VENV_BIN"/python -m pip install -q "maturin>=1.15,<2" "mcp>=1,<2"
       - name: Build module
-        run: maturin develop
+        run: "$VENV_BIN"/python -m maturin develop
       - name: Build demo
-        run: ikat build examples/mini.md --outdir /tmp/demo-out
+        run: "$VENV_BIN"/ikat build examples/mini.md --outdir /tmp/demo-out
       - name: Build showcase paper
         run: python examples/ikat-paper/build.py
       - name: No undefined citations
