@@ -105,3 +105,16 @@ reference-manager integration.
 Phase 1 before 2 (plots need a pipeline to land in); 3 after 2
 (layout work needs real diagrams to test against); 4 last, except
 M4.3, which can jump the queue any time — it costs nothing.
+
+## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md)
+
+- **M5.1 float formatting.** Per-element `span/pos/width/captionpos`
+  attrs + `[floats]` fractions/counters + `barrier_sections` +
+  `table*` wide tables; package auto-adds (float/placeins/
+  dblfloatfix) through `tex_requirements`; Rust validation matrix.
+- **M5.2 level-3 skeleton.** `[template] skeleton` with
+  `{{body}}`/`{{bibliography}}` tokens, mutual exclusion with
+  `preamble_file`, shipped `skeleton-plain.tex`, compile-proven.
+- **M5.3 Markdown AST spike.** pulldown-cmark event-diff vs the
+  hand scanner on the paper manuscript; switch only on empty diff
+  + byte-identical golden `.tex`. Document the verdict here.
