@@ -64,6 +64,7 @@ ikat build doc.md --toml ikat.toml --outdir out --ensure-packages
 ikat weave doc.md --spec spec.json > doc.tex   # tex to stdout, no TeX needed
 ikat check doc.tex [--install]                 # missing packages (-> exit 1)
 ikat templates | ikat template arxiv --show-preset
+ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 ikat version
 ```
@@ -87,11 +88,12 @@ python -m ikat.mcp_server
 |---|---|---|---|
 | weave document | `build_document` / `build_from_paths` | `ikat build` / `weave` | `weave_document` |
 | flowchart | `flowchart_to_tikz` | `ikat flowchart` | `flowchart_to_tikz` |
-| bar chart | `barchart_to_tikz` | — | `barchart_to_tikz` |
-| line plot | `lineplot_to_tikz` | — | `lineplot_to_tikz` |
+| bar chart | `barchart_to_tikz` | `ikat barchart` (JSON, `--legend`) | `barchart_to_tikz` |
+| line plot | `lineplot_to_tikz` | `ikat lineplot` (JSON, `--legend`) | `lineplot_to_tikz` |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |
+| skeletons | `list_skeletons` / `template_path` | `ikat skeletons` / `skeleton` | `list_skeletons` / `get_skeleton` |
 
 `compile_pdf` stays out of MCP (workdir-bound, minutes-long);
 drive it from the CLI.

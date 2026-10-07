@@ -134,6 +134,80 @@ def cmd_flowchart(a: argparse.Namespace) -> int:
     return 0
 
 
+def _read_payload(a: argparse.Namespace) -> dict:
+    """JSON plot payload from a file or stdin (`-`)."""
+    raw = sys.stdin.read() if a.file == "-" else Path(a.file).read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"bad JSON payload: {e}")
+    if not isinstance(data, dict):
+        raise ValueError("payload must be a JSON object")
+    return data
+
+
+def cmd_barchart(a: argparse.Namespace) -> int:
+    from ikat import barchart_to_tikz
+
+    p = _read_payload(a)
+    refline = p.get("refline")
+    tikz = barchart_to_tikz(
+        p["title"],
+        p["ylabel"],
+        p.get("log_y", False),
+        p["group_labels"],
+        p["series_names"],
+        p["values"],
+        p["mins"],
+        p["maxs"],
+        tuple(refline) if refline else None,
+        a.legend or p.get("legend", "auto"),
+    )
+    sys.stdout.write(tikz + "\n")
+    return 0
+
+
+def cmd_lineplot(a: argparse.Namespace) -> int:
+    from ikat import lineplot_to_tikz
+
+    p = _read_payload(a)
+    tikz = lineplot_to_tikz(
+        p["title"],
+        p["xlabel"],
+        p["ylabel"],
+        p["xs"],
+        p["names"],
+        p["yss"],
+        p["errs"],
+        a.legend or p.get("legend", "auto"),
+    )
+    sys.stdout.write(tikz + "\n")
+    return 0
+
+
+def cmd_skeletons(a: argparse.Namespace) -> int:
+    from ikat import list_skeletons
+
+    for name in list_skeletons():
+        print(name)
+    return 0
+
+
+def cmd_skeleton(a: argparse.Namespace) -> int:
+    from ikat import template_path
+
+    try:
+        p = template_path(a.name)
+    except FileNotFoundError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if not p.stem.startswith("skeleton-"):
+        print(f"ikat skeleton: {a.name!r} is a head, not a skeleton", file=sys.stderr)
+        return 1
+    sys.stdout.write(p.read_text(encoding="utf-8"))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ikat", description="Weave Markdown into camera-ready LaTeX.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -174,6 +248,32 @@ def build_parser() -> argparse.ArgumentParser:
     f = sub.add_parser("flowchart", help="mermaid flowchart -> tikzpicture on stdout")
     f.add_argument("file", help="file or - for stdin")
     f.set_defaults(func=cmd_flowchart)
+
+    bc = sub.add_parser(
+        "barchart",
+        help="grouped bar chart -> tikzpicture on stdout (JSON payload: "
+        "title, ylabel, group_labels, series_names, values, mins, maxs; "
+        "optional log_y, refline [x0,x1,y,label], legend)",
+    )
+    bc.add_argument("file", help="JSON file or - for stdin")
+    bc.add_argument("--legend", default=None, help="position keyword (overrides payload)")
+    bc.set_defaults(func=cmd_barchart)
+
+    lp = sub.add_parser(
+        "lineplot",
+        help="line plot -> tikzpicture on stdout (JSON payload: "
+        "title, xlabel, ylabel, xs, names, yss, errs; optional legend)",
+    )
+    lp.add_argument("file", help="JSON file or - for stdin")
+    lp.add_argument("--legend", default=None, help="position keyword (overrides payload)")
+    lp.set_defaults(func=cmd_lineplot)
+
+    k = sub.add_parser("skeletons", help="list shipped skeleton documents")
+    k.set_defaults(func=cmd_skeletons)
+
+    n = sub.add_parser("skeleton", help="print a shipped skeleton document")
+    n.add_argument("name")
+    n.set_defaults(func=cmd_skeleton)
 
     v = sub.add_parser("version", help="print ikat version")
     v.set_defaults(func=lambda a: (print(ikat.__version__), 0)[1])

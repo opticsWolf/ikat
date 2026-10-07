@@ -125,6 +125,12 @@ def get_template(name: str) -> dict:
 
 
 @mcp.tool()
+def list_skeletons() -> list[str]:
+    """Shipped whole-document skeletons (level 3, `{{body}}` contract)."""
+    return _skeletons()
+
+
+@mcp.tool()
 def get_skeleton(name: str) -> dict:
     """A shipped whole-document skeleton's content (level 3)."""
     p = _tpath(name)

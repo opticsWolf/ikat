@@ -81,6 +81,28 @@ def test_flowchart_stdin(capsys, monkeypatch):
     assert "\\begin{tikzpicture}" in capsys.readouterr().out
 
 
+def test_skeleton_commands(capsys):
+    assert cli_main(["skeletons"]) == 0
+    assert "plain" in capsys.readouterr().out
+    assert cli_main(["skeleton", "skeleton-plain"]) == 0
+    assert "{{body}}" in capsys.readouterr().out
+
+
+def test_plot_commands(tmp_path, capsys):
+    bar = tmp_path / "bar.json"
+    bar.write_text('{"title": "t", "ylabel": "y", "group_labels": ["a"],'
+                     ' "series_names": ["s"], "values": [[2.0]], "mins": [[2.0]],'
+                     ' "maxs": [[2.0]]}', encoding="utf-8")
+    assert cli_main(["barchart", str(bar), "--legend", "below"]) == 0
+    out = capsys.readouterr().out
+    assert "anchor=north,legend columns=-1" in out
+    line = tmp_path / "line.json"
+    line.write_text('{"title": "t", "xlabel": "x", "ylabel": "y", "xs": [1.0],'
+                      ' "names": ["s"], "yss": [[2.0]], "errs": [[0.0]]}', encoding="utf-8")
+    assert cli_main(["lineplot", str(line)]) == 0
+    assert "\\begin{tikzpicture}" in capsys.readouterr().out
+
+
 def test_version(capsys):
     assert cli_main(["version"]) == 0
     assert capsys.readouterr().out.strip() == __version__
@@ -94,7 +116,7 @@ def test_mcp_tools_registered():
     names = sorted(t.name for t in asyncio.run(mcp_server.mcp.list_tools()))
     assert names == ["barchart_to_tikz", "check_tex_packages", "ensure_tex_packages",
                      "float_packages", "flowchart_to_tikz", "get_skeleton", "get_template", "lineplot_to_tikz",
-                     "list_templates", "version", "weave_document"]
+                     "list_skeletons", "list_templates", "version", "weave_document"]
 
 
 @needs_mcp
