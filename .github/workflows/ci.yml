@@ -32,9 +32,9 @@ jobs:
       - name: Rust tests
         run: cargo test --locked
       - name: Build module
-        run: "$VENV_BIN"/python -m maturin develop
+        run: '"$VENV_BIN"/python -m maturin develop'
       - name: Python tests
-        run: "$VENV_BIN"/python -m pytest tests/
+        run: '"$VENV_BIN"/python -m pytest tests/'
 
   tex:
     # Compile check on real TeX Live (Ubuntu apt packages):
@@ -63,11 +63,11 @@ jobs:
           else echo "VENV_BIN=$PWD/.venv/bin" >> "$GITHUB_ENV"; fi
           "$VENV_BIN"/python -m pip install -q "maturin>=1.15,<2" "mcp>=1,<2"
       - name: Build module
-        run: "$VENV_BIN"/python -m maturin develop
+        run: '"$VENV_BIN"/python -m maturin develop'
       - name: Build demo
-        run: "$VENV_BIN"/ikat build examples/mini.md --outdir /tmp/demo-out
+        run: '"$VENV_BIN"/ikat build examples/mini.md --outdir /tmp/demo-out'
       - name: Build showcase paper
-        run: "$VENV_BIN"/python examples/ikat-paper/build.py
+        run: '"$VENV_BIN"/python examples/ikat-paper/build.py'
       - name: No undefined citations
         run: |
           if grep -rE "There were undefined references|Citation .* undefined|Undefined control sequence" \
