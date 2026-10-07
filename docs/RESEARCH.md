@@ -25,7 +25,27 @@ GitHub scripts) confirm demand but are services or unmaintained
 snippets — no canonical offline library exists, which justifies our
 own flowchart-subset parser.
 
-## Strategy decisions
+## Prior art: the two md2tex projects (checked 2026-10-06)
+
+- **paulhectork/md2tex** (Python): generic regex-based md→TeX CLI
+  with templates and fine-tuning (quote styles, numbered headers,
+  document classes). Hard-requires `minted`, which needs
+  `-shell-escape` + Pygments — arXiv-hostile and heavier than our
+  whole pipeline. No citations/bib, no figures-from-data, no
+  spanning model. Borrow-worthy: user template overrides (a future
+  `[template]` key) and quote-style options.
+- **lbeckman314/md2tex** (Rust 0.1.3, crates.io): small md→tex/pdf
+  via tectonic, forked from md2pdf for mdbook chapters, used by
+  mdbook-latex. Unmaintained (Travis era). Scope is book prose:
+  no citations, no tables-as-floats, no generated figures. No name
+  conflict (`md2tex` vs `ikat`). Validates Rust-for-md→tex; its
+  tectonic backend is a candidate future compile engine for
+  self-contained builds without system TeX.
+
+ikat's gap vs both: a *paper* pipeline (bib-validated citations,
+float tables, IEEE sectioning) where figures are *generated* from
+source (mermaid/TikZ, data/pgfplots) in the same build, with
+per-element column spanning and arXiv-safe output.
 
 1. **Emit pgfplots, don't plot.** The paper range (bars+whiskers,
    log-y, lines+error bands, reflines, footnotes) is small; a ~150-line
