@@ -47,6 +47,50 @@ float tables, IEEE sectioning) where figures are *generated* from
 source (mermaid/TikZ, data/pgfplots) in the same build, with
 per-element column spanning and arXiv-safe output.
 
+## Compile-backend alternatives (checked 2026-10-06)
+
+The job: turn woven `.tex` into PDF without fighting system TeX.
+Tectonic (above) is the embeddable candidate; the rest of the field:
+
+- **TinyTeX (incumbent).** Minimal TeX Live + on-demand `tlmgr`.
+  What ikat uses today. Weakness demonstrated firsthand: `tlmgr`
+  GPG/mirror failures forced manual IEEEtran/pgfplots installs.
+  Stays the default (arXiv-closest engine: real pdfTeX).
+- **MiKTeX portable + on-the-fly install.** Best Windows story:
+  needs no admin rights, and missing packages auto-install at
+  compile time (its own manager/mirrors — a different chain from
+  the `tlmgr` one that bit us). Still a system install, just a
+  portable one. Verdict: document as the Windows fallback path;
+  no code changes needed (`compile_pdf` already shells to
+  `pdflatex`).
+- **SwiftLaTeX (XeTeX/pdfTeX → WebAssembly).** Full engines in
+  WASM, near-identical XeTeX (minus full ICU: locale linebreaking
+  caveat), deployable server-side via wasmtime/Node. Fascinating
+  but wrong weight class: embedding a WASM runtime + texmf
+  payload dwarfs the problem. Verdict: out of scope; revisit if
+  ikat ever needs browser-side preview.
+- **Docker TeX Live images** (`texlive/texlive`, pandoc/latex
+  images, latex GitHub Actions). The CI standard: reproducible,
+  version-pinned, zero host pollution. Needs a daemon, so never a
+  library default — but ideal as ikat's own CI job compiling the
+  demo and the paper on every push. Verdict: adopt for CI, not
+  as a backend.
+- **Hosted compile APIs** (latexonline-style endpoints,
+  self-hosted Overleaf CE). Zero-install at the price of network,
+  trust, and availability. Verdict: manual fallback only, never
+  a dependency.
+- **texliveonfly(.py).** Wrapper that auto-installs missing TeX
+  Live packages mid-compile. Complementary idea (an ikat
+  "ensure packages" helper could steal the trick), not an engine.
+- **Typst.** Different language, cannot compile `.tex`; journals
+  and arXiv still require LaTeX in 2026. Out of scope by
+  definition — noted only because it comes up every time.
+
+Net: no change to the tectonic decision (optional engine behind
+the flag). Actionable now: (1) document MiKTeX-portable as the
+Windows fallback in README, (2) Docker-based CI compile check as
+a roadmap item.
+
 ## Strategy decisions
 
 1. **Emit pgfplots, don't plot.** The paper range (bars+whiskers,

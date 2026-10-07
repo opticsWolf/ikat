@@ -67,6 +67,9 @@ their mermaid fences with no hand-tuning.
   caret) instead of bare strings.
 - **M4.2 CLI.** `ikat build doc.md` → PDF in one command (md + toml
   discovery, workdir isolation, log tail on failure).
+- **M4.2b CI compile check.** Docker TeX Live job compiling the
+  demo and the paper on every push (backend verification, not a
+  user-facing backend).
 - **M4.3 claim the names.** Publish 0.1.0 to crates.io + PyPI early —
   both `ikat` names are currently free and publishing reserves them.
 - **M4.4 self-hosting.** The next paper revision is built with ikat

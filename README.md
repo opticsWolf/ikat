@@ -89,7 +89,10 @@ Notes:
   install from a TeX Live archive instead: unpack
   `systems/texlive/tlnet/archive/<pkg>.tar.xz`, copy its `tex/`
   tree into your texmf-local tree, run `mktexlsr`. That is how the
-  dev setup gained `IEEEtran` and `pgfplots`.
+  dev setup gained `IEEEtran` and `pgfplots`. Windows alternative:
+  MiKTeX Portable needs no admin rights and auto-installs missing
+  packages at compile time (its own manager/mirrors); ikat's
+  `compile_pdf` shells to `pdflatex`, so it works unchanged.
 - arXiv's TeX Live ships everything above, so an ikat bundle
   (`.tex` + `.bbl` + figure PDFs, no class/style files) compiles
   there as-is.
