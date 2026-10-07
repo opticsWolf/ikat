@@ -107,12 +107,13 @@ no hand-tuning.
 - **M4.8 MCP server.** ✅ DONE 2026-10-07 — `python -m
   ikat.mcp_server` (FastMCP stdio, `ikat[mcp]` extra): nine tools
   mirroring the CLI/API map; `compile_pdf` deliberately excluded.
-- **M4.2b CI compile check.** OPEN (documented-only: no Docker
-  daemon on this machine) — Docker TeX Live job compiling the demo
-  AND the showcase paper on every push (backend verification, not
-  a user-facing backend). Concrete job: `texlive/texlive` image +
-  maturin build, `ikat build examples/mini.md` and
-  `examples/ikat-paper/build.py`, fail on any undefined citation.
+- **M4.2b CI compile check.** ✅ DONE — `.github/workflows/ci.yml`:
+  `test` runs cargo + pytest on ubuntu/windows/macos-latest;
+  `tex` (ubuntu) installs real TeX Live via apt, builds the demo
+  and the showcase paper, and fails on undefined citations or
+  control sequences. (Docker image dropped: runner TeX Live is
+  the same backend verification with less machinery; the tectonic
+  crate-embedding check rides along once M4.2b exists.)
 - **M4.5 ensure-packages helper.** ✅ DONE 2026-10-06 — the
   texliveonfly trick: `src/texenv.rs` scans any preamble into
   `(probe file, tlmgr package)` needs, `python/ikat/texenv.py`

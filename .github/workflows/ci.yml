@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install build deps
+        run: pip install "maturin>=1.15,<2" "pytest>=8" "mcp>=1,<2"
+      - name: Rust tests
+        run: cargo test --locked
+      - name: Build module
+        run: maturin develop
+      - name: Python tests
+        run: python -m pytest tests/
+
+  tex:
+    # Compile check on real TeX Live (Ubuntu apt packages):
+    # the demo and the showcase paper must build with
+    # zero undefined citations.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install TeX Live
+        run: >
+          sudo apt-get update -q &&
+          sudo apt-get install -y -q
+          texlive-latex-base texlive-latex-recommended
+          texlive-pictures texlive-publishers
+      - name: Install build deps
+        run: pip install "maturin>=1.15,<2" "mcp>=1,<2"
+      - name: Build module
+        run: maturin develop
+      - name: Build demo
+        run: ikat build examples/mini.md --outdir /tmp/demo-out
+      - name: Build showcase paper
+        run: python examples/ikat-paper/build.py
+      - name: No undefined citations
+        run: |
+          if grep -rE "There were undefined references|Citation .* undefined|Undefined control sequence" \
+              /tmp/demo-out examples/ikat-paper/out --include="*.log"; then
+            echo "::error::TeX errors in build logs"; exit 1;
+          fi
