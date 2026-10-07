@@ -34,12 +34,22 @@ def _read_md_toml(md_path: str, toml_path: str | None) -> tuple[str, str, Path |
     return md, "", None
 
 
+def _apply_bib(spec, bib_path: str | None) -> None:
+    """`--bib refs.bib`: derive the cited-key set from the bibliography
+    instead of freezing it into the spec (no drift by construction)."""
+    if bib_path:
+        from ikat import bib_keys
+
+        spec.bib_keys = bib_keys(Path(bib_path).read_text(encoding="utf-8"))
+
+
 def cmd_build(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths, compile_pdf
 
     spec = _spec_from_json(a.spec)
     if a.bib_style:
         spec.bib_style = a.bib_style
+    _apply_bib(spec, a.bib)
     outdir = Path(a.outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
     stem = Path(a.md).stem
@@ -66,6 +76,7 @@ def cmd_weave(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths
 
     spec = _spec_from_json(a.spec)
+    _apply_bib(spec, a.bib)
     if a.toml:
         r = build_from_paths(a.md, a.toml, spec)
     else:
@@ -132,6 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--toml", default=None)
     b.add_argument("--outdir", default=None)
     b.add_argument("--spec", default=None, help="BuildSpec JSON (diagrams/plots/captions/...)")
+    b.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
     b.add_argument("--no-pdf", action="store_true", help="stop after .tex (no TeX needed)")
@@ -141,6 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("md")
     w.add_argument("--toml", default=None)
     w.add_argument("--spec", default=None)
+    w.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
     w.set_defaults(func=cmd_weave)
 
     c = sub.add_parser("check", help="report missing TeX packages for a .tex file")

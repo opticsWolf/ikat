@@ -91,8 +91,12 @@ their mermaid fences with no hand-tuning.
   hoist for top-matter classes, all nine compile-proven locally.
 - **M4.3 claim the names.** Publish 0.1.0 to crates.io + PyPI early —
   both `ikat` names are currently free and publishing reserves them.
-- **M4.4 self-hosting.** The next paper revision is built with ikat
-  itself; `build-paper.py` retires to `docs/`.
+- **M4.4 self-hosting.** ✅ DONE 2026-10-07 — the paper builds with
+  ikat itself (`ikat weave paper/paper-2026-10-05.md --spec
+  paper/ikat-spec.json --bib paper/refs.bib`, byte-identical);
+  `build-paper.py` retired to `docs/build-paper-retired.py`; new
+  `--bib` flag derives `bib_keys` from the `.bib` (no frozen
+  derived data, no drift).
 
 ## Non-goals
 
