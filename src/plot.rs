@@ -67,7 +67,7 @@ pub fn barchart(
     if log_y {
         out.push_str("  ymode=log, log origin=infty,\n");
     }
-    out.push_str("  xtick=data,\n  xticklabels={");
+    out.push_str("  xtick=data,\n  x tick label style={rotate=45,anchor=east},\n  xticklabels={");
     out.push_str(
         &group_labels
             .iter()
@@ -129,6 +129,14 @@ pub fn lineplot(
     let mut out = String::new();
     out.push_str("\\begin{tikzpicture}\n\\begin{axis}[\n");
     out.push_str(&format!("  title={{{title}}},\n  xlabel={{{xlabel}}},\n  ylabel={{{ylabel}}},\n"));
+    let (mut xmin, mut xmax) = (xs[0], xs[0]);
+    for x in xs {
+        xmin = xmin.min(*x);
+        xmax = xmax.max(*x);
+    }
+    // Pin the axis to the data: pgfplots otherwise starts at zero,
+    // leaving a meaningless gap before the first commit (or sample).
+    out.push_str(&format!("  xmin={}, xmax={},\n", xmin.floor(), xmax.ceil()));
     out.push_str("  legend style={at={(0.02,0.98)},anchor=north west,font=\\footnotesize},\n");
     out.push_str("  error bars/y dir=both, error bars/y explicit,\n]\n");
     for (name, ys, es) in series {

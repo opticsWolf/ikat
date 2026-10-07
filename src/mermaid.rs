@@ -393,7 +393,7 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
         };
         if let Some(lbl) = &e.label {
             out.push_str(&format!(
-                "  \\draw[{style}] ({}) -- ({}) node[midway,above,font=\\footnotesize] {{{}}};\n",
+                "  \\draw[{style}] ({}) -- ({}) node[midway,above,fill=white,inner sep=1pt,font=\\footnotesize] {{{}}};\n",
                 e.from,
                 e.to,
                 esc_label(lbl)
