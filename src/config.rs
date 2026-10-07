@@ -274,6 +274,10 @@ pub struct Template {
     /// `\maketitle`: hoist the body's abstract env before it.
     #[serde(default)]
     pub abstract_before_maketitle: bool,
+    /// Whole-document skeleton file (level 3 escape hatch);
+    /// mutually exclusive with `preamble_file` (checked at build).
+    #[serde(default)]
+    pub skeleton: String,
 }
 
 /// `[floats]` table: document-wide float tuning. Fraction/counter

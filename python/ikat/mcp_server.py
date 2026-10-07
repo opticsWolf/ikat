@@ -40,6 +40,7 @@ from ikat import (
     flowchart_to_tikz as _flow,
     lineplot_to_tikz as _line,
     list_templates as _templates,
+    list_skeletons as _skeletons,
     template_path as _tpath,
     template_preset as _preset,
 )
@@ -103,8 +104,8 @@ def float_packages(tex_source: str) -> list[str]:
 
 @mcp.tool()
 def list_templates() -> list[str]:
-    """Shipped preamble heads (arxiv, acm-sigconf, ...)."""
-    return _templates()
+    """Shipped heads (arxiv, acm-sigconf, ...) plus skeletons."""
+    return _templates() + _skeletons()
 
 
 @mcp.tool()
@@ -114,6 +115,13 @@ def get_template(name: str) -> dict:
     preset = _preset(name)
     return {"name": name, "head": p.read_text(encoding="utf-8"),
             "bib_style": preset["bib_style"], "toml": preset["toml"]}
+
+
+@mcp.tool()
+def get_skeleton(name: str) -> dict:
+    """A shipped whole-document skeleton's content (level 3)."""
+    p = _tpath(name)
+    return {"name": name, "skeleton": p.read_text(encoding="utf-8")}
 
 
 @mcp.tool()

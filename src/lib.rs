@@ -107,6 +107,7 @@ fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>
     m.insert("float_topnumber".to_string(), cfg.floats.topnumber.to_string());
     m.insert("float_bottomnumber".to_string(), cfg.floats.bottomnumber.to_string());
     m.insert("float_barrier_sections".to_string(), cfg.floats.barrier_sections.to_string());
+    m.insert("template_skeleton".to_string(), cfg.template.skeleton.clone());
     for kind in ["diagram", "plot", "table", "picture", "default"] {
         let span = cfg.spans.for_kind(kind);
         m.insert(format!("span_{kind}"), span.latex_env().to_string());

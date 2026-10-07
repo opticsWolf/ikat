@@ -60,6 +60,11 @@ pub struct BuildSpec {
     /// *content* of `[template] preamble_file`; empty = none).
     #[serde(default)]
     pub preamble_override: String,
+    /// Whole-document skeleton (file *content* of `[template]`
+    /// `skeleton`); mutually exclusive with `preamble_override`.
+    /// Empty = level 0/1 path.
+    #[serde(default)]
+    pub skeleton: String,
     /// Extra preamble lines, appended just before `\begin{document}`.
     #[serde(default)]
     pub preamble_append: Vec<String>,
@@ -280,12 +285,112 @@ pub fn render_override(override_tex: &str, title: &str, author: &str, thanks: &s
     rendered.replace("\\thanks{}", "")
 }
 
+/// Split a line into (code, comment) at the first unescaped `%`.
+/// The comment keeps its `%`; a line without one yields `""`.
+fn split_comment(line: &str) -> (&str, &str) {
+    let mut search = 0;
+    while let Some(at) = line[search..].find('%') {
+        let at = search + at;
+        if at > 0 && line.as_bytes()[at - 1] == b'\\' {
+            search = at + 1;
+            continue;
+        }
+        return (&line[..at], &line[at..]);
+    }
+    (line, "")
+}
+
+/// Strip TeX `%` comments (unescaped `%` to end of line) for
+/// token COUNTING: a `{{body}}` in a comment is documentation,
+/// not a second body.
+fn strip_tex_comments(skel: &str) -> String {
+    skel.lines()
+        .map(|line| split_comment(line).0)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Fill a LEVEL-3 skeleton: complete `.tex` with `{{tokens}}`.
+/// `{{title}}/{{author}}/{{thanks}}` fill as level 1;
+/// `{{body}}` is required exactly once; `{{bibliography}}` is
+/// required exactly once unless `bib` is empty (biblatex-style
+/// skeletons print refs themselves); `{{abstract}}` is required
+/// exactly once when `abstract_tex` is non-empty, else renders
+/// empty. Unknown `{{word}}` tokens and duplicates are errors —
+/// a typo'd token must fail here, not as a silent blank page.
+pub fn render_skeleton(
+    skel: &str,
+    title: &str,
+    author: &str,
+    thanks: &str,
+    abstract_tex: &str,
+    body: &str,
+    bib: &str,
+) -> Result<String, String> {
+    let tok_re = regex::Regex::new(r"\{\{([A-Za-z_]+)\}\}").unwrap();
+    let countable = strip_tex_comments(skel);
+    let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for cap in tok_re.captures_iter(&countable) {
+        *counts.entry(cap.get(1).unwrap().as_str()).or_default() += 1;
+    }
+    for tok in counts.keys() {
+        match *tok {
+            "title" | "author" | "thanks" | "body" | "abstract" | "bibliography" => {}
+            _ => return Err(format!("skeleton has unknown token {{{{{tok}}}}}")),
+        }
+    }
+    let count = |tok: &str| counts.get(tok).copied().unwrap_or(0);
+    // `{{body}}` is the point of the skeleton: exactly once.
+    // `{{bibliography}}` / `{{abstract}}` are required exactly
+    // once when they carry content; when empty they may appear
+    // at most once and render as nothing (forward-compatible
+    // skeletons for manuscripts gaining refs/abstracts later).
+    if count("body") != 1 {
+        return Err("skeleton needs {{body}} exactly once".to_string());
+    }
+    for (tok, content) in [("bibliography", bib), ("abstract", abstract_tex)] {
+        let n = count(tok);
+        if !content.is_empty() && n != 1 {
+            return Err(format!("skeleton needs {{{{{tok}}}}} exactly once"));
+        }
+        if content.is_empty() && n > 1 {
+            return Err(format!("skeleton has {{{{{tok}}}}} {n} times (max once)"));
+        }
+    }
+    // Absent-but-empty tokens render as nothing, so skeletons
+    // stay forward-compatible with manuscripts gaining refs later.
+    let rendered = skel
+        .lines()
+        .map(|line| {
+            // Tokens substitute in code only; comments documenting
+            // the token contract keep their literal `{{names}}`.
+            let (code, comment) = split_comment(line);
+            let filled = tok_re
+                .replace_all(code, |cap: &regex::Captures| match cap.get(1).unwrap().as_str() {
+                    "title" => title.to_string(),
+                    "author" => author.to_string(),
+                    "thanks" => thanks.to_string(),
+                    "abstract" => abstract_tex.to_string(),
+                    "body" => body.to_string(),
+                    // `{{bibliography}}` is the only token whose
+                    // replacement is built here, not passed in.
+                    _ => bib.to_string(),
+                })
+                .to_string();
+            format!("{filled}{comment}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .replace("\\thanks{}", "");
+    Ok(rendered)
+}
+
 /// A user-supplied preamble head must carry a document class and
 /// every package the woven body provably needs; otherwise the
 /// failure would surface as a cryptic TeX log, far from its cause.
 pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> Result<(), String> {
     if crate::texenv::document_class(override_tex).is_none() {
-        return Err("template preamble_file has no \\documentclass".to_string());
+        return Err("template has no \\documentclass".to_string());
     }
     let mut required: Vec<&str> = Vec::new();
     if body.contains("\\includegraphics") {
@@ -308,7 +413,7 @@ pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> 
         Ok(())
     } else {
         Err(format!(
-            "template preamble_file drops packages the body needs: {}",
+            "template drops packages the body needs: {}",
             missing.into_iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
         ))
     }
@@ -584,7 +689,51 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     let opts = cfg.document.class_options.join(",");
     let has_tikz = body.contains("\\begin{tikzpicture}");
     let has_plots = body.contains("\\begin{axis}");
-    let mut head: Vec<String> = if spec.preamble_override.is_empty() {
+    let mut head: Vec<String> = if !spec.skeleton.is_empty() {
+        // Level 3: the skeleton IS the document. No generated
+        // head/tail at all — render tokens, splice appends, done.
+        if !spec.preamble_override.is_empty() || !cfg.template.preamble_file.is_empty() {
+            return Err(
+                "[template] skeleton is mutually exclusive with preamble_file".to_string(),
+            );
+        }
+        validate_template(&spec.skeleton, &body, &needs)?;
+        let (abs, rest) = if cfg.template.abstract_before_maketitle {
+            split_abstract(&body)
+        } else {
+            (String::new(), body.clone())
+        };
+        let bib = if spec.bib_name.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\\bibliographystyle{{{}}}\n\\bibliography{{{}}}",
+                spec.bib_style, spec.bib_name
+            )
+        };
+        let mut rendered = render_skeleton(
+            &spec.skeleton,
+            &title,
+            &spec.author,
+            &spec.title_thanks,
+            &abs,
+            &rest,
+            &bib,
+        )?;
+        if !spec.preamble_append.is_empty() {
+            let Some(at) = rendered.find("\\begin{document}") else {
+                return Err("skeleton has no \\begin{document} for preamble_append".to_string());
+            };
+            rendered.insert_str(at, &(spec.preamble_append.join("\n") + "\n"));
+        }
+        return Ok(BuildResult {
+            title,
+            body: body.clone(),
+            tex: rendered + "\n",
+            n_diagrams,
+            n_tables,
+        });
+    } else if spec.preamble_override.is_empty() {
         let mut generated = vec![
             format!("\\documentclass[{opts}]{{{}}}", cfg.document.class),
             "\\usepackage[utf8]{inputenc}".to_string(),
@@ -667,6 +816,7 @@ mod tests {
             bib_keys: HashSet::new(),
             preamble_override: String::new(),
             preamble_append: Vec::new(),
+            skeleton: String::new(),
             bib_style: "IEEEtran".to_string(),
         }
     }
@@ -827,6 +977,55 @@ mod tests {
         let got = tex_extra_packages("\\begin{figure}[H]x\\FloatBarrier");
         assert!(got.contains(&"\\usepackage{float}".to_string()));
         assert!(got.contains(&"\\usepackage{placeins}".to_string()));
+    }
+
+    #[test]
+    fn skeleton_renders_and_guards() {
+        let skel = "\\documentclass{article}\n\\title{{title}}\n\\begin{document}\n{{body}}\n{{bibliography}}\n\\end{document}\n";
+        let r = render_skeleton(skel, "T", "A", "", "", "B", "\\bibliography{refs}").unwrap();
+        assert!(r.contains("\\titleT"));
+        assert!(r.contains("B\n\\bibliography{refs}"));
+        // Missing body, doubled body, unknown token, missing bib.
+        assert!(render_skeleton("no tokens", "T", "A", "", "", "B", "bib").is_err());
+        assert!(render_skeleton("{{body}}{{body}}", "T", "A", "", "", "B", "").is_err());
+        assert!(render_skeleton("{{body}}{{typo}}", "T", "A", "", "", "B", "").is_err());
+        assert!(render_skeleton("{{body}}", "T", "A", "", "", "B", "nonempty-bib").is_err());
+        // Empty bib/abstract tokens render as nothing.
+        let r = render_skeleton("{{body}}\n{{bibliography}}\n{{abstract}}", "T", "A", "", "", "B", "").unwrap();
+        assert_eq!(r, "B\n\n");
+        // Non-empty abstract requires its token.
+        assert!(render_skeleton("{{body}}", "T", "A", "", "ABS", "B", "").is_err());
+        let r = render_skeleton("{{abstract}}\n{{body}}", "T", "A", "", "ABS", "B", "").unwrap();
+        assert!(r.starts_with("ABS\nB"));
+        // thanks strip mirrors level 1 (`\thanks{{{thanks}}}` convention).
+        let r = render_skeleton("\\title{T\\thanks{{{thanks}}}}\n{{body}}", "T", "A", "", "", "B", "").unwrap();
+        assert!(!r.contains("thanks"));
+        let r = render_skeleton("\\title{T\\thanks{{{thanks}}}}\n{{body}}", "T", "A", "nth", "", "B", "").unwrap();
+        assert!(r.contains("\\title{T\\thanks{nth}}"));
+    }
+
+    #[test]
+    fn skeleton_ignores_comment_tokens() {
+        let skel = "% {{body}} documented here\nreal {{body}} here\n";
+        let r = render_skeleton(skel, "T", "A", "", "", "B", "").unwrap();
+        assert!(r.contains("% {{body}} documented here\nreal B here"));
+    }
+
+    #[test]
+    fn skeleton_end_to_end_and_exclusion() {
+        let md = "# T\n\n## 1. I\n\nHi.\n";
+        let skel = "\\documentclass{article}\n\\usepackage{tabularx}\n\\begin{document}\n\\title{{title}}\n\\author{{author}}\n\\maketitle\n{{body}}\n{{bibliography}}\n\\end{document}\n";
+        let mut s = spec();
+        s.skeleton = skel.to_string();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\titleT\n\\authoropticsWolf\n\\maketitle"));
+        assert!(r.tex.contains("\\bibliographystyle{IEEEtran}\n\\bibliography{refs-paper}"));
+        assert!(!r.tex.contains("{{"));
+        // Mutual exclusion with the override path.
+        s.preamble_override = "\\documentclass{article}".to_string();
+        assert!(build_document(md, "", &s).is_err());
     }
 
     #[test]

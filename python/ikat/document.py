@@ -42,6 +42,7 @@ class BuildSpec:
     bib_keys: set = field(default_factory=set)
     preamble_override: str = ""
     preamble_append: list[str] = field(default_factory=list)
+    skeleton: str = ""  # level-3 whole-document content; exclusive with preamble_override
     bib_style: str = "IEEEtran"
     plot_attrs: dict[str, str] = field(default_factory=dict)
 
@@ -93,6 +94,12 @@ def read_template(toml_dir: str | Path, toml_src: str) -> tuple[str, list[str]]:
     return override, raw.splitlines() if raw else []
 
 
+def read_skeleton(toml_dir: str | Path, toml_src: str) -> str:
+    """Resolve `[template] skeleton` relative to the toml directory."""
+    rel = _parse_config(toml_src).get("template_skeleton", "")
+    return (Path(toml_dir) / rel).read_text(encoding="utf-8") if rel else ""
+
+
 def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec) -> BuildResult:
     """Path-based build: reads md + toml, resolves `[template]` files
     relative to the toml, and weaves. `spec.preamble_*` already set
@@ -100,10 +107,14 @@ def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec
     toml_path = Path(toml_path)
     toml_src = toml_path.read_text(encoding="utf-8")
     override, append = read_template(toml_path.parent, toml_src)
+    skel = read_skeleton(toml_path.parent, toml_src)
+    if skel and (override or spec.preamble_override):
+        raise ValueError("[template] skeleton is mutually exclusive with preamble_file")
     spec = replace(
         spec,
         preamble_override=spec.preamble_override or override,
         preamble_append=[*spec.preamble_append, *append],
+        skeleton=spec.skeleton or skel,
     )
     md_text = Path(md_path).read_text(encoding="utf-8")
     return build_document(md_text, toml_src, spec)
@@ -128,13 +139,21 @@ def list_templates() -> list[str]:
     return sorted(p.stem.removesuffix("-head") for p in d.glob("*-head.tex")) if d.is_dir() else []
 
 
+def list_skeletons() -> list[str]:
+    """Names of shipped whole-document skeletons (`skeleton-plain`)."""
+    d = _templates_dir()
+    return sorted(p.stem for p in d.glob("skeleton-*.tex")) if d.is_dir() else []
+
+
 def template_path(name: str) -> Path:
-    """Path to a shipped head, e.g. `template_path("arxiv")`. Raises
-    `FileNotFoundError` naming the available templates."""
-    p = _templates_dir() / f"{name}-head.tex"
-    if not p.is_file():
-        raise FileNotFoundError(f"no ikat template {name!r}; have: {list_templates()}")
-    return p
+    """Path to a shipped head, e.g. `template_path("arxiv")`, or a
+    shipped skeleton (`template_path("skeleton-plain")`). Raises
+    `FileNotFoundError` naming what is available."""
+    d = _templates_dir()
+    for cand in (d / f"{name}-head.tex", d / f"{name}.tex"):
+        if cand.is_file() and (cand.stem.endswith("-head") or cand.stem.startswith("skeleton-")):
+            return cand
+    raise FileNotFoundError(f"no ikat template {name!r}; have: {list_templates() + list_skeletons()}")
 
 
 #: Per-template companion settings: bibliography style plus the

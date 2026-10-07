@@ -122,8 +122,8 @@ byte-identically.
 ## Templates
 
 The generated preamble fits the common case; journals are not
-the common case. `[template]` in `ikat.toml` hands you the head:
-the common case. `[template]` in `ikat.toml` hands you the head:
+the common case. `[template]` in `ikat.toml` hands you the head
+(level 1) or the whole document (level 3):
 
 ```toml
 [template]
@@ -181,6 +181,29 @@ were installed from TeX Live archives into the local texmf tree
 (same trick as IEEEtran/pgfplots) — on a full TeX Live they just
 work. Heads are starting points, not submissions: always verify
 against the publisher's proof.
+
+### Level 3: whole-document skeletons
+
+`skeleton = "paper-skel.tex"` (in `[template]`, mutually
+exclusive with `preamble_file`) replaces the WHOLE document —
+head and tail. The skeleton is complete `.tex` with tokens:
+
+| token | fills from |
+|---|---|
+| `{{title}}` `{{author}}` `{{thanks}}` | as level 1 (brace them: `\title{{{title}}}`; empty `\thanks{}` drops) |
+| `{{body}}` | woven body — required exactly once |
+| `{{bibliography}}` | bib style + name — required exactly once unless `bib_name` is empty (biblatex skeletons print refs themselves) |
+| `{{abstract}}` | the whole woven abstract env — required exactly once when the manuscript has one (needs `abstract_before_maketitle`) |
+
+Unknown `{{word}}` tokens and duplicates are build errors;
+`%` comments may document tokens freely (counting and rendering
+skip them). Package validation scans the whole skeleton, and
+`preamble_append` splices before `\begin{document}` as usual.
+This unlocks multicol wraps, per-journal tails, and biblatex —
+whatever the generated tail cannot express. `skeleton-plain.tex`
+(article + the tokens, `placeins`/`float` preloaded) is the
+starting point, compile-proven to PDF; level-1 heads stay the
+recommended path.
 
 Requires Rust (cargo) and Python ≥ 3.10.
 

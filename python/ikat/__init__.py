@@ -20,7 +20,7 @@ from ._core import (
 )
 from .compile import compile_pdf
 from .document import BuildResult, BuildSpec, DiagramEntry, build_document
-from .document import build_from_paths, list_templates, read_template, template_path
+from .document import build_from_paths, list_skeletons, list_templates, read_skeleton, read_template, template_path
 from .document import spec_from_dict, template_preset
 from .document import template_preset
 from .pipeline import (
@@ -47,6 +47,7 @@ __all__ = [
     "bib_safe",
     "build_document",
     "build_from_paths",
+    "list_skeletons",
     "list_templates",
     "compile_pdf",
     "config_spans",
@@ -59,6 +60,7 @@ __all__ = [
     "lineplot_to_tikz",
     "package_needs",
     "parse_config",
+    "read_skeleton",
     "read_template",
     "resolve_span",
     "spec_from_dict",

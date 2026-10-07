@@ -1,7 +1,12 @@
 # Formatting draft: floats, skeleton level 3, Markdown parsing
 
-Status: M5.1 BUILT 2026-10-07 (sections A/A.1–A.4); B (skeleton)
-and C (AST spike) still draft. Nothing here changes defaults.
+Status: M5.1 BUILT 2026-10-07 (sections A/A.1–A.4); M5.2 BUILT
+2026-10-07 (section B, with amendments: `{{abstract}}` token
+carries the whole woven env and is required iff the manuscript
+has an abstract; counting AND rendering skip `%` comments so
+token docs in headers stay literal; titles brace the token —
+`\title{{{title}}}`); C (AST spike) still draft. Nothing here
+changes defaults.
 
 Conventions today (baseline, all in `figure[t]` / `table[t]`):
 
@@ -112,6 +117,9 @@ validates, done — no generated head or tail at all:
 | `{{title}}` `{{author}}` `{{thanks}}` | as level 1 |
 | `{{body}}` | woven body (floats + text + tables) |
 | `{{bibliography}}` | `\bibliographystyle{<spec bib_style>}` + `\bibliography{<spec bib_name>}` |
+| `{{abstract}}` | (amendment) the WHOLE woven `abstract` env; required iff the
+manuscript has one (with `abstract_before_maketitle`) — skeleton
+authors place it bare, never wrapped in a second env |
 
 Rules: `{{body}}` REQUIRED (error if absent); `{{bibliography}}`
 REQUIRED unless spec `bib_name` is empty (working papers without

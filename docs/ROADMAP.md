@@ -113,9 +113,11 @@ M4.3, which can jump the queue any time — it costs nothing.
   `plot_attrs` registry for plots) + `[floats]` fractions/counters/
   `barrier_sections` + `table*` + `picture` kind; packages
 auto-added or template-validated; compile-proven to PDF.
-- **M5.2 level-3 skeleton.** `[template] skeleton` with
-  `{{body}}`/`{{bibliography}}` tokens, mutual exclusion with
-  `preamble_file`, shipped `skeleton-plain.tex`, compile-proven.
+- **M5.2 level-3 skeleton.** ✅ DONE 2026-10-07 — `[template]`
+  `skeleton` with `{{body}}`/`{{bibliography}}`/`{{abstract}}`
+  token contract (comment-aware counting/rendering, unknown-token
+  errors, exclusion vs `preamble_file`), shipped
+  `skeleton-plain.tex`, compile-proven to PDF.
 - **M5.3 Markdown AST spike.** pulldown-cmark event-diff vs the
   hand scanner on the paper manuscript; switch only on empty diff
   + byte-identical golden `.tex`. Document the verdict here.
