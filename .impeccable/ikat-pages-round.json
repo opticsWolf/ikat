@@ -1,0 +1,114 @@
+{
+  "title": "Choose the visual world",
+  "question": "Which direction should shape ikat’s GitHub Pages site? All options honor the light background and strong contrast.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Exploded Service Manual",
+      "kicker": "THE ROLL",
+      "lineage": "illustrated field-service manuals and exploded assembly sheets",
+      "thesis": "A paper is assembled in view: source, figures, layout, and final document shown as parts with a clear job.",
+      "palette": ["#F3F7FC", "#111D2C", "#1649E8", "#E8492D", "#B6C5D9"],
+      "materials": ["technical drawing rules", "layered white plates", "cobalt and signal-orange callouts"],
+      "viewport": "A white, open sheet: an editorial-scale heading and Try ikat action sit beside an exploded source-to-paper assembly. Markdown, editable figure inputs, and LaTeX/PDF are separated as labeled plates with leader rules, then visibly align into one output. The rest of the page reads as a service manual: setup sequence, real commands, and precise parts references.",
+      "risk": "Could feel like a generic hardware manual unless every plate explains a real part of ikat’s document pipeline.",
+      "raised": [
+        {"from": "Layered papercut", "raise": "Assembly layers remain visibly distinct and authored; nothing collapses into a decorative stack."},
+        {"from": "Alien understory", "raise": "The pipeline demonstration has one restrained stage-reveal, with reduced-motion and no-motion states fully readable."},
+        {"from": "ANSI bulletin board", "raise": "Keyboard operation is native throughout; focus and navigation are drawn as intentional states, not afterthoughts."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "The Plotter Registration Sheet",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "vector-plotter calibration and registration sheets",
+      "thesis": "A plotted proof makes the central promise visible: the figure is generated as editable vector output, not pasted as a screenshot.",
+      "palette": ["#FFFFFF", "#111827", "#1649E8", "#E8492D", "#DAE5F4"],
+      "materials": ["registration crosses", "fine plotting grid", "solid ink annotations"],
+      "viewport": "A large plotted figure sheet occupies the opening field; source and output are joined by measured registration marks. The install action is set clearly beside the figure. Below it, a compact proof path maps Markdown and data to TikZ/pgfplots and the document.",
+      "risk": "A plotter sheet can over-focus on figures and under-explain the manuscript pipeline; the copy must make the broader product clear."
+    },
+    {
+      "id": "challenger-seven-segment",
+      "label": "The Build-State Instrument",
+      "verdict": "competitive",
+      "lineage": "seven-segment instruments and process-control panels, translated to a light field",
+      "thesis": "The build is a series of named states: source accepted, diagrams emitted, layout woven, document ready.",
+      "palette": ["#F6F8FB", "#111827", "#1649E8", "#D9402B", "#D7DEE8"],
+      "materials": ["fixed segment cells", "ghost-segment outlines", "high-contrast status marks"],
+      "viewport": "A fixed horizontal register spells out the source-to-document stages; one stage is active while a real code example and output fragment sit below. The Try action remains a distinct solid cobalt control.",
+      "case": "Holds on product clarity: discrete build stages are easy to read. Loses on audience identification: an instrument register is not a familiar paper-authoring surface.",
+      "risk": "Could turn technical state into a retro display costume if segments do not explain real pipeline stages."
+    },
+    {
+      "id": "challenger-gridshowroom",
+      "label": "The Square-Module Proof",
+      "verdict": "competitive",
+      "lineage": "Wiener Werkstätte square lattices and ruled technical plates, translated to a light field",
+      "thesis": "Every element has a measured place: a strict square-module grid makes per-element layout and figure structure tangible.",
+      "palette": ["#FFFFFF", "#111827", "#1649E8", "#E8492D", "#CBD5E1"],
+      "materials": ["square-unit rules", "inked modules", "unfilled cells"],
+      "viewport": "A lattice is the actual layout surface, not card chrome: a manuscript region spans the grid, figure and table modules fit different slots, and the wide output is visibly assembled across columns. Installation and docs sit in the same ruled vocabulary.",
+      "case": "Holds on audience identification: authors recognize page grids and layout constraints. Loses on product clarity: the grid alone does not dramatize source-to-output conversion.",
+      "risk": "The strict grid could make the page feel like a specimen box instead of a useful tool."
+    },
+    {
+      "id": "challenger-shareware",
+      "label": "The Try-It Setup Wizard",
+      "verdict": "competitive",
+      "lineage": "1990s shareware installers, stripped of nagware and adapted to a clean light surface",
+      "thesis": "Trying ikat becomes a short, linear setup sequence that ends with a working local build.",
+      "palette": ["#F2F4F7", "#131B28", "#1649E8", "#E8492D", "#BBC5D2"],
+      "materials": ["flat setup panels", "dither-like rules", "solid progress blocks"],
+      "viewport": "The first view is a single, wide setup sheet: clone the repository, build the extension, then run the demo. Each command is copyable; the final step links to the showcase and documentation.",
+      "case": "Holds on task success: it makes install/try concrete. Loses on product clarity: a wizard explains the setup better than what makes ikat distinctive.",
+      "risk": "Could over-prioritize setup and leave the generated-figure mechanism invisible."
+    },
+    {
+      "id": "declined-lowicz",
+      "label": "Layered Papercut Roundel",
+      "verdict": "declined",
+      "lineage": "Lowicz layered papercut",
+      "palette": ["#FFFFFF", "#111827", "#1649E8", "#E8492D", "#F0C400"],
+      "materials": ["flat cut-paper planes", "hard overlaps", "unmixed colors"],
+      "case": "Loses both axes: the roundel is not a recognizable authoring workflow and does not explain Markdown-to-LaTeX. Kept discipline: make the layers visibly authored, not simulated with shadows.",
+      "kept": "Make the source-to-output components genuinely distinct, not simulated with drop shadows.",
+      "risk": "Decorative pattern could overtake the product demonstration."
+    },
+    {
+      "id": "declined-forest",
+      "label": "The Impossible Understory",
+      "verdict": "declined",
+      "lineage": "surreal luminescent forest, translated onto a light surface",
+      "palette": ["#FFFFFF", "#163D36", "#1A6B92", "#7662C5", "#D5E9DC"],
+      "materials": ["branching vein lines", "softly pulsing marks", "light-field labels"],
+      "case": "Loses both axes: its imagined ecology is remote from paper authors and the transformation remains obscure. Kept discipline: motion follows the pipeline’s order and stops under reduced-motion.",
+      "kept": "Let the demonstration’s one stage transition follow the real build order; never animate for decoration.",
+      "risk": "Abstract atmosphere would obscure the actual product."
+    },
+    {
+      "id": "declined-bbs",
+      "label": "The ANSI Nightboard",
+      "verdict": "declined",
+      "lineage": "dial-up bulletin boards and ANSI character-grid interfaces",
+      "palette": ["#FFFFFF", "#111827", "#1649E8", "#C21C8B", "#16A34A"],
+      "materials": ["fixed character cells", "box-drawing rules", "numbered text links"],
+      "case": "Loses both axes: the terminal grid has weak paper-author recognition and the retro surface does not clarify the build. Its canonical dark ground also conflicts with the user's explicit light-background direction. Kept discipline: all functions remain keyboard reachable.",
+      "kept": "Make every link, tab, and command usable without a pointer, with visible focus.",
+      "risk": "Terminal nostalgia would compete with clear product onboarding."
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code", "toggle": false},
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A conventional open-source project page, executed with care: product headline, direct install path, familiar feature list, documentation links.",
+    "palette": ["#FFFFFF", "#111827", "#1649E8"],
+    "materials": ["clean sans-serif typography", "quiet layout rules", "simple code panels"],
+    "viewport": "A familiar white developer-tool landing page with a clear Try ikat action and quick-start command in the opening view.",
+    "risk": "Clear and familiar, but less specific to ikat’s editable, TeX-native figures."
+  },
+  "steer": true
+}
