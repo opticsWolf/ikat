@@ -13,6 +13,7 @@ import shutil
 import subprocess
 
 from ._core import document_class, package_needs, used_packages
+from ._core import tex_extra_packages as _extra_pkgs
 
 MANUAL_HINT = (
     "tlmgr is unavailable or failed. Options: install the package from "
@@ -26,7 +27,14 @@ MANUAL_HINT = (
 def needs(tex_source: str) -> list[tuple[str, str]]:
     """`(probe file, tlmgr package)` pairs a `.tex` source requires."""
     cls = document_class(tex_source)
-    return package_needs(used_packages(tex_source), cls)
+    req = package_needs(used_packages(tex_source), cls)
+    for line in _extra_pkgs(tex_source):
+        # "\usepackage{float}" -> ("float.sty", "float")
+        name = line.split("{", 1)[1].split("}", 1)[0]
+        pair = (f"{name}.sty", name)
+        if pair not in req:
+            req.append(pair)
+    return req
 
 
 def probe(files: list[str]) -> dict[str, bool | None]:

@@ -108,10 +108,11 @@ M4.3, which can jump the queue any time — it costs nothing.
 
 ## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md)
 
-- **M5.1 float formatting.** Per-element `span/pos/width/captionpos`
-  attrs + `[floats]` fractions/counters + `barrier_sections` +
-  `table*` wide tables; package auto-adds (float/placeins/
-  dblfloatfix) through `tex_requirements`; Rust validation matrix.
+- **M5.1 float formatting.** ✅ DONE 2026-10-07 — per-element
+  `span/pos/width/captionpos` attrs (`%% table {...}` for tables,
+  `plot_attrs` registry for plots) + `[floats]` fractions/counters/
+  `barrier_sections` + `table*` + `picture` kind; packages
+auto-added or template-validated; compile-proven to PDF.
 - **M5.2 level-3 skeleton.** `[template] skeleton` with
   `{{body}}`/`{{bibliography}}` tokens, mutual exclusion with
   `preamble_file`, shipped `skeleton-plain.tex`, compile-proven.

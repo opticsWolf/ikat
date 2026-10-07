@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-use crate::config::{Config, Span};
+use crate::config::{CaptionPos, Config, FloatNeeds, Pos, Span};
 use crate::esc::inline;
 use crate::mermaid::flowchart_to_tikz;
 use crate::table::table_block;
@@ -35,6 +35,9 @@ pub struct BuildSpec {
     pub diagrams: Vec<DiagramEntry>,
     #[serde(default)]
     pub plots: Vec<(String, String)>,
+    /// Per-plot `{k=v}` attrs by plot key (serde default: none).
+    #[serde(default)]
+    pub plot_attrs: HashMap<String, String>,
     #[serde(default = "default_plot_dir")]
     pub plot_dir: String,
     #[serde(default)]
@@ -90,17 +93,141 @@ pub struct BuildResult {
     pub n_tables: usize,
 }
 
-fn figure_block(body_tex: &str, caption: &str, label: &str, span: Span) -> String {
-    let (env, width) = match span {
+/// Render a validated width against a span width: fractions scale
+/// it (`0.8` of `\columnwidth`), anything else passes through.
+fn width_to_tex(width: Option<&str>, span_w: &str) -> String {
+    match width {
+        None => span_w.to_string(),
+        Some(f) if f.parse::<f64>().map(|v| v > 0.0 && v <= 2.0).unwrap_or(false) => {
+            format!("{f}{span_w}")
+        }
+        Some(abs) => abs.to_string(),
+    }
+}
+
+/// Per-element float options from a `{k=v ...}` attribute string
+/// (fence info lines, `%% table {...}` comments, plot registry).
+/// Unknown keys and bad values are errors — strict subset doctrine.
+#[derive(Debug, Clone, Default)]
+pub struct ElemAttrs {
+    pub span: Option<Span>,
+    pub pos: Option<Pos>,
+    pub width: Option<String>,
+    pub captionpos: Option<CaptionPos>,
+}
+
+/// A width is a fraction of the span width (`0.8`) or a TeX length
+/// (`5cm`, `\columnwidth`, ...). Anything else is an error.
+fn parse_width(s: &str) -> Result<String, String> {
+    if let Ok(v) = s.parse::<f64>() {
+        if v > 0.0 && v <= 2.0 {
+            return Ok(s.to_string());
+        }
+        return Err(format!("width fraction must be in (0, 2], got {s:?}"));
+    }
+    let len_re =
+        regex::Regex::new(r"^[0-9.]+(cm|mm|in|pt|pc|bp|dd|cc|sp|em|ex)$|\\").unwrap();
+    if len_re.is_match(s) {
+        return Ok(s.to_string());
+    }
+    Err(format!("width must be a fraction or TeX length, got {s:?}"))
+}
+
+pub fn parse_attrs(attr: &str, what: &str) -> Result<(ElemAttrs, bool), String> {
+    let mut out = ElemAttrs::default();
+    let mut inline = false;
+    for tok in attr.split_whitespace() {
+        if tok == "{inline}" || tok == "inline" {
+            inline = true;
+            continue;
+        }
+        let Some((k, v)) = tok.split_once('=') else {
+            return Err(format!("{what}: bad attribute {tok:?} (want k=v)"));
+        };
+        match k {
+            "span" => {
+                out.span = Some(match v {
+                    "column" => Span::Column,
+                    "wide" => Span::Wide,
+                    _ => return Err(format!("{what}: span must be column|wide, got {v:?}")),
+                })
+            }
+            "pos" => out.pos = Some(Pos::parse(v).map_err(|e| format!("{what}: {e}"))?),
+            "width" => out.width = Some(parse_width(v).map_err(|e| format!("{what}: {e}"))?),
+            "captionpos" => {
+                out.captionpos =
+                    Some(CaptionPos::parse(v).map_err(|e| format!("{what}: {e}"))?)
+            }
+            _ => return Err(format!("{what}: unknown attribute {k:?} (span|pos|width|captionpos)")),
+        }
+    }
+    Ok((out, inline))
+}
+
+/// Extract the `{...}` attribute string from a fence info line.
+fn fence_attr_str(line: &str) -> &str {
+    match (line.find('{'), line.rfind('}')) {
+        (Some(a), Some(b)) if b > a => &line[a + 1..b],
+        _ => "",
+    }
+}
+
+fn figure_block(
+    body_tex: &str,
+    caption: &str,
+    label: &str,
+    span: Span,
+    pos: Pos,
+    width: Option<&str>,
+    caption_bottom: bool,
+) -> Result<(String, FloatNeeds), String> {
+    let mut needs = FloatNeeds::none();
+    let wide = matches!(span, Span::Wide);
+    if wide && matches!(pos, Pos::Here | Pos::Force) {
+        return Err("figure*: pos here/force is illegal on full-width floats (use span=column)".to_string());
+    }
+    if wide && matches!(pos, Pos::Bottom | Pos::Both) {
+        needs.dblfloat = true;
+    }
+    if matches!(pos, Pos::Force) {
+        needs.float_h = true;
+    }
+    let barrier = matches!(pos, Pos::Barrier);
+    if barrier {
+        needs.barrier = true;
+    }
+    let (env, span_w) = match span {
         Span::Column => ("figure", "\\columnwidth"),
         Span::Wide => ("figure*", "\\textwidth"),
     };
-    let body = if body_tex.trim_start().starts_with("\\begin{tikzpicture}") {
+    let is_tikz = body_tex.trim_start().starts_with("\\begin{tikzpicture}");
+    let body = if is_tikz {
+        match width {
+            None => body_tex.to_string(),
+            Some(f) if f.parse::<f64>().is_ok() && !body_tex.contains("[scale=") => body_tex
+                .replacen("\\begin{tikzpicture}", &format!("\\begin{{tikzpicture}}[scale={f}]"), 1),
+            _ => {
+                needs.graphicx = true;
+                let w = width_to_tex(width, span_w);
+                format!("\\resizebox{{{w}}}{{!}}{{{body_tex}}}")
+            }
+        }
+    } else if body_tex.trim_start().starts_with("\\includegraphics") {
         body_tex.to_string()
     } else {
-        format!("\\includegraphics[width={width}]{{{body_tex}}}")
+        format!("\\includegraphics[width={}]{{{body_tex}}}", width_to_tex(width, span_w))
     };
-    format!("\\begin{{{env}}}[t]\n\\centering\n{body}\n\\caption{{{caption}}}\n\\label{{{label}}}\n\\end{{{env}}}")
+    let caption_lines = format!("\\caption{{{caption}}}\n\\label{{{label}}}");
+    let inner = if caption_bottom {
+        format!("{body}\n{caption_lines}")
+    } else {
+        format!("{caption_lines}\n{body}")
+    };
+    let prefix = if barrier { "\\FloatBarrier\n" } else { "" };
+    Ok((
+        format!("{prefix}\\begin{{{env}}}{}\n\\centering\n{inner}\n\\end{{{env}}}", pos.latex_spec()),
+        needs,
+    ))
 }
 
 fn strip_section_number(head: &str) -> String {
@@ -156,7 +283,7 @@ pub fn render_override(override_tex: &str, title: &str, author: &str, thanks: &s
 /// A user-supplied preamble head must carry a document class and
 /// every package the woven body provably needs; otherwise the
 /// failure would surface as a cryptic TeX log, far from its cause.
-pub fn validate_template(override_tex: &str, body: &str) -> Result<(), String> {
+pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> Result<(), String> {
     if crate::texenv::document_class(override_tex).is_none() {
         return Err("template preamble_file has no \\documentclass".to_string());
     }
@@ -174,6 +301,8 @@ pub fn validate_template(override_tex: &str, body: &str) -> Result<(), String> {
         required.push("tabularx");
     }
     let have = crate::texenv::used_packages(override_tex);
+    let mut required: Vec<&str> = required;
+    required.extend(needs.required_names());
     let missing: Vec<&&str> = required.iter().filter(|r| !have.iter().any(|h| h == **r)).collect();
     if missing.is_empty() {
         Ok(())
@@ -183,6 +312,20 @@ pub fn validate_template(override_tex: &str, body: &str) -> Result<(), String> {
             missing.into_iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
         ))
     }
+}
+
+/// Heuristic package scan for ARBITRARY `.tex` (user heads, pasted
+/// preambles): `\FloatBarrier` needs placeins, `[H]` needs float.
+/// The builder itself threads precise `FloatNeeds` instead.
+pub fn tex_extra_packages(tex: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if tex.contains("[H]") {
+        out.push("\\usepackage{float}".to_string());
+    }
+    if tex.contains("\\FloatBarrier") {
+        out.push("\\usepackage{placeins}".to_string());
+    }
+    out
 }
 
 /// LaTeX packages a woven body needs, detected from what it contains.
@@ -202,9 +345,11 @@ pub fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
     req
 }
 
-pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(String, String, usize, usize), String> {
+pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(String, String, usize, usize, FloatNeeds), String> {
     let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
     let mut out: Vec<String> = Vec::new();
+    let mut needs = FloatNeeds::none();
+    let mut pending_table: Option<ElemAttrs> = None;
     let mut para: Vec<String> = Vec::new();
     let mut title = String::new();
     let mut in_abstract = false;
@@ -248,21 +393,34 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                     j += 1;
                 }
                 let entry = &spec.diagrams[diagram_idx];
-                let mode = if s.contains("{inline}") { "inline" } else { entry.mode.as_str() };
-                let span = cfg.spans.for_kind("diagram");
+                let (attrs, inline_flag) =
+                    parse_attrs(fence_attr_str(s), &format!("mermaid fence #{diagram_idx}"))?;
+                let mode = if inline_flag || s.contains("{inline}") {
+                    "inline"
+                } else {
+                    entry.mode.as_str()
+                };
+                let kind = if mode == "inline" { "diagram" } else { "picture" };
+                let span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
+                let pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
                 let body = if mode == "inline" {
                     flowchart_to_tikz(&fence.join("\n"))?
                 } else {
                     format!("{}{}", entry.path_prefix, entry.key)
                 };
-                out.push(
-                    figure_block(
-                        &body,
-                        &inline(&entry.caption, keys)?,
-                        &format!("fig:{}", entry.key),
-                        span,
-                    ) + "\n",
-                );
+                let caption_bottom = attrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
+                let (fig, n) = figure_block(
+                    &body,
+                    &inline(&entry.caption, keys)?,
+                    &format!("fig:{}", entry.key),
+                    span,
+                    pos,
+                    attrs.width.as_deref(),
+                    caption_bottom,
+                )
+                .map_err(|e| format!("mermaid fence #{diagram_idx}: {e}"))?;
+                needs.add(n);
+                out.push(fig + "\n");
                 diagram_idx += 1;
                 i = j + 1;
                 continue;
@@ -274,6 +432,23 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
             i += 1;
             continue;
         }
+        if s.starts_with("%% table") {
+            // Attribute comment for the table below: consume it here so
+            // it never becomes paragraph text; the table branch below
+            // picks the stashed attrs up.
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].trim().is_empty() {
+                j += 1;
+            }
+            if j < lines.len() && lines[j].trim().starts_with('|') {
+                let (attrs, _) = parse_attrs(fence_attr_str(s), &format!("table #{table_idx}"))?;
+                if attrs.span.is_some() || attrs.pos.is_some() || attrs.width.is_some() || attrs.captionpos.is_some() {
+                    pending_table = Some(attrs);
+                }
+                i = j;
+                continue;
+            }
+        }
         if s.starts_with('|') {
             flush(&mut out, &mut para)?;
             let mut rows = Vec::new();
@@ -284,14 +459,23 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
             if table_idx >= spec.table_captions.len() {
                 return Err(format!("table #{table_idx} has no caption"));
             }
-            out.push(
-                table_block(
-                    &rows,
-                    &spec.table_captions[table_idx],
-                    keys,
-                    spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
-                )? + "\n",
-            );
+            let tattrs = pending_table.take().unwrap_or_default();
+            let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
+            let tpos = tattrs.pos.unwrap_or(cfg.floats.pos_default);
+            let caption_top = tattrs.captionpos.map(|c| c == CaptionPos::Top).unwrap_or(true);
+            let (tab, n) = table_block(
+                &rows,
+                &spec.table_captions[table_idx],
+                keys,
+                spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
+                tspan,
+                tpos,
+                caption_top,
+                tattrs.width.as_deref(),
+            )
+            .map_err(|e| format!("table #{table_idx}: {e}"))?;
+            needs.add(n);
+            out.push(tab + "\n");
             table_idx += 1;
             continue;
         }
@@ -315,6 +499,10 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                 in_abstract = false;
             }
             let head = strip_section_number(&s[3..]);
+            if cfg.floats.barrier_sections {
+                out.push("\\FloatBarrier\n".to_string());
+                needs.barrier = true;
+            }
             out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
             i += 1;
             continue;
@@ -322,6 +510,10 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
         if s.starts_with("### ") {
             flush(&mut out, &mut para)?;
             let head = strip_section_number(&s[4..]);
+            if cfg.floats.barrier_sections {
+                out.push("\\FloatBarrier\n".to_string());
+                needs.barrier = true;
+            }
             out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
             i += 1;
             continue;
@@ -338,13 +530,13 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
     if in_abstract {
         out.push("\\end{abstract}\n".to_string());
     }
-    Ok((title, out.join("\n"), diagram_idx, table_idx))
+    Ok((title, out.join("\n"), diagram_idx, table_idx, needs))
 }
 
 pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<BuildResult, String> {
     let cfg = Config::from_toml(toml_src)?;
     let lines: Vec<String> = md_text.lines().map(|l| l.to_string()).collect();
-    let (title, mut body, n_diagrams, n_tables) = convert(&lines, spec, &cfg)?;
+    let (title, mut body, n_diagrams, n_tables, mut needs) = convert(&lines, spec, &cfg)?;
     if n_diagrams != spec.diagrams.len() {
         return Err(format!(
             "{n_diagrams} fences vs {} registry entries",
@@ -360,12 +552,26 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     if !spec.plots.is_empty() {
         let mut figs = Vec::new();
         for (key, cap) in &spec.plots {
-            figs.push(figure_block(
+            let pattrs = match spec.plot_attrs.get(key) {
+                Some(a) => parse_attrs(a, &format!("plot {key}"))?.0,
+                None => ElemAttrs::default(),
+            };
+            let pspan = pattrs.span.unwrap_or_else(|| cfg.spans.for_kind("plot"));
+            let ppos = pattrs.pos.unwrap_or(cfg.floats.pos_default);
+            let caption_bottom =
+                pattrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
+            let (fig, n) = figure_block(
                 &format!("{}{}", spec.plot_dir, key),
                 cap,
                 &format!("fig:{key}"),
-                cfg.spans.for_kind("plot"),
-            ));
+                pspan,
+                ppos,
+                pattrs.width.as_deref(),
+                caption_bottom,
+            )
+            .map_err(|e| format!("plot {key}: {e}"))?;
+            needs.add(n);
+            figs.push(fig);
         }
         let plot_figs = figs.join("\n");
         if !spec.plot_insert_before.is_empty() && body.contains(&spec.plot_insert_before) {
@@ -389,6 +595,8 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             "\\usepackage{graphicx}".to_string(),
         ];
         generated.extend(tex_requirements(has_tikz, has_plots));
+        generated.extend(needs.packages());
+        generated.extend(cfg.floats.setup_lines());
         generated.extend([
             "\\usepackage[hidelinks]{hyperref}".to_string(),
             format!("\\graphicspath{{{paths}}}"),
@@ -401,8 +609,10 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         ]);
         generated
     } else {
-        validate_template(&spec.preamble_override, &body)?;
-        vec![render_override(&spec.preamble_override, &title, &spec.author, &spec.title_thanks)]
+        validate_template(&spec.preamble_override, &body, &needs)?;
+        let mut over = vec![render_override(&spec.preamble_override, &title, &spec.author, &spec.title_thanks)];
+        over.extend(cfg.floats.setup_lines());
+        over
     };
     head.extend(spec.preamble_append.clone());
     head.extend(["\\begin{document}".to_string()]);
@@ -445,6 +655,7 @@ mod tests {
                 path_prefix: "figs/tikz/".into(),
             }],
             plots: vec![],
+            plot_attrs: HashMap::new(),
             plot_dir: "figs/".into(),
             table_captions: vec!["T.".into()],
             table_specs: HashMap::new(),
@@ -544,8 +755,78 @@ mod tests {
 
     #[test]
     fn template_without_class_is_an_error() {
-        let err = validate_template("\\usepackage{tikz}\n", "plain").unwrap_err();
+        let err = validate_template("\\usepackage{tikz}\n", "plain", &FloatNeeds::none()).unwrap_err();
         assert!(err.contains("documentclass"));
+    }
+
+    #[test]
+    fn attrs_parse_strictly() {
+        let (a, inl) = parse_attrs("span=column pos=both width=0.8 captionpos=top", "t").unwrap();
+        assert!(!inl);
+        assert_eq!(a.span, Some(Span::Column));
+        assert_eq!(a.pos, Some(Pos::Both));
+        assert_eq!(a.width.as_deref(), Some("0.8"));
+        assert_eq!(a.captionpos, Some(CaptionPos::Top));
+        let (_, inl) = parse_attrs("{inline}", "t").unwrap();
+        assert!(inl);
+        assert!(parse_attrs("pos=center", "t").is_err());
+        assert!(parse_attrs("bogus=1", "t").is_err());
+        assert!(parse_attrs("width=huge", "t").is_err());
+        assert!(parse_attrs("width=0", "t").is_err());
+        assert!(parse_attrs("width=5cm", "t").unwrap().0.width.is_some());
+    }
+
+    #[test]
+    fn figure_placements_and_needs() {
+        let tikz = "\\begin{tikzpicture}\\node{a};\\end{tikzpicture}";
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Both, None, true).unwrap();
+        assert!(f.contains("\\begin{figure}[!tb]"));
+        assert_eq!(n, FloatNeeds::none());
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Force, None, true).unwrap();
+        assert!(f.contains("\\begin{figure}[H]"));
+        assert!(n.float_h);
+        let (f, n) = figure_block("pic.pdf", "C", "l", Span::Wide, Pos::Barrier, Some("0.8"), false).unwrap();
+        assert!(f.contains("\\FloatBarrier\n\\begin{figure*}[t]"));
+        assert!(f.contains("\\includegraphics[width=0.8\\textwidth]{pic.pdf}"));
+        assert!(f.contains("\\caption{C}\n\\label{l}\n\\includegraphics"));
+        assert!(n.barrier);
+        let (_, n) = figure_block("p.pdf", "C", "l", Span::Wide, Pos::Bottom, None, true).unwrap();
+        assert!(n.dblfloat);
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Force, None, true).is_err());
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Here, None, true).is_err());
+    }
+
+    #[test]
+    fn fence_attrs_flow_end_to_end() {
+        let md = "# T\n\n## 1. I\n\nHi.\n\n```mermaid {span=column pos=both}\ngraph TD\na[x]-->b[y]\n```\n\n%% table {pos=barrier}\n\n| A |\n|---|\n| 1 |\n";
+        let mut s = spec();
+        s.preamble_override = String::new();
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\begin{figure}[!tb]"));
+        assert!(r.tex.contains("\\FloatBarrier\n\\begin{table}[t]"));
+        assert!(r.tex.contains("\\usepackage{placeins}"));
+        assert!(!r.tex.contains("\\usepackage{float}"));
+    }
+
+    #[test]
+    fn float_tuning_and_section_barriers() {
+        let md = "# T\n\n## 1. A\n\nx\n\n## 2. B\n\ny\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let toml = "[floats]\ntopfraction = 0.9\nbarrier_sections = true\npos_default = \"page\"\n";
+        let r = build_document(md, toml, &s).unwrap();
+        assert!(r.tex.contains("\\renewcommand{\\topfraction}{0.9}"));
+        assert_eq!(r.tex.matches("\\FloatBarrier").count(), 2);
+        assert!(r.tex.contains("\\usepackage{placeins}"));
+    }
+
+    #[test]
+    fn extra_packages_heuristic() {
+        assert!(tex_extra_packages("plain").is_empty());
+        let got = tex_extra_packages("\\begin{figure}[H]x\\FloatBarrier");
+        assert!(got.contains(&"\\usepackage{float}".to_string()));
+        assert!(got.contains(&"\\usepackage{placeins}".to_string()));
     }
 
     #[test]

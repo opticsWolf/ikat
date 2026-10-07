@@ -43,6 +43,7 @@ class BuildSpec:
     preamble_override: str = ""
     preamble_append: list[str] = field(default_factory=list)
     bib_style: str = "IEEEtran"
+    plot_attrs: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
         d = asdict(self)

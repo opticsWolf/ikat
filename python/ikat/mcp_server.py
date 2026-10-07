@@ -94,6 +94,14 @@ def ensure_tex_packages(tex_source: str, install: bool = True) -> dict:
 
 
 @mcp.tool()
+def float_packages(tex_source: str) -> list[str]:
+    """Extra packages for hand-written floats: `[H]` -> float, `\\FloatBarrier` -> placeins."""
+    from ikat import tex_extra_packages as _xp
+
+    return _xp(tex_source)
+
+
+@mcp.tool()
 def list_templates() -> list[str]:
     """Shipped preamble heads (arxiv, acm-sigconf, ...)."""
     return _templates()

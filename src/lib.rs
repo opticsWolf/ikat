@@ -99,7 +99,15 @@ fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>
         "template_abstract_before_maketitle".to_string(),
         cfg.template.abstract_before_maketitle.to_string(),
     );
-    for kind in ["diagram", "plot", "table", "default"] {
+    m.insert("float_pos_default".to_string(), format!("{:?}", cfg.floats.pos_default).to_lowercase());
+    m.insert("float_topfraction".to_string(), cfg.floats.topfraction.to_string());
+    m.insert("float_bottomfraction".to_string(), cfg.floats.bottomfraction.to_string());
+    m.insert("float_textfraction".to_string(), cfg.floats.textfraction.to_string());
+    m.insert("float_floatpagefraction".to_string(), cfg.floats.floatpagefraction.to_string());
+    m.insert("float_topnumber".to_string(), cfg.floats.topnumber.to_string());
+    m.insert("float_bottomnumber".to_string(), cfg.floats.bottomnumber.to_string());
+    m.insert("float_barrier_sections".to_string(), cfg.floats.barrier_sections.to_string());
+    for kind in ["diagram", "plot", "table", "picture", "default"] {
         let span = cfg.spans.for_kind(kind);
         m.insert(format!("span_{kind}"), span.latex_env().to_string());
         m.insert(format!("width_{kind}"), span.latex_width().to_string());
@@ -165,6 +173,13 @@ fn package_needs(names: Vec<String>, class: Option<String>) -> Vec<(String, Stri
     texenv::package_needs(&names, class.as_deref())
 }
 
+/// Heuristic package scan for arbitrary `.tex`: `[H]` and
+/// `\FloatBarrier` map to their packages.
+#[pyfunction]
+fn tex_extra_packages(tex: &str) -> Vec<String> {
+    doc::tex_extra_packages(tex)
+}
+
 /// ikat core (Rust): mermaid→TikZ, data→pgfplots, document config.
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -176,6 +191,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
     m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
     m.add_function(wrap_pyfunction!(tex_requirements, m)?)?;
+    m.add_function(wrap_pyfunction!(tex_extra_packages, m)?)?;
     m.add_function(wrap_pyfunction!(used_packages, m)?)?;
     m.add_function(wrap_pyfunction!(document_class, m)?)?;
     m.add_function(wrap_pyfunction!(package_needs, m)?)?;

@@ -1,8 +1,7 @@
 # Formatting draft: floats, skeleton level 3, Markdown parsing
 
-Status: DRAFT 2026-10-07 (unimplemented). Consolidates the `pos=`
-discussion, the level-3 skeleton promise, and the Markdown-AST
-question into one buildable spec. Nothing here changes defaults.
+Status: M5.1 BUILT 2026-10-07 (sections A/A.1–A.4); B (skeleton)
+and C (AST spike) still draft. Nothing here changes defaults.
 
 Conventions today (baseline, all in `figure[t]` / `table[t]`):
 

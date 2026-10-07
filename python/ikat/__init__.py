@@ -14,6 +14,7 @@ from ._core import (
     lineplot_to_tikz,
     package_needs,
     parse_config,
+    tex_extra_packages,
     tex_requirements,
     used_packages,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "spec_from_dict",
     "template_path",
     "template_preset",
+    "tex_extra_packages",
     "tex_package_needs",
     "tex_requirements",
     "used_packages",

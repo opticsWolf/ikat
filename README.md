@@ -92,9 +92,37 @@ python -m ikat.mcp_server
 `compile_pdf` stays out of MCP (workdir-bound, minutes-long);
 drive it from the CLI.
 
+## Floats: span, position, width
+
+Every floatable element (diagram, picture, plot, table) takes
+`{...}` attributes on its fence — tables via a `%% table {...}`
+comment on the line above:
+
+````markdown
+```mermaid {span=column pos=both width=0.8}
+%% table {pos=barrier}
+````
+
+| attr | values | default |
+|---|---|---|
+| `span` | `column` \| `wide` | per-kind `[spans]` (`picture` falls back to `diagram`) |
+| `pos` | `top` \| `bottom` \| `both`(`[!tb]`) \| `page` \| `here` \| `force`(`[H]`) \| `barrier` | `[floats] pos_default` (`top`) |
+| `width` | fraction of span (`0.8`) or TeX length (`5cm`) | span width |
+| `captionpos` | `top` \| `bottom` | figures bottom, tables top |
+
+Hard LaTeX rules are build errors, not log mysteries: `figure*`
+with `here`/`force` is illegal (use `span=column`); wide+bottom
+auto-loads `dblfloatfix`; `force`/`barrier` auto-load
+`float`/`placeins` (generated head) or are required in template
+heads (validated). Document-wide tuning lives in `[floats]`
+(fractions, counters, `barrier_sections`, `pos_default`) and is
+emitted only when non-default — default documents weave
+byte-identically.
+
 ## Templates
 
 The generated preamble fits the common case; journals are not
+the common case. `[template]` in `ikat.toml` hands you the head:
 the common case. `[template]` in `ikat.toml` hands you the head:
 
 ```toml

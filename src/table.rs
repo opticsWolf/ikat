@@ -5,6 +5,7 @@ use regex::Regex;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+use crate::config::{FloatNeeds, Pos, Span};
 use crate::esc::inline;
 
 fn sep_re() -> &'static Regex {
@@ -38,15 +39,48 @@ pub fn table_block(
     cap: &str,
     keys: Option<&HashSet<String>>,
     spec: Option<&str>,
-) -> Result<String, String> {
+    span: Span,
+    pos: Pos,
+    caption_top: bool,
+    width: Option<&str>,
+) -> Result<(String, FloatNeeds), String> {
+    let mut needs = FloatNeeds::none();
+    let wide = matches!(span, Span::Wide);
+    if wide && matches!(pos, Pos::Here | Pos::Force) {
+        return Err("table*: pos here/force is illegal on full-width floats (use span=column)".to_string());
+    }
+    if wide && matches!(pos, Pos::Bottom | Pos::Both) {
+        needs.dblfloat = true;
+    }
+    if matches!(pos, Pos::Force) {
+        needs.float_h = true;
+    }
+    if matches!(pos, Pos::Barrier) {
+        needs.barrier = true;
+    }
+    let env = if wide { "table*" } else { "table" };
+    let span_w = if wide { "\\textwidth" } else { "\\columnwidth" };
+    let w = match width {
+        None => span_w.to_string(),
+        Some(f) if f.parse::<f64>().map(|v| v > 0.0 && v <= 2.0).unwrap_or(false) => {
+            format!("{f}{span_w}")
+        }
+        Some(abs) => abs.to_string(),
+    };
     let n = rows.iter().map(|r| split_row(r).len()).max().unwrap_or(0);
+    let caption = format!("\\caption{{{cap}}}");
     let mut lines = vec![
-        "\\begin{table}[t]".to_string(),
-        format!("\\caption{{{cap}}}"),
-        "\\small".to_string(),
-        format!("\\begin{{tabularx}}{{\\columnwidth}}{{{}}}", spec.unwrap_or(&"X".repeat(n))),
-        "\\hline".to_string(),
+        (if matches!(pos, Pos::Barrier) { "\\FloatBarrier\n" } else { "" }).to_string()
+            + &format!("\\begin{{{env}}}{}", pos.latex_spec()),
     ];
+    if caption_top {
+        lines.push(caption.clone());
+    }
+    lines.extend([
+        "\\small".to_string(),
+        format!("\\begin{{tabularx}}{{{w}}}{{{}}}", spec.unwrap_or(&"X".repeat(n))),
+        "\\hline".to_string(),
+    ]);
     let mut first = true;
     for r in rows {
         if is_sep(r) {
@@ -70,8 +104,11 @@ pub fn table_block(
     }
     lines.push("\\hline".to_string());
     lines.push("\\end{tabularx}".to_string());
-    lines.push("\\end{table}".to_string());
-    Ok(lines.join("\n"))
+    if !caption_top {
+        lines.push(caption);
+    }
+    lines.push(format!("\\end{{{env}}}"));
+    Ok((lines.join("\n"), needs))
 }
 
 /// Every `@type{key,` entry key in a .bib source.
@@ -132,16 +169,34 @@ mod tests {
     #[test]
     fn block_shape() {
         let rows = ["| A | B |".to_string(), "|--|--|".to_string(), "| `x_y` | 3 |".to_string()];
-        let got = table_block(&rows, "Cap.", None, None).unwrap();
+        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None).unwrap();
+        assert!(got.contains("\\begin{table}[t]"));
         assert!(got.contains("\\begin{tabularx}{\\columnwidth}{XX}"));
         assert!(got.contains("\\textbf{A} & \\textbf{B} \\\\"));
         assert!(got.contains("\\texttt{x\\_y} & 3 \\\\"));
+        assert_eq!(needs, FloatNeeds::none());
+    }
+
+    #[test]
+    fn wide_barrier_table() {
+        let rows = ["| A |".to_string()];
+        let (got, needs) =
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8")).unwrap();
+        assert!(got.contains("\\FloatBarrier\n\\begin{table*}[t]"));
+        assert!(got.contains("\\begin{tabularx}{0.8\\textwidth}{X}"));
+        assert!(needs.barrier);
+    }
+
+    #[test]
+    fn wide_force_table_is_an_error() {
+        let rows = ["| A |".to_string()];
+        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None).is_err());
     }
 
     #[test]
     fn appendix_spec() {
         let rows = ["| A | B | C |".to_string(), "| 1 | 2 | 3 |".to_string()];
-        let got = table_block(&rows, "C.", None, Some("Xcl")).unwrap();
+        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None).unwrap();
         assert!(got.contains("{Xcl}"));
     }
 

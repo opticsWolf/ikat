@@ -32,7 +32,16 @@ class Element:
     caption: str = ""
     label: str = ""
     span: str | None = None  # "column" | "wide" | None (= configured)
+    pos: str | None = None  # top|bottom|both|page|here|force|barrier
+    width: str | None = None  # fraction of span width or TeX length
+    captionpos: str | None = None  # top|bottom|None (= convention)
     extra: dict = field(default_factory=dict)
+
+
+_POS_SPEC = {
+    "top": "[t]", "bottom": "[b]", "both": "[!tb]", "page": "[p]",
+    "here": "[h]", "force": "[H]", "barrier": "[t]",
+}
 
 
 def config_spans(toml_src: str) -> dict:
@@ -48,23 +57,39 @@ def resolve_span(kind: str, local: str | None, spans: dict) -> str:
     return "wide" if env == "figure*" else "column"
 
 
-def figure_env(body_tex: str, caption: str, label: str, span: str) -> str:
-    """Wrap TikZ/figure body in a float of the right width."""
+def resolve_pos(kind: str, local: str | None, floats: dict | None = None) -> str:
+    """Final pos name for one element (toml default, else per-kind map)."""
+    if local in _POS_SPEC:
+        return local
+    return (floats or {}).get("float_pos_default", "top")
+
+
+def figure_env(body_tex: str, caption: str, label: str, span: str,
+               pos: str = "top", width: str | None = None,
+               captionpos: str | None = None) -> str:
+    """Wrap TikZ/figure body in a float of the right width and place."""
     env = "figure*" if span == "wide" else "figure"
-    width = "\\textwidth" if span == "wide" else "\\columnwidth"
-    width_opt = f"[width={width}]"
+    if span == "wide" and pos in ("here", "force"):
+        raise ValueError(f"figure*: pos {pos} is illegal on full-width floats")
+    sw = "\\textwidth" if span == "wide" else "\\columnwidth"
+    if width is None:
+        w = sw
+    elif re.fullmatch(r"[0-9.]*[0-9]", width or ""):
+        w = f"{width}{sw}"
+    else:
+        w = width
+    width_opt = f"[width={w}]"
     if body_tex.lstrip().startswith("\\begin{tikzpicture}"):
         body = body_tex
+        if width is not None and re.fullmatch(r"[0-9.]*[0-9]", width) and "[scale=" not in body:
+            body = body.replace("\\begin{tikzpicture}", "\\begin{tikzpicture}[scale=" + width + "]", 1)
     else:  # external graphic: scale it
         body = f"\\includegraphics{width_opt}{{{body_tex}}}"
-    lines = [
-        f"\\begin{{{env}}}[t]",
-        "\\centering",
-        body,
-        f"\\caption{{{caption}}}",
-        f"\\label{{{label}}}",
-        f"\\end{{{env}}}",
-    ]
+    spec = _POS_SPEC.get(pos, "[t]")
+    cap = f"\\caption{{{caption}}}\n\\label{{{label}}}"
+    inner = f"{body}\n{cap}" if (captionpos or "bottom") == "bottom" else f"{cap}\n{body}"
+    prefix = "\\FloatBarrier\n" if pos == "barrier" else ""
+    lines = [f"{prefix}\\begin{{{env}}}{spec}", "\\centering", inner, f"\\end{{{env}}}"]
     return "\n".join(lines)
 
 
@@ -76,9 +101,31 @@ def extract_fences(md: str) -> list[tuple[str, str, str]]:
     ]
 
 
+def _attr(attr: str, key: str, allowed: tuple[str, ...]) -> str | None:
+    m = re.search(rf"{key}\s*=\s*([^\s}}]+)", attr)
+    if not m:
+        return None
+    if m.group(1) not in allowed:
+        raise ValueError(f"{key} must be {'|'.join(allowed)}, got {m.group(1)!r}")
+    return m.group(1)
+
+
+def _width_attr(attr: str) -> str | None:
+    m = re.search(r"width\s*=\s*([^\s}]+)", attr)
+    if not m:
+        return None
+    v = m.group(1)
+    if re.fullmatch(r"[0-9.]*[0-9]", v):
+        if not 0 < float(v) <= 2:
+            raise ValueError(f"width fraction must be in (0, 2], got {v!r}")
+        return v
+    if re.fullmatch(r"[0-9.]+(cm|mm|in|pt|pc|bp|dd|cc|sp|em|ex)", v) or v.startswith("\\"):
+        return v
+    raise ValueError(f"width must be a fraction or TeX length, got {v!r}")
+
+
 def _span_attr(attr: str) -> str | None:
-    m = re.search(r"span\s*=\s*(column|wide)", attr)
-    return m.group(1) if m else None
+    return _attr(attr, "span", ("column", "wide"))
 
 
 def weave_fragment(md: str, toml_src: str = "") -> list[Element]:
@@ -89,6 +136,7 @@ def weave_fragment(md: str, toml_src: str = "") -> list[Element]:
     configured kind default.
     """
     spans = config_spans(toml_src)
+    floats = {k: v for k, v in spans.items() if k.startswith("float_")}
     out: list[Element] = []
     for lang, attr, body in extract_fences(md):
         if lang != "mermaid":
@@ -102,5 +150,7 @@ def weave_fragment(md: str, toml_src: str = "") -> list[Element]:
                 label = s.split(":", 1)[1].strip()
         tikz = _flowchart_to_tikz(body)
         span = resolve_span("diagram", _span_attr(attr), spans)
-        out.append(Element("diagram", tikz, caption, label, span))
+        pos = resolve_pos("diagram", _attr(attr, "pos", tuple(_POS_SPEC)), floats)
+        out.append(Element("diagram", tikz, caption, label, span, pos,
+                           _width_attr(attr), _attr(attr, "captionpos", ("top", "bottom"))))
     return out

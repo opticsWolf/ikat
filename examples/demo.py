@@ -37,7 +37,7 @@ outdir = HERE / "demo-out"
 outdir.mkdir(exist_ok=True)
 
 floats = [
-    figure_env(el.body_tex, el.caption, el.label, el.span)
+    figure_env(el.body_tex, el.caption, el.label, el.span, el.pos or "top", el.width, el.captionpos)
     for el in weave_fragment(md, toml_src)
 ]
 tex = PREAMBLE + "\n\n".join(floats) + "\n\\end{document}\n"
