@@ -131,7 +131,7 @@ no hand-tuning.
 - **M4.4 self-hosting.** ✅ DONE 2026-10-07 — the paper builds with
   ikat itself (`ikat weave paper/paper-2026-10-05.md --spec
   paper/ikat-spec.json --bib paper/refs.bib`, byte-identical);
-  `build-paper.py` retired to `docs/build-paper-retired.py`; new
+  `build-paper.py` retired (kept in git history, not in the tree); new
   `--bib` flag derives `bib_keys` from the `.bib` (no frozen
   derived data, no drift).
 - **M4.9 tectonic engine (prototype).** ✅ DONE 2026-10-07 —
