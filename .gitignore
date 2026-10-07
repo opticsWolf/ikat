@@ -19,3 +19,7 @@ examples/ikat-paper/out/
 *.blg
 *.pdf
 !examples/*.pdf
+
+# Another agent/design round scratch space (impeccable) — not part of ikat
+PRODUCT.md
+.impeccable/
