@@ -135,7 +135,7 @@ pub fn lineplot(
         out.push_str("  \\addplot+[error bars/.cd,y explicit] coordinates {\n");
         for ((x, y), e) in xs.iter().zip(ys.iter()).zip(es.iter()) {
             out.push_str(&format!(
-                "    ({},{}) +- (,{})\n",
+                "    ({},{}) +- (0,{})\n",
                 fmt_num(*x),
                 fmt_num(*y),
                 fmt_num(e.max(0.0))
@@ -150,6 +150,13 @@ pub fn lineplot(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lineplot_error_bars_parse() {
+        let got = lineplot("t", "x", "y", &[1.0], &[("s", vec![2.0], vec![0.0])]).unwrap();
+        assert!(got.contains("(1,2) +- (0,0)"));
+        assert!(!got.contains("+- (,"));
+    }
 
     fn groups() -> (Vec<String>, Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
         (

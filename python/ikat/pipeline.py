@@ -82,7 +82,10 @@ def figure_env(body_tex: str, caption: str, label: str, span: str,
     if body_tex.lstrip().startswith("\\begin{tikzpicture}"):
         body = body_tex
         if width is not None and re.fullmatch(r"[0-9.]*[0-9]", width) and "[scale=" not in body:
-            body = body.replace("\\begin{tikzpicture}", "\\begin{tikzpicture}[scale=" + width + "]", 1)
+            if "\\begin{tikzpicture}[" in body:
+                body = body.replace("\\begin{tikzpicture}[", "\\begin{tikzpicture}[scale=" + width + ",", 1)
+            else:
+                body = body.replace("\\begin{tikzpicture}", "\\begin{tikzpicture}[scale=" + width + "]", 1)
     else:  # external graphic: scale it
         body = f"\\includegraphics{width_opt}{{{body_tex}}}"
     spec = _POS_SPEC.get(pos, "[t]")

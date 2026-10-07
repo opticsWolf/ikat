@@ -209,8 +209,21 @@ fn figure_block(
     let body = if is_tikz {
         match width {
             None => body_tex.to_string(),
-            Some(f) if f.parse::<f64>().is_ok() && !body_tex.contains("[scale=") => body_tex
-                .replacen("\\begin{tikzpicture}", &format!("\\begin{{tikzpicture}}[scale={f}]"), 1),
+            Some(f) if f.parse::<f64>().is_ok() && !body_tex.contains("[scale=") => {
+                if body_tex.contains("\\begin{tikzpicture}[") {
+                    body_tex.replacen(
+                        "\\begin{tikzpicture}[",
+                        &format!("\\begin{{tikzpicture}}[scale={f},"),
+                        1,
+                    )
+                } else {
+                    body_tex.replacen(
+                        "\\begin{tikzpicture}",
+                        &format!("\\begin{{tikzpicture}}[scale={f}]"),
+                        1,
+                    )
+                }
+            }
             _ => {
                 needs.graphicx = true;
                 let w = width_to_tex(width, span_w);
@@ -931,6 +944,14 @@ mod tests {
         assert!(parse_attrs("width=huge", "t").is_err());
         assert!(parse_attrs("width=0", "t").is_err());
         assert!(parse_attrs("width=5cm", "t").unwrap().0.width.is_some());
+    }
+
+    #[test]
+    fn figure_width_with_existing_options() {
+        let tikz = "\\begin{tikzpicture}[>=Stealth]\n\\node{a};\\end{tikzpicture}";
+        let (f, _) = figure_block(tikz, "C", "l", Span::Column, Pos::Top, Some("0.9"), true).unwrap();
+        assert!(f.contains("\\begin{tikzpicture}[scale=0.9,>=Stealth]"));
+        assert!(!f.contains("]["));
     }
 
     #[test]
