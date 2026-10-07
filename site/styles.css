@@ -46,7 +46,7 @@
   --signal-soft: #fae5df;
   --mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
   --sans: "Source Sans 3", "Segoe UI", sans-serif;
-  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --display: "Barlow Condensed", sans-serif;
   --page: 1240px;
 }
 
