@@ -1,0 +1,96 @@
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Validate static site and local references
+        shell: bash
+        run: |
+          test -s site/index.html
+          test -s site/styles.css
+          test -s site/script.js
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import unquote, urlsplit
+          import re
+
+          root = Path("site")
+          html = (root / "index.html").read_text(encoding="utf-8")
+
+          class PageParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.ids = set()
+                  self.refs = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if "id" in attrs:
+                      self.ids.add(attrs["id"])
+                  for key in ("href", "src"):
+                      value = attrs.get(key, "")
+                      if value:
+                          self.refs.append(value)
+
+          page = PageParser()
+          page.feed(html)
+          errors = []
+          for ref in page.refs:
+              url = urlsplit(ref)
+              if url.scheme or url.netloc:
+                  continue
+              if url.fragment and not url.path and url.fragment not in page.ids:
+                  errors.append(f"missing in-page target #{url.fragment}")
+                  continue
+              if not url.path:
+                  continue
+              target = root / unquote(url.path)
+              if not target.is_file():
+                  errors.append(f"missing local file for {ref}")
+
+          css = (root / "styles.css").read_text(encoding="utf-8")
+          for raw in re.findall(r"url\([\"']?([^\)\"']+)", css):
+              if raw.startswith(("http:", "https:", "data:")):
+                  continue
+              if not (root / unquote(raw)).is_file():
+                  errors.append(f"missing CSS asset {raw}")
+
+          if "<title>ikat" not in html:
+              errors.append("page title is missing")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print(f"Static site OK: {len(page.ids)} ids, {len(page.refs)} HTML references, CSS assets present")
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f7fc">
+  <meta name="description" content="Ikat turns Markdown, flowcharts, and plot data into LaTeX and PDF, with figures generated as editable TikZ and pgfplots source.">
+  <meta property="og:title" content="ikat: Keep every figure inside the paper">
+  <meta property="og:description" content="A Rust-powered Markdown-to-LaTeX pipeline for papers with editable, TeX-native figures.">
+  <meta property="og:type" content="website">
+  <title>ikat: Keep every figure inside the paper</title>
+  <link rel="preload" href="assets/fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/source-sans-3-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark" href="#top" aria-label="ikat home">ikat<span class="wordmark-dot" aria-hidden="true">.</span></a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#pipeline">How it works</a>
+      <a href="#try-it">Try it</a>
+      <a href="#showcase">Showcase</a>
+      <a class="nav-repo" href="https://github.com/opticsWolf/ikat">GitHub repository</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero page-width" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">Keep every figure <span>inside the paper.</span></h1>
+        <p class="hero-lede">Ikat turns Markdown, flowcharts, and plot data into LaTeX and PDF. Diagrams and charts stay editable as TeX-native source that uses the paper’s own fonts.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#try-it">Try ikat from source</a>
+          <a class="text-link" href="#pipeline">See what it emits</a>
+        </div>
+        <p class="requirements-line"><strong>Python 3.10+</strong><span aria-hidden="true">·</span><strong>Rust</strong><span aria-hidden="true">·</span><strong>TeX for PDF output</strong></p>
+      </div>
+
+      <figure class="assembly-figure" aria-labelledby="assembly-title" aria-describedby="assembly-description">
+        <figcaption class="assembly-head">
+          <div>
+            <p class="drawing-title" id="assembly-title">Document assembly</p>
+            <p class="drawing-ref">Pipeline view / source to output</p>
+          </div>
+          <button class="assembly-control js-only" id="assemble-button" type="button" aria-pressed="false" aria-controls="assembly-board">Assemble the layers</button>
+        </figcaption>
+        <div class="assembly-board" id="assembly-board" data-state="exploded" role="group" aria-label="Exploded view of ikat’s document pipeline">
+          <div class="leader leader-one" aria-hidden="true"></div>
+          <div class="leader leader-two" aria-hidden="true"></div>
+          <div class="leader leader-three" aria-hidden="true"></div>
+
+          <article class="assembly-part part-source">
+            <div class="part-caption"><span class="part-index">A</span><span>MANUSCRIPT</span></div>
+            <h3>paper.md</h3>
+            <pre><code># A paper
+Text + citations
+```mermaid</code></pre>
+          </article>
+          <article class="assembly-part part-figures">
+            <div class="part-caption"><span class="part-index">B</span><span>FIGURE SOURCE</span></div>
+            <h3>Diagram + data</h3>
+            <div class="figure-samples" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+            <p>Flowchart · plot values</p>
+          </article>
+          <article class="assembly-part part-engine">
+            <div class="part-caption"><span class="part-index">C</span><span>RUST CORE</span></div>
+            <h3>ikat</h3>
+            <p>Parse · lay out · emit</p>
+          </article>
+          <article class="assembly-part part-output">
+            <div class="part-caption"><span class="part-index">D</span><span>DOCUMENT</span></div>
+            <h3>paper.tex</h3>
+            <p class="output-line">TikZ + pgfplots</p>
+            <p class="output-stamp">PDF, when TeX is installed</p>
+          </article>
+        </div>
+        <p id="assembly-description" class="sr-only">Markdown and editable figure inputs pass through ikat’s Rust core, which emits LaTeX with TikZ and pgfplots figures. PDF compilation uses the local TeX installation.</p>
+        <p class="assembly-status" id="assembly-status" aria-live="polite">The parts are separated so each input and output is visible.</p>
+        <noscript><p class="noscript-note">The assembly view is shown as a static exploded diagram. The pipeline description and all commands are available below.</p></noscript>
+      </figure>
+    </section>
+
+    <section class="source-proof section-rule" id="pipeline" aria-labelledby="pipeline-title">
+      <div class="page-width">
+        <div class="section-heading">
+          <h2 id="pipeline-title">Not a screenshot. <span>A source fragment.</span></h2>
+          <p>Write the flowchart once. Ikat’s Rust emitter turns the supported Mermaid flowchart subset into TikZ, ready for the same TeX build as the paper.</p>
+        </div>
+        <div class="source-output">
+          <figure class="code-sheet code-input">
+            <figcaption><span class="sheet-index">INPUT</span><span>Mermaid source</span></figcaption>
+            <pre><code>graph TD
+  md[Markdown] --&gt; rust[Rust core]
+  rust --&gt; tikz[TikZ + pgfplots]
+  tikz --&gt; pdf[PDF]</code></pre>
+          </figure>
+          <div class="join-mark" aria-hidden="true"><span></span></div>
+          <figure class="code-sheet code-output">
+            <figcaption><span class="sheet-index">EMITTED</span><span>Rust-generated TikZ</span></figcaption>
+            <pre><code>\begin{tikzpicture}[&gt;=Stealth,
+  every node/.style={align=center,font=\small},
+  box/.style={draw,rounded corners=2pt,fill=gray!8},
+  dia/.style={draw,diamond,aspect=2,fill=blue!8},
+  stad/.style={draw,rounded corners=10pt,fill=gray!8},
+  sub/.style={draw,double,fill=gray!8}]
+  \node (md) at (0.0,-0.0) [box] {Markdown};
+  \node (rust) at (0.0,-2.4) [box] {Rust core};
+  \node (tikz) at (0.0,-4.8) [box] {TikZ + pgfplots};
+  \node (pdf) at (0.0,-7.2) [box] {PDF};
+  \draw[-&gt;] (md) -- (rust);
+  \draw[-&gt;] (rust) -- (tikz);
+  \draw[-&gt;] (tikz) -- (pdf);
+\end{tikzpicture}</code></pre>
+          </figure>
+        </div>
+        <p class="proof-note">A short excerpt from ikat’s actual flowchart emitter. The generated TikZ stays text, not a screenshot of a browser canvas.</p>
+      </div>
+    </section>
+
+    <section class="try-section" id="try-it" aria-labelledby="try-title">
+      <div class="page-width try-grid">
+        <div class="try-intro">
+          <h2 id="try-title">Build it. Then weave a paper.</h2>
+          <p>Try the current source with Python and Rust installed. The <code>--no-pdf</code> build writes LaTeX without TeX installed; remove that flag after adding TeX Live or TinyTeX to produce a PDF.</p>
+          <ul class="prerequisites" aria-label="Build prerequisites">
+            <li>Python 3.10 or newer</li>
+            <li>Rust stable toolchain</li>
+            <li>TeX only for PDF compilation</li>
+          </ul>
+          <a class="try-secondary" href="https://github.com/opticsWolf/ikat">Open the source repository</a>
+        </div>
+        <div class="install-sheet">
+          <div class="install-heading">
+            <h3>Quick start</h3>
+            <span>Source build</span>
+          </div>
+          <details class="command-details" open>
+            <summary>macOS / Linux</summary>
+            <div class="command-block">
+              <pre><code id="unix-commands">git clone https://github.com/opticsWolf/ikat.git
+cd ikat
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install maturin pytest
+maturin develop
+python -m pytest tests/
+ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
+              <button class="copy-button js-only" type="button" data-copy="unix-commands">Copy commands</button>
+            </div>
+          </details>
+          <details class="command-details">
+            <summary>Windows PowerShell</summary>
+            <div class="command-block">
+              <pre><code id="windows-commands">git clone https://github.com/opticsWolf/ikat.git
+cd ikat
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install maturin pytest
+maturin develop
+python -m pytest tests/
+ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
+              <button class="copy-button js-only" type="button" data-copy="windows-commands">Copy commands</button>
+            </div>
+          </details>
+          <p class="copy-status" id="copy-status" aria-live="polite"></p>
+          <p class="install-footnote">For a PDF, install a TeX distribution and rerun the last command without <code>--no-pdf</code>. Add <code>mcp&gt;=1,&lt;2</code> if you also want ikat’s optional MCP server.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="capabilities section-rule" aria-labelledby="capabilities-title">
+      <div class="page-width">
+        <div class="section-heading capability-heading">
+          <h2 id="capabilities-title">One pipeline. <span>Paper-native output.</span></h2>
+          <p>Rust owns parsing, layout, and figure code generation. Python carries document strings and drives the tools.</p>
+        </div>
+        <dl class="capability-list">
+          <div class="capability-row">
+            <dt><span class="row-code">INPUT</span>Markdown</dt>
+            <dd>Headings, tables, citations, code, footnotes, math, and Unicode become a complete LaTeX document.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">DIAGRAMS</span>Mermaid → TikZ</dt>
+            <dd>A strict <code>graph TD</code> / <code>graph LR</code> flowchart subset, laid out deterministically. Unsupported syntax fails fast.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">PLOTS</span>Data → pgfplots</dt>
+            <dd>Bar and line plots are emitted directly as TeX, including whiskers, log axes, and collision-aware legend placement.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">LAYOUT</span>Floats + templates</dt>
+            <dd>Configure width, column span, placement, document heads, and whole-document skeletons without surrendering the source.</dd>
+          </div>
+        </dl>
+        <p class="tex-note"><strong>TeX boundary:</strong> <code>ikat weave</code> writes TeX without TeX installed. To compile a PDF, use a local <code>pdflatex</code> installation; a bibliography also needs <code>bibtex</code>.</p>
+      </div>
+    </section>
+
+    <section class="showcase-section" id="showcase" aria-labelledby="showcase-title">
+      <div class="page-width showcase-layout">
+        <div>
+          <h2 id="showcase-title">The example paper is its own demo.</h2>
+          <p>The showcase manuscript exercises the pipeline with Mermaid diagrams, plots, tables, citations, math, Unicode, float controls, and templates. Its Markdown and build script are in the repository.</p>
+        </div>
+        <div class="reference-list" aria-label="Project resources">
+          <a href="https://github.com/opticsWolf/ikat/tree/main/examples/ikat-paper"><span>Showcase paper source</span><span class="resource-type">EXAMPLE</span></a>
+          <a href="https://github.com/opticsWolf/ikat/blob/main/docs/QUICKREF.md"><span>Quick reference</span><span class="resource-type">COMMANDS</span></a>
+          <a href="https://github.com/opticsWolf/ikat/blob/main/docs/ARCHITECTURE.md"><span>Architecture</span><span class="resource-type">DESIGN</span></a>
+          <a href="https://github.com/opticsWolf/ikat/blob/main/docs/ROADMAP.md"><span>Roadmap</span><span class="resource-type">STATUS</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="page-width footer-inner">
+      <a class="footer-wordmark" href="#top">ikat<span aria-hidden="true">.</span></a>
+      <p>Markdown to LaTeX, with the figures still in the paper.</p>
+      <div class="footer-links">
+        <a href="https://github.com/opticsWolf/ikat">Source</a>
+        <a href="https://github.com/opticsWolf/ikat/blob/main/LICENSE-MIT">MIT</a>
+        <a href="https://github.com/opticsWolf/ikat/blob/main/LICENSE-APACHE">Apache-2.0</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
