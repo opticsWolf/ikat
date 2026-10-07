@@ -89,14 +89,24 @@ their mermaid fences with no hand-tuning.
   with `{{{title}}}`/`{{{author}}}`/`{{{thanks}}}` tokens,
   per-template presets (bib_style + toml), `abstract_before_maketitle`
   hoist for top-matter classes, all nine compile-proven locally.
-- **M4.3 claim the names.** Publish 0.1.0 to crates.io + PyPI early —
-  both `ikat` names are currently free and publishing reserves them.
+- **M4.3 claim the names.** ✅ READY 2026-10-07 — both `ikat`
+  names verified free; `cargo publish --dry-run` green; release
+  wheel proven in a clean venv (9 heads + skeleton, weave ok);
+  `v0.1.0` tagged. Needs your two tokens to ship (below).
 - **M4.4 self-hosting.** ✅ DONE 2026-10-07 — the paper builds with
   ikat itself (`ikat weave paper/paper-2026-10-05.md --spec
   paper/ikat-spec.json --bib paper/refs.bib`, byte-identical);
   `build-paper.py` retired to `docs/build-paper-retired.py`; new
   `--bib` flag derives `bib_keys` from the `.bib` (no frozen
   derived data, no drift).
+- **M4.9 tectonic engine (prototype).** ✅ DONE 2026-10-07 —
+  `compile_pdf(engine="tectonic")` cascades embedded binding
+  (`tectonic` cargo feature, off by default) → `TECTONIC_EXE`/PATH
+  binary; `tex_for_tectonic` drops the inputenc line; woven doc
+  with TikZ+table compiled to a content-verified PDF. Crate
+  embedding blocked on Windows C deps (Linux-CI exercise); empty
+  `bib_name` now emits no bibliography lines (tectonic auto-runs
+  BibTeX and dies on empty `\bibliography{}`).
 
 ## Non-goals
 

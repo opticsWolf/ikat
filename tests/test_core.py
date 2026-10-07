@@ -71,3 +71,35 @@ def test_weave_fragment():
     assert el.body_tex.startswith("\\begin{tikzpicture}")
     (el2,) = weave_fragment("```mermaid\n" + READ_Q + "```\n")
     assert el2.span == "wide"  # configured kind default
+
+
+def test_empty_bib_name_omits_bibliography():
+    from ikat import BuildSpec, build_document
+
+    r = build_document("# T\n\n## 1. I\n\nHi.\n", "", BuildSpec(bib_name=""))
+    assert "bibliography" not in r.tex
+    r = build_document("# T\n\n## 1. I\n\nHi.\n", "", BuildSpec())
+    assert r"\bibliography{refs-paper}" in r.tex
+
+
+def test_tex_for_tectonic_drops_inputenc():
+    from ikat.compile import tex_for_tectonic
+
+    tex = ('\\documentclass{article}' + '\n' + '\\usepackage[utf8]{inputenc}' + '\n' + '\\usepackage{tikz}' + '\n')
+    out = tex_for_tectonic(tex)
+    assert "inputenc" not in out
+    assert r"\usepackage{tikz}" in out
+
+
+def test_tectonic_engine_errors_helpfully_without_backend(monkeypatch, tmp_path):
+    from ikat.compile import CompileError, compile_pdf
+
+    monkeypatch.delenv("TECTONIC_EXE", raising=False)
+    monkeypatch.setattr("shutil.which", lambda *a, **k: None)
+    (tmp_path / "t.tex").write_text("\\documentclass{article}\n", encoding="utf-8")
+    try:
+        compile_pdf(tmp_path, "t.tex", engine="tectonic")
+    except CompileError as e:
+        assert "tectonic" in str(e).lower()
+    else:  # pragma: no cover - embedded binding present (feature build)
+        pass

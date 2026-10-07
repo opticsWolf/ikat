@@ -12,6 +12,8 @@ mod md_spike;
 mod mermaid;
 mod plot;
 mod table;
+#[cfg(feature = "tectonic")]
+mod tectonic;
 mod texenv;
 
 /// Convert a mermaid flowchart block to a standalone `tikzpicture`.
@@ -183,6 +185,14 @@ fn tex_extra_packages(tex: &str) -> Vec<String> {
     doc::tex_extra_packages(tex)
 }
 
+/// Tectonic engine (feature `tectonic` only): full `.tex` in,
+/// PDF bytes out. Absent without the feature — see `compile.py`.
+#[cfg(feature = "tectonic")]
+#[pyfunction]
+fn compile_tectonic_pdf(tex: &str) -> PyResult<Vec<u8>> {
+    crate::tectonic::compile_tectonic(tex).map_err(pyo3::exceptions::PyRuntimeError::new_err)
+}
+
 /// ikat core (Rust): mermaid→TikZ, data→pgfplots, document config.
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -198,5 +208,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(used_packages, m)?)?;
     m.add_function(wrap_pyfunction!(document_class, m)?)?;
     m.add_function(wrap_pyfunction!(package_needs, m)?)?;
+    #[cfg(feature = "tectonic")]
+    m.add_function(wrap_pyfunction!(compile_tectonic_pdf, m)?)?;
     Ok(())
 }

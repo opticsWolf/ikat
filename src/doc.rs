@@ -773,14 +773,21 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     if !topmatter.is_empty() {
         head.push(topmatter);
     }
+    // No bib_name (working paper without refs): no bibliography lines
+    // at all. An empty `\bibliography{}` warns under pdfTeX but kills
+    // engines that auto-run BibTeX (tectonic builds an item-less
+    // thebibliography and dies at \end{thebibliography}).
     head.extend([
         "\\maketitle".to_string(),
         rest,
-        format!("\\bibliographystyle{{{}}}", spec.bib_style),
-        format!("\\bibliography{{{}}}", spec.bib_name),
-        "\\end{document}".to_string(),
-        String::new(),
     ]);
+    if !spec.bib_name.is_empty() {
+        head.extend([
+            format!("\\bibliographystyle{{{}}}", spec.bib_style),
+            format!("\\bibliography{{{}}}", spec.bib_name),
+        ]);
+    }
+    head.extend(["\\end{document}".to_string(), String::new()]);
     let doc = head.join("\n");
     Ok(BuildResult {
         title,

@@ -174,3 +174,20 @@ Fit for ikat: **yes, as an optional engine, not the default.**
 Not implemented yet: tectonic's C build is slow and its CDN may be
 unreachable from some sandboxes — prototype on a networked machine
 first, behind the feature flag.
+
+### Prototype results (2026-10-07)
+
+✅ PROVEN via the binary cascade. `compile_pdf(engine="tectonic")`
+routes embedded-binding → `TECTONIC_EXE`/PATH binary; `src/tectonic.rs`
++ `compile_tectonic_pdf` binding exist behind the cargo feature
+(default off). A woven article (inline TikZ, `[!tb]` float,
+table, abstract) compiled to a content-verified PDF.
+
+- Crate path BLOCKED on Windows: tectonic's C deps (libpng et al.
+  via pkg-config/system libs) don't build here; embedding stays a
+  Linux-CI exercise. The binary cascade is the supported path.
+- Two real findings: XeTeX needs the inputenc line dropped
+  (`tex_for_tectonic`, automatic); empty `bib_name` must emit NO
+  `\bibliography{}` line (pdfTeX warns, tectonic auto-runs BibTeX
+  and dies on the item-less thebibliography) — fixed in the core,
+  all suites green.

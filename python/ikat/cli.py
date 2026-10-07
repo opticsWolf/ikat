@@ -64,7 +64,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     if a.no_pdf:
         return 0
     try:
-        pdf = compile_pdf(outdir, tex_path.name, ensure_packages=a.ensure_packages)
+        pdf = compile_pdf(outdir, tex_path.name, ensure_packages=a.ensure_packages, engine=a.engine)
     except Exception as e:
         print(f"compile failed: {e}", file=sys.stderr)
         return 1
@@ -144,6 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--outdir", default=None)
     b.add_argument("--spec", default=None, help="BuildSpec JSON (diagrams/plots/captions/...)")
     b.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
+    b.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
     b.add_argument("--no-pdf", action="store_true", help="stop after .tex (no TeX needed)")
