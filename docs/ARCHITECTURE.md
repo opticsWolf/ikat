@@ -4,14 +4,14 @@
 mini.md + ikat.toml
       │  fences, tables, citations
       ▼
-┌───────────── python/ikat/pipeline.py ─────────────┐
-│ Element(kind, body, caption, label, span?)          │
+┌───────────── python/ikat/pipeline.py ──────────────┐
+│ Element(kind, body, caption, label, span?)         │
 │ resolve_span(): toml default ← fence attr ← call   │
 │ figure_env(): figure vs figure* + width            │
 └──────┬──────────────────────────────┬──────────────┘
        │ mermaid fence                │ data (plots)
        ▼                              ▼
-┌─ Rust src/mermaid.rs ───┐  ┌─ Rust src/plot.rs ────┐
+┌─ Rust src/mermaid.rs ──┐  ┌── Rust src/plot.rs ───┐
 │ parse → layered layout │  │ tables → pgfplots code│
 │ → tikzpicture          │  │ bar+whiskers, log-y,  │
 └────────────────────────┘  │ lines+error bars      │
