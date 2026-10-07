@@ -8,7 +8,9 @@ core owns parsing, layout math, and code generation while thin Python
 wrappers carry strings across the boundary. Float placement, publisher
 templates, and engine choice are configuration, not post-processing.
 This paper is its own demo: every heading, float, table, citation,
-and plot below was woven by ikat itself.
+and plot below was woven by ikat itself. (52 Rust tests, 42 Python
+tests, and compile proofs guard the behavior; acceptance is one
+document rebuilt to the byte.)
 
 ## 1. Introduction
 
@@ -37,9 +39,8 @@ unknown attributes, dangling citation keys, and doubled skeleton
 tokens are build errors — LaTeX logs are never the debugger.
 Second, defaults never move: tuning emits preamble lines only when
 they differ from the LaTeX defaults, so untouched documents weave
-byte-identically. Third, the paper is the test suite — 50 Rust tests
-and 42 Python tests guard behavior, but acceptance is one document
-rebuilt to the byte. Sections that follow use mechanisms §2–§5
+byte-identically. Third, the paper is the test suite — §4 names the
+numbers. Sections that follow use mechanisms §2–§5
 describe; §6 collects the skeleton token contract.
 
 ## 2. Architecture
@@ -54,10 +55,10 @@ tmpl[head or skeleton<br/>level 1 or level 3]-->doc[assemble document]
 body-->doc
 doc-->eng{engine?}
 eng-->|pdflatex|pdfa[PDF via TinyTeX<br/>arXiv-closest]
-eng-->|tectonic|pdfb[PDF via embedded XeTeX<br/>zero-install]
+eng-->|tectonic|pdfb[PDF via tectonic<br/>zero-install]
 ```
 
-Figure 1 shows the build as a pipeline with three inputs and one
+Figure 1 shows the build: three content inputs, a template, and one
 decision. The manuscript carries content plus per-element `{attrs}`;
 `ikat.toml` carries document policy — which kinds span columns,
 where floats may go, which template wraps the result; the spec
@@ -89,9 +90,9 @@ el[element<br/>kind + {attrs}]-->res[resolve span + pos]
 res-->col{span?}
 col-->|column|f1[figure / table]
 col-->|wide|f2[figure* / table*]
-f1-->p1[pos: top bottom<br/>both page here]
-f2-->p2[pos: top bottom<br/>both page]
-p1-->pkg[packages: float<br/>placeins dblfloatfix]
+f1-->p1[pos: top bottom<br/>both page here<br/>force barrier]
+f2-->p2[pos: top bottom<br/>both page barrier]
+p1-->pkg[packages as needed<br/>float placeins<br/>dblfloatfix]
 p2-->pkg
 ```
 
@@ -116,8 +117,9 @@ heads. Table 1 lists the attribute surface.
 | captionpos | top or bottom | figures bottom, tables top |
 
 Document-wide tuning lives in `[floats]`: this paper sets
-`topfraction` to 0.85 and `pos_default` to top, and those two lines
-are the only float preamble it emits — everything else is LaTeX
+`topfraction` 0.9, `bottomfraction` 0.7, `textfraction` 0.1,
+`topnumber` 3, `bottomnumber` 2, and `pos_default` top — six lines
+that are the only float preamble it emits, everything else LaTeX
 default, so the tuning is visible and minimal. `barrier_sections`
 caps the worst case by holding floats inside their section; the
 engines table in §5 demonstrates the per-element `barrier`
@@ -129,7 +131,7 @@ instead, pinning itself above its own section.
 
 | Suite | What it guards | Count |
 |---|---|---|
-| Rust unit | emitters, scanner, templates, floats | 50 run |
+| Rust unit | emitters, scanner, templates, floats | 52 run |
 | Python | pipeline, CLI, MCP, golden paper | 42 pass, 1 skip |
 | Compile proofs | heads, skeleton, floats, engines | PDF-verified |
 
@@ -142,15 +144,17 @@ in one command.
 
 ### 4.1 Where the code and the tests live
 
-Figure 3 counts lines per Rust module — `doc` dominates because
-assembly lives there — and Figure 4 counts test functions per
-commit across the build, Rust and Python series separately. Both
-series are grep-true: `#[test]` attributes and `def test`
-functions, counted from history, with no smoothing and no
-invention. The Python jump at commit 7 is the CLI/MCP surface
-landing; the Rust steps track floats, skeletons, and the AST spike.
-Growth is linear because each milestone ships its proofs — the
-spike paper trail is typical: conjecture, probe, verdict, all in
+Figure 3 counts lines per shipped Rust module — `doc` dominates
+because assembly lives there (the test-only spike module aside) —
+and Figure 4 counts test functions per commit across the build,
+Rust and Python series separately. Both series are grep-true:
+`#[test]` attributes and `def test` functions, counted from
+history, with no smoothing and no invention. The Python steps
+track texenv tests (7), the CLI/MCP surface (10), floats (12),
+and skeletons (13); the Rust steps track texenv (7), templates
+(8), heads (9), floats (12), skeletons (13), and the AST spike
+(14). Growth is linear because each milestone ships its proofs —
+the spike paper trail is typical: conjecture, probe, verdict, all in
 the tree.
 
 ## 5. Engines and templates

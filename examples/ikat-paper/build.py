@@ -35,8 +35,8 @@ FIGS = OUT / "figs"
 
 # Real data, grep-counted from the ikat tree (see README below).
 RUST_LOC = {
-    "config": 473, "doc": 1044, "esc": 281, "lib": 214,
-    "mermaid": 450, "plot": 209, "table": 213,
+    "config": 473, "doc": 1065, "esc": 281, "lib": 214,
+    "mermaid": 450, "plot": 224, "table": 213,
     "tectonic": 43, "texenv": 253,
 }
 GROWTH_RUST = [21, 22, 22, 22, 22, 22, 28, 32, 36, 36, 36, 46, 49, 50, 50, 50, 51]
@@ -131,11 +131,11 @@ def make_paper() -> None:
     ref_bib = (HERE / "refs.bib").read_text(encoding="utf-8")
     spec = BuildSpec(
         diagrams=[
-            DiagramEntry(key="fig-pipeline", caption="The ikat build: three inputs, one decision.", mode="inline"),
+            DiagramEntry(key="fig-pipeline", caption="The ikat build: three inputs, a template, one decision.", mode="inline"),
             DiagramEntry(key="fig-floats", caption="Float resolution: attrs against policy.", mode="inline"),
         ],
         plots=[
-            ("fig-loc", "Rust lines of code by module (wc, HEAD)."),
+            ("fig-loc", "Rust lines of code by shipped module (wc, HEAD; test-only spike excluded)."),
             ("fig-tests", "Test functions per commit, both suites (grep, no smoothing)."),
         ],
         plot_attrs={"fig-tests": "pos=bottom"},
