@@ -64,6 +64,8 @@ graphics hold a column.
 | preamble scan + file→tlmgr map | `src/texenv.rs` | `cargo test` (6) |
 | kpsewhich/tlmgr probe + install | `python/ikat/texenv.py` | pytest (7+fakes) |
 | shipped heads + presets | `python/ikat/templates/` + `template_preset` | pytest + headsproof (needs TeX) |
+| unified CLI | `python/ikat/cli.py` (`ikat` script) | pytest test_surface |
+| MCP server (FastMCP stdio) | `python/ikat/mcp_server.py` | pytest test_surface (skips w/o extra) |
 
 ## Roadmap
 

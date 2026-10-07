@@ -65,8 +65,12 @@ their mermaid fences with no hand-tuning.
 
 - **M4.1 errors.** Line-numbered parse errors (statement echo +
   caret) instead of bare strings.
-- **M4.2 CLI.** `ikat build doc.md` → PDF in one command (md + toml
-  discovery, workdir isolation, log tail on failure).
+- **M4.2 CLI.** ✅ DONE 2026-10-07 — `ikat build/weave/check/templates/template/flowchart/version`
+  (`python/ikat/cli.py`, `ikat` console script): same operations as
+  the API, `--spec` BuildSpec JSON, `--ensure-packages` gate.
+- **M4.8 MCP server.** ✅ DONE 2026-10-07 — `python -m
+  ikat.mcp_server` (FastMCP stdio, `ikat[mcp]` extra): nine tools
+  mirroring the CLI/API map; `compile_pdf` deliberately excluded.
 - **M4.2b CI compile check.** Docker TeX Live job compiling the
   demo and the paper on every push (backend verification, not a
   user-facing backend).

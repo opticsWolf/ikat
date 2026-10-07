@@ -61,6 +61,21 @@ class BuildResult:
     n_tables: int
 
 
+def spec_from_dict(raw: dict) -> BuildSpec:
+    """BuildSpec from a plain dict (CLI --spec JSON, MCP spec_json).
+    Unknown keys are ignored; diagrams accept entry dicts."""
+    raw = dict(raw)
+    diagrams = [
+        d if isinstance(d, DiagramEntry) else DiagramEntry(**d)
+        for d in raw.pop("diagrams", [])
+    ]
+    known = set(BuildSpec.__dataclass_fields__)
+    raw = {k: v for k, v in raw.items() if k in known}
+    if isinstance(raw.get("bib_keys"), list):
+        raw["bib_keys"] = set(raw["bib_keys"])
+    return BuildSpec(diagrams=diagrams, **raw)
+
+
 def build_document(md_text: str, toml_src: str, spec: BuildSpec) -> BuildResult:
     r = json.loads(_build_document(md_text, toml_src, spec.to_json()))
     return BuildResult(r["title"], r["body"], r["tex"], r["n_diagrams"], r["n_tables"])

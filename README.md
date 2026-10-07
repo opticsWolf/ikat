@@ -39,6 +39,59 @@ ikat/
   examples/       ikat.toml + mini.md starter document
 ```
 
+## Develop
+
+Requires Rust (cargo) and Python ≥ 3.10.
+
+```bash
+uv venv .venv && uv pip install -p .venv maturin pytest
+VIRTUAL_ENV=$PWD/.venv maturin develop
+.venv/Scripts/pytest tests/      # windows
+cargo test                       # Rust unit tests
+```
+
+## CLI / MCP / API — one surface
+
+Same operations three ways. Python API is the reference; the CLI
+and the MCP server call it directly (`ikat[mcp]` pins `mcp>=1,<2`).
+
+```bash
+ikat build doc.md --toml ikat.toml --outdir out --ensure-packages
+ikat weave doc.md --spec spec.json > doc.tex   # tex to stdout, no TeX needed
+ikat check doc.tex [--install]                 # missing packages (-> exit 1)
+ikat templates | ikat template arxiv --show-preset
+printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
+ikat version
+```
+
+`--spec` is BuildSpec JSON (diagrams/plots/table_captions/bib_style/…;
+unknown keys ignored). MCP server over stdio:
+
+```bash
+python -m ikat.mcp_server
+```
+
+```jsonc
+// Claude Desktop / pi client config
+{ "mcpServers": { "ikat": {
+  "command": "/path/to/.venv/Scripts/python.exe",
+  "args": ["-m", "ikat.mcp_server"],
+  "cwd": "/path/to/ikat" } } }
+```
+
+| operation | Python API | CLI | MCP tool |
+|---|---|---|---|
+| weave document | `build_document` / `build_from_paths` | `ikat build` / `weave` | `weave_document` |
+| flowchart | `flowchart_to_tikz` | `ikat flowchart` | `flowchart_to_tikz` |
+| bar chart | `barchart_to_tikz` | — | `barchart_to_tikz` |
+| line plot | `lineplot_to_tikz` | — | `lineplot_to_tikz` |
+| check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
+| install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
+| templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |
+
+`compile_pdf` stays out of MCP (workdir-bound, minutes-long);
+drive it from the CLI.
+
 ## Templates
 
 The generated preamble fits the common case; journals are not
