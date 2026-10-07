@@ -3,8 +3,8 @@
 [![CI](https://github.com/opticsWolf/ikat/actions/workflows/ci.yml/badge.svg)](https://github.com/opticsWolf/ikat/actions)
 [![PyPI](https://img.shields.io/pypi/v/ikat?logo=pypi)](https://pypi.org/project/ikat/)
 [![crates.io](https://img.shields.io/crates/v/ikat?logo=rust)](https://crates.io/crates/ikat)
-[![License](https://img.shields.io/github/license/opticsWolf/ikat)](https://github.com/opticsWolf/ikat)
-[![Last commit](https://img.shields.io/github/last-commit/opticsWolf/ikat)](https://github.com/opticsWolf/ikat/commits/main)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/opticsWolf/ikat/blob/main/LICENSE-MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/opticsWolf/ikat/blob/main/LICENSE-APACHE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue?logo=python)](https://www.python.org/)
 [![Rust](https://img.shields.io/badge/rust-2021-orange?logo=rust)](https://www.rust-lang.org/)
 
