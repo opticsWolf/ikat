@@ -51,7 +51,7 @@ ikat/
                   script), mcp_server.py (FastMCP stdio),
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
-  docs/           ARCHITECTURE.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
+  docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
   examples/       mini.md starter + ikat-paper/ showcase (6-page paper
                   built by ikat itself), plot/float/skeleton proofs
 ```
