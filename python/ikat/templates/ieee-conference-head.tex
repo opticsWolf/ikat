@@ -1,0 +1,21 @@
+% ikat template: ieee-conference
+% IEEE conference papers (the ikat default head, made explicit and
+% reusable). Matches what build_document generates without a
+% template; start here when customizing for an IEEE venue.
+%
+% Tokens {{{title}}} {{{author}}} {{{thanks}}} are filled from the build.
+% Companion config: none (defaults); spec bib_style stays IEEEtran.
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\title{{{title}}\thanks{{{thanks}}}}
+\author{\IEEEauthorblockN{{{author}}}}

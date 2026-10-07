@@ -95,6 +95,10 @@ fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>
     m.insert("margins".to_string(), cfg.document.margins.clone());
     m.insert("template_preamble_file".to_string(), cfg.template.preamble_file.clone());
     m.insert("template_preamble_append".to_string(), cfg.template.preamble_append.join("\n"));
+    m.insert(
+        "template_abstract_before_maketitle".to_string(),
+        cfg.template.abstract_before_maketitle.to_string(),
+    );
     for kind in ["diagram", "plot", "table", "default"] {
         let span = cfg.spans.for_kind(kind);
         m.insert(format!("span_{kind}"), span.latex_env().to_string());

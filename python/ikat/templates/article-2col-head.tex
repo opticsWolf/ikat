@@ -1,0 +1,23 @@
+% ikat template: article-2col
+% Two-column article via the class option. Diagrams default to
+% figure* (full text width) — keep [spans] diagram = "wide";
+% plots and tables stay in-column.
+%
+% Tokens {{{title}}} {{{author}}} {{{thanks}}} are filled from the build.
+% Companion config: none beyond the span defaults.
+\documentclass[11pt,twocolumn]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\title{{{title}}}
+\author{{{author}}}
+\date{}

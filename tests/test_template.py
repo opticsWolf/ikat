@@ -8,6 +8,7 @@ that drop packages the body needs.
 import pytest
 
 from ikat import BuildSpec, DiagramEntry, build_from_paths
+from ikat import list_templates, template_path, template_preset
 
 MD = "# T\n\n## 1. I\n\nHi.\n"
 MD_TIKZ = MD + "\n```mermaid\ngraph TD\na[x]-->b[y]\n```\n"
@@ -64,6 +65,23 @@ def test_no_template_keeps_generated_head(tmp_path):
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
     r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
     assert "\\documentclass[conference]{IEEEtran}" in r.tex
+
+
+def test_library_heads_are_valid_templates():
+    names = list_templates()
+    assert len(names) == 9
+    for name in names:
+        head = template_path(name).read_text(encoding="utf-8")
+        assert "\\documentclass" in head, name
+        preset = template_preset(name)
+        assert preset["bib_style"]
+
+
+def test_presets_cover_library():
+    from ikat.document import TEMPLATE_PRESETS
+    assert sorted(TEMPLATE_PRESETS) == sorted(list_templates())
+    flagged = {n for n, p in TEMPLATE_PRESETS.items() if "abstract_before_maketitle" in p["toml"]}
+    assert flagged == {"acm-sigconf", "elsevier", "aps"}
 
 
 def test_spec_override_beats_toml(tmp_path):

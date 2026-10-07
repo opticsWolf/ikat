@@ -1,0 +1,23 @@
+% ikat template: springer-llncs
+% Springer Lecture Notes in Computer Science. Multi-author idiom:
+% \author{A\inst{1} \and B\inst{2}} with matching \institute lines;
+% add \titlerunning{...} for a short running head.
+%
+% Tokens {{{title}}} {{{author}}} are filled from the build.
+% Companion config: none (abstract stays after \maketitle, as LNCS
+% expects); spec bib_style = "splncs04".
+\documentclass[runningheads]{llncs}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\title{{{title}}}
+\author{{{author}}\inst{1}}
+\institute{INSTITUTE \email{MAIL@EXAMPLE.EDU}}

@@ -92,6 +92,44 @@ the flag). Actionable now: (1) document MiKTeX-portable as the
 Windows fallback in README, (2) Docker-based CI compile check as
 a roadmap item.
 
+## Publisher requirements survey (checked 2026-10-07)
+
+What each shipped head assumes, verified against installed class
+sources (not just docs) and proven by compiling every head with
+an abstract + TikZ + table through pdflatex:
+
+- **ACM (acmart, sigconf).** Class pre-loads graphicx + hyperref
+  (configure via `\hypersetup`, never re-load with options) and
+  the newtxmath font stack (re-loading amssymb clashes on
+  `\Bbbk`); lmodern/geometry forbidden. Abstract is set in
+  `\maketitle` ⇒ flag required. Bib `ACM-Reference-Format`
+  (ships in the class package). Double-blind: add
+  `review,anonymous` to the class options.
+- **Springer LNCS (llncs, runningheads).** Plain `\maketitle` +
+  abstract-after; bib `splncs04`. No flag.
+- **Elsevier (elsarticle, preprint).** Preamble declarations work
+  with no frontmatter env (proven), but the abstract is top
+  matter ⇒ flag required or it vanishes (proven dropped). Final
+  formats `[5p]`/`[3p]` take the same source. Bib
+  `elsarticle-num`.
+- **APS (revtex4-2, aps/prl).** `\title` AND `\author` are
+  body-scoped ⇒ both ride `\AfterEndPreamble` (etoolbox);
+  abstract before `\maketitle` ⇒ flag required. tabularx
+  clashes with REVTeX internals (`Extra \or`) ⇒ omitted; bodies
+  with tabularx fail validation naming it. Bib `apsrev4-2`.
+- **IEEE (IEEEtran, conference).** The generated default, made
+  explicit. Empty `\thanks{}` drops the title ⇒ ikat strips it.
+- **arXiv.** article 11pt single-spaced, standard packages only;
+  nothing outside TeX Live, no shell-escape.
+
+Local TeX cost of the survey: acmart/llncs/elsarticle/revtex +
+their bst files + the acmart dependency tree (xstring, textcase,
+aliascnt, microtype, totpages, environ, trimspaces, hyperxmp,
+ifmtarg, oberdiek, balance/preprint, manyfoot/ncctools, fonts for
+libertine+newtx with updmap-enabled maps, upquote, fontaxes,
+binhex/kastrup) installed from tlnet archives into texmf-local —
+the same trick as IEEEtran/pgfplots, now routine.
+
 ## Strategy decisions
 
 1. **Emit pgfplots, don't plot.** The paper range (bars+whiskers,

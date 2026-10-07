@@ -63,6 +63,44 @@ preamble_append = ["\\usepackage{natbib}"]  # extra lines before \\begin{documen
   `build_from_paths(md, toml, spec)`; `spec.preamble_override`
   set directly beats the toml value.
 
+### Shipped library
+
+Nine starting heads in `ikat/templates/` (each documents its
+companion config). Tokens `{{{title}}}`, `{{{author}}}` and
+`{{{thanks}}}` fill from the manuscript H1 + spec author/thanks;
+an emptied `\\thanks{}` is dropped (it kills IEEEtran titles).
+
+| name | class | bib_style | needs flag |
+|---|---|---|---|
+| `arxiv` | article 11pt, arXiv-safe | IEEEtran | — |
+| `article-1col` / `-2col` | article + geometry | IEEEtran | — |
+| `article-3col` | article + multicol (all spans column) | IEEEtran | — |
+| `ieee-conference` | IEEEtran conference (the generated default, explicit) | IEEEtran | — |
+| `acm-sigconf` | acmart sigconf (no hyperref/lmodern/geometry: class-owned) | ACM-Reference-Format | abstract first |
+| `springer-llncs` | llncs runningheads | splncs04 | — |
+| `elsevier` | elsarticle preprint | elsarticle-num | abstract first |
+| `aps` | revtex4-2 (title+authors ride AfterEndPreamble; no tabularx: REVTeX clashes) | apsrev4-2 | abstract first |
+
+`abstract_before_maketitle = true` (in `[template]`) hoists the
+body's abstract env before `\\maketitle` for top-matter classes
+(ACM, Elsevier, APS set the abstract in the title block — a late
+abstract is silently dropped, proven by probe). `template_preset(name)`
+returns each head's bib_style + toml snippet:
+
+```python
+from ikat import template_path, template_preset
+preset = template_preset("elsevier")
+# {'bib_style': 'elsarticle-num', 'toml': '[template]\nabstract_before_maketitle = true\n'}
+```
+
+Every head is compile-proven locally (abstract + TikZ + table
+through pdflatex, title/abstract text verified in the PDF);
+`examples/headsproof.py` re-runs the proof. Publisher classes
+were installed from TeX Live archives into the local texmf tree
+(same trick as IEEEtran/pgfplots) — on a full TeX Live they just
+work. Heads are starting points, not submissions: always verify
+against the publisher's proof.
+
 Requires Rust (cargo) and Python ≥ 3.10.
 
 ```bash

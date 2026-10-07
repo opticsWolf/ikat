@@ -1,0 +1,29 @@
+% ikat template: aps
+% APS journals (Physical Review Letters shown; swap prl for pra,
+% prb, pre, ...). REVTeX sets the abstract in \maketitle, so it
+% MUST precede it; reprint for review, twocolumn for final.
+%
+% Multi-author idiom: repeat \author{}/\affiliation{}/\email{} per
+% author; shared affiliations merge automatically.
+%
+% Tokens {{{title}}} {{{author}}} are filled from the build.
+% Companion config (REQUIRED):
+%   [template]
+%   abstract_before_maketitle = true
+% and spec bib_style = "apsrev4-2".
+\documentclass[aps,prl,reprint]{revtex4-2}
+\usepackage{amsmath,amssymb}
+% NOTE: no tabularx — it clashes with REVTeX's tabular internals
+% ("Extra \\or" at \end{tabularx}); use plain tabular for tables.
+% A body containing tabularx fails validation naming it.
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+% REVTeX scopes \title AND \author to the body (its \author is only
+% valid after \begin{document}), so both ride \AfterEndPreamble:
+% title+authors -> abstract -> \maketitle stays in class order.
+\usepackage{etoolbox}
+\AfterEndPreamble{\title{{{title}}}\author{{{author}}}\affiliation{AFFILIATION}}

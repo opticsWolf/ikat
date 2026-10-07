@@ -19,7 +19,9 @@ from ._core import (
 )
 from .compile import compile_pdf
 from .document import BuildResult, BuildSpec, DiagramEntry, build_document
-from .document import build_from_paths, read_template
+from .document import build_from_paths, list_templates, read_template, template_path
+from .document import template_preset
+from .document import template_preset
 from .pipeline import (
     Element,
     config_spans,
@@ -44,6 +46,7 @@ __all__ = [
     "bib_safe",
     "build_document",
     "build_from_paths",
+    "list_templates",
     "compile_pdf",
     "config_spans",
     "check_tex_env",
@@ -57,6 +60,8 @@ __all__ = [
     "parse_config",
     "read_template",
     "resolve_span",
+    "template_path",
+    "template_preset",
     "tex_package_needs",
     "tex_requirements",
     "used_packages",

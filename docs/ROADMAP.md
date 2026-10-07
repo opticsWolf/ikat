@@ -80,6 +80,11 @@ their mermaid fences with no hand-tuning.
   `preamble_file` replaces the generated head, `preamble_append`
   adds lines before `\\begin{document}`; Rust validates the
   replacement carries a class + every package the body needs.
+- **M4.7 template library.** ✅ DONE 2026-10-07 — nine shipped
+  heads (arXiv, article 1/2/3-col, IEEE, ACM, LNCS, Elsevier, APS)
+  with `{{{title}}}`/`{{{author}}}`/`{{{thanks}}}` tokens,
+  per-template presets (bib_style + toml), `abstract_before_maketitle`
+  hoist for top-matter classes, all nine compile-proven locally.
 - **M4.3 claim the names.** Publish 0.1.0 to crates.io + PyPI early —
   both `ikat` names are currently free and publishing reserves them.
 - **M4.4 self-hosting.** The next paper revision is built with ikat

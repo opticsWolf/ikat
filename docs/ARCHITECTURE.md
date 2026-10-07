@@ -63,6 +63,7 @@ graphics hold a column.
 | pdflatex/bibtex driver | `python/ikat/compile.py` | manual (needs TeX) |
 | preamble scan + file→tlmgr map | `src/texenv.rs` | `cargo test` (6) |
 | kpsewhich/tlmgr probe + install | `python/ikat/texenv.py` | pytest (7+fakes) |
+| shipped heads + presets | `python/ikat/templates/` + `template_preset` | pytest + headsproof (needs TeX) |
 
 ## Roadmap
 

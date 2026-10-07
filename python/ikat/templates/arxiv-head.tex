@@ -1,0 +1,25 @@
+% ikat template: arxiv
+% A minimal, arXiv-safe head: standard article, single-spaced 11pt,
+% no shell-escape packages, nothing outside TeX Live.
+% arXiv rules this satisfies: TeX source upload (not PDF), all fonts
+% embedded via lmodern, \includegraphics for figures.
+%
+% Tokens {{{title}}} {{{author}}} {{{thanks}}} are filled from the build
+% (manuscript H1 + spec author/thanks).
+% Companion config: none (defaults). Works with any ikat body:
+% TikZ, pgfplots and tabularx are loaded, so validation passes.
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\title{{{title}}}
+\author{{{author}}}
+\date{}

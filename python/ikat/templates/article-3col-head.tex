@@ -1,0 +1,33 @@
+% ikat template: article-3col
+% Three text columns via multicol. The title block stays full width:
+% \maketitle is patched to open multicols, which closes at document
+% end. Starred floats (figure*) are ILLEGAL inside multicols, so this
+% head requires every span in-column:
+%
+%   [spans]
+%   diagram = "column"
+%   plot = "column"
+%   table = "column"
+%   default = "column"
+%
+% Tokens {{{title}}} {{{author}}} {{{thanks}}} are filled from the build.
+\documentclass[11pt]{article}
+\usepackage[margin=0.6in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{etoolbox}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\apptocmd{\maketitle}{\begin{multicols}{3}}{}{}
+\AtEndDocument{\end{multicols}}
+\title{{{title}}}
+\author{{{author}}}
+\date{}

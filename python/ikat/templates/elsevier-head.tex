@@ -1,0 +1,34 @@
+% ikat template: elsevier
+% Elsevier journals, preprint (single-column review) format; switch
+% to [5p] or [3p] for final two-column layout. Verified against the
+% installed elsarticle.cls: preamble declarations work without the
+% frontmatter environment — but the abstract is top matter, set in
+% \maketitle, so it MUST precede it.
+%
+% Multi-author idiom:
+%   \author[inst1,inst2]{First Author}
+%   \author[inst2]{Second Author}
+%   \address[inst1]{Dept, University, City, Country}
+%   \address[inst2]{...}
+%   \ead{mail@example.edu}
+%
+% Tokens {{{title}}} {{{author}}} are filled from the build.
+% Companion config (REQUIRED):
+%   [template]
+%   abstract_before_maketitle = true
+% and spec bib_style = "elsarticle-num".
+\documentclass[preprint,12pt]{elsarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{textcomp}
+\usepackage{amsmath,amssymb}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[hidelinks]{hyperref}
+\title{{{title}}}
+\author{{{author}}}
+\address{INSTITUTE, CITY, COUNTRY}

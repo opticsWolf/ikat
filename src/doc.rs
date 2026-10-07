@@ -60,6 +60,9 @@ pub struct BuildSpec {
     /// Extra preamble lines, appended just before `\begin{document}`.
     #[serde(default)]
     pub preamble_append: Vec<String>,
+    /// `\bibliographystyle` name (publisher templates override it).
+    #[serde(default = "default_bibstyle")]
+    pub bib_style: String,
 }
 
 fn default_plot_dir() -> String {
@@ -67,6 +70,9 @@ fn default_plot_dir() -> String {
 }
 fn default_author() -> String {
     "opticsWolf".to_string()
+}
+fn default_bibstyle() -> String {
+    "IEEEtran".to_string()
 }
 fn default_bib() -> String {
     "refs-paper".to_string()
@@ -119,6 +125,32 @@ fn strip_section_number(head: &str) -> String {
         }
     }
     head.to_string()
+}
+
+/// Split a woven body's abstract env out for top-matter classes
+/// (ACM, Elsevier, APS): returns `(abstract_block, body_without)`;
+/// empty abstract when the body has none.
+pub fn split_abstract(body: &str) -> (String, String) {
+    let (Some(start), Some(end)) = (body.find("\\begin{abstract}"), body.find("\\end{abstract}")) else {
+        return (String::new(), body.to_string());
+    };
+    let end = end + "\\end{abstract}".len();
+    if end <= start {
+        return (String::new(), body.to_string());
+    }
+    let (head, tail) = body.split_at(start);
+    let (abs, rest) = tail.split_at(end - start);
+    (abs.to_string(), format!("{head}{}", rest.trim_start_matches('\n')))
+}
+
+/// Fill the shipped-template tokens from the build: `{{title}}`
+/// from the manuscript H1, `{{author}}` / `{{thanks}}` from the
+/// spec. Only applied to `preamble_override` content.
+pub fn render_override(override_tex: &str, title: &str, author: &str, thanks: &str) -> String {
+    let rendered = override_tex.replace("{{title}}", title).replace("{{author}}", author).replace("{{thanks}}", thanks);
+    // An emptied \thanks{} drops the whole title in IEEEtran;
+    // an empty thanks must vanish, not render.
+    rendered.replace("\\thanks{}", "")
 }
 
 /// A user-supplied preamble head must carry a document class and
@@ -360,20 +392,32 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         generated.extend([
             "\\usepackage[hidelinks]{hyperref}".to_string(),
             format!("\\graphicspath{{{paths}}}"),
-            format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks),
+            if spec.title_thanks.is_empty() {
+                format!("\\title{{{title}}}")
+            } else {
+                format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks)
+            },
             format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author),
         ]);
         generated
     } else {
         validate_template(&spec.preamble_override, &body)?;
-        vec![spec.preamble_override.clone()]
+        vec![render_override(&spec.preamble_override, &title, &spec.author, &spec.title_thanks)]
     };
     head.extend(spec.preamble_append.clone());
+    head.extend(["\\begin{document}".to_string()]);
+    let (topmatter, rest) = if cfg.template.abstract_before_maketitle {
+        split_abstract(&body)
+    } else {
+        (String::new(), body.clone())
+    };
+    if !topmatter.is_empty() {
+        head.push(topmatter);
+    }
     head.extend([
-        "\\begin{document}".to_string(),
         "\\maketitle".to_string(),
-        body.clone(),
-        "\\bibliographystyle{IEEEtran}".to_string(),
+        rest,
+        format!("\\bibliographystyle{{{}}}", spec.bib_style),
         format!("\\bibliography{{{}}}", spec.bib_name),
         "\\end{document}".to_string(),
         String::new(),
@@ -412,6 +456,7 @@ mod tests {
             bib_keys: HashSet::new(),
             preamble_override: String::new(),
             preamble_append: Vec::new(),
+            bib_style: "IEEEtran".to_string(),
         }
     }
 
@@ -467,6 +512,34 @@ mod tests {
         s.preamble_override = "\\documentclass{article}\n\\title{T}".to_string();
         let err = build_document(md, "", &s).unwrap_err();
         assert!(err.contains("tikz"), "unexpected: {err}");
+    }
+
+    #[test]
+    fn override_tokens_render_from_build() {
+        assert_eq!(
+            render_override("\\title{{title}}\\author{{author}}\\thanks{{thanks}}", "T", "A", "th"),
+            "\\titleT\\authorA\\thanksth"
+        );
+    }
+
+    #[test]
+    fn bib_style_follows_spec() {
+        let md = "# T\n\n## 1. I\n\nHi.\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        s.bib_style = "splncs04".to_string();
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\bibliographystyle{splncs04}"));
+    }
+
+    #[test]
+    fn abstract_hoist_for_topmatter_classes() {
+        let body = "Sec.\\begin{abstract}Abs.\\end{abstract}\\section{X}";
+        let (abs, rest) = split_abstract(body);
+        assert_eq!(abs, "\\begin{abstract}Abs.\\end{abstract}");
+        assert_eq!(rest, "Sec.\\section{X}");
+        assert_eq!(split_abstract("no abstract here"), (String::new(), "no abstract here".to_string()));
     }
 
     #[test]

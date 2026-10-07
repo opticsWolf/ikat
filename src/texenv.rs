@@ -149,6 +149,12 @@ pub fn probe_and_tlmgr(name: &str) -> (String, String) {
             return (format!("{name}.cls"), "latex".to_string());
         }
         "IEEEtran" => ("IEEEtran.cls", "IEEEtran"),
+        // Publisher classes: TeX Live package names follow the
+        // class, except revtex4-2 which ships in package `revtex`.
+        "acmart" => ("acmart.cls", "acmart"),
+        "llncs" => ("llncs.cls", "llncs"),
+        "elsarticle" => ("elsarticle.cls", "elsarticle"),
+        "revtex4-2" => ("revtex4-2.cls", "revtex"),
         _ => return (format!("{name}.sty"), name.to_string()),
     };
     (pair.0.to_string(), pair.1.to_string())
@@ -222,6 +228,14 @@ mod tests {
         assert_eq!(
             probe_and_tlmgr("article"),
             ("article.cls".to_string(), "latex".to_string())
+        );
+        assert_eq!(
+            probe_and_tlmgr("llncs"),
+            ("llncs.cls".to_string(), "llncs".to_string())
+        );
+        assert_eq!(
+            probe_and_tlmgr("revtex4-2"),
+            ("revtex4-2.cls".to_string(), "revtex".to_string())
         );
         assert_eq!(
             probe_and_tlmgr("obscurepkg"),

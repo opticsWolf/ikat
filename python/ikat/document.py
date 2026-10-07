@@ -42,6 +42,7 @@ class BuildSpec:
     bib_keys: set = field(default_factory=set)
     preamble_override: str = ""
     preamble_append: list[str] = field(default_factory=list)
+    bib_style: str = "IEEEtran"
 
     def to_json(self) -> str:
         d = asdict(self)
@@ -90,6 +91,67 @@ def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec
     )
     md_text = Path(md_path).read_text(encoding="utf-8")
     return build_document(md_text, toml_src, spec)
+
+
+def _templates_dir() -> Path:
+    """Shipped `*-head.tex` library: installed package data first,
+    source tree fallback (covers `maturin develop`)."""
+    try:
+        from importlib.resources import files
+        d = files("ikat") / "templates"
+        if d.is_dir():
+            return Path(str(d))
+    except (ImportError, ModuleNotFoundError, TypeError):
+        pass
+    return Path(__file__).parent / "templates"
+
+
+def list_templates() -> list[str]:
+    """Names of shipped preamble heads (`arxiv`, `acm-sigconf`, …)."""
+    d = _templates_dir()
+    return sorted(p.stem.removesuffix("-head") for p in d.glob("*-head.tex")) if d.is_dir() else []
+
+
+def template_path(name: str) -> Path:
+    """Path to a shipped head, e.g. `template_path("arxiv")`. Raises
+    `FileNotFoundError` naming the available templates."""
+    p = _templates_dir() / f"{name}-head.tex"
+    if not p.is_file():
+        raise FileNotFoundError(f"no ikat template {name!r}; have: {list_templates()}")
+    return p
+
+
+#: Per-template companion settings: bibliography style plus the
+#: `ikat.toml` snippet the head's comments also document. `spans`
+#: notes where a head constrains float placement (3-column).
+TEMPLATE_PRESETS: dict[str, dict[str, str]] = {
+    "arxiv": {"bib_style": "IEEEtran", "toml": ""},
+    "article-1col": {"bib_style": "IEEEtran", "toml": ""},
+    "article-2col": {"bib_style": "IEEEtran", "toml": ""},
+    "article-3col": {
+        "bib_style": "IEEEtran",
+        "toml": '[spans]\ndiagram = "column"\nplot = "column"\ntable = "column"\ndefault = "column"\n',
+    },
+    "ieee-conference": {"bib_style": "IEEEtran", "toml": ""},
+    "acm-sigconf": {
+        "bib_style": "ACM-Reference-Format",
+        "toml": "[template]\nabstract_before_maketitle = true\n",
+    },
+    "springer-llncs": {"bib_style": "splncs04", "toml": ""},
+    "elsevier": {
+        "bib_style": "elsarticle-num",
+        "toml": "[template]\nabstract_before_maketitle = true\n",
+    },
+    "aps": {
+        "bib_style": "apsrev4-2",
+        "toml": "[template]\nabstract_before_maketitle = true\n",
+    },
+}
+
+
+def template_preset(name: str) -> dict[str, str]:
+    """Companion settings for a shipped template (KeyError if unknown)."""
+    return TEMPLATE_PRESETS[name]
 
 
 def bib_keys(bib_src: str) -> set:

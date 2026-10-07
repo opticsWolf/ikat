@@ -140,6 +140,10 @@ pub struct Template {
     pub preamble_file: String,
     #[serde(default)]
     pub preamble_append: Vec<String>,
+    /// Top-matter classes (ACM, Elsevier, APS) set the abstract in
+    /// `\maketitle`: hoist the body's abstract env before it.
+    #[serde(default)]
+    pub abstract_before_maketitle: bool,
 }
 
 /// Whole-file configuration.
@@ -193,6 +197,13 @@ mod tests {
         assert_eq!(cfg.template.preamble_file, "head.tex");
         assert_eq!(cfg.template.preamble_append, vec!["\\usepackage{natbib}"]);
         assert!(Config::from_toml("").unwrap().template.preamble_append.is_empty());
+    }
+
+    #[test]
+    fn template_flag_parses() {
+        let cfg = Config::from_toml("[template]\nabstract_before_maketitle = true\n").unwrap();
+        assert!(cfg.template.abstract_before_maketitle);
+        assert!(!Config::from_toml("").unwrap().template.abstract_before_maketitle);
     }
 
     #[test]

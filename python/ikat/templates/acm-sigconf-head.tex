@@ -1,0 +1,32 @@
+% ikat template: acm-sigconf
+% ACM conference proceedings (sigconf). Verified against the
+% installed acmart.cls: the class pre-loads graphicx and hyperref,
+% so hyperref is configured via \hypersetup (re-loading it with
+% options would clash); lmodern is skipped (ACM sets Libertine)
+% and geometry is FORBIDDEN by the class.
+%
+% Multi-author idiom: repeat the \author/\affiliation/\email block
+% per author. Double-blind review: \documentclass[sigconf,review,anonymous]{acmart}.
+% Check ACM's approved-package list before adding more (\usepackage)
+% lines: https://authors.acm.org (TAPS enforces it at production).
+%
+% Tokens {{{title}}} {{{author}}} are filled from the build.
+% Companion config (REQUIRED):
+%   [template]
+%   abstract_before_maketitle = true   % acmart sets the abstract in \maketitle
+% and spec bib_style = "ACM-Reference-Format".
+\documentclass[sigconf]{acmart}
+% NOTE: no amsmath/amssymb here — the class font stack (newtxmath)
+% already defines AMS symbols; reloading amssymb clashes (\Bbbk).
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\hypersetup{hidelinks}
+\title{{{title}}}
+\author{{{author}}}
+\affiliation{\institution{INSTITUTION}\city{CITY}\country{COUNTRY}}
+\email{MAIL@EXAMPLE.EDU}
