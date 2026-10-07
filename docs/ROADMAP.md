@@ -118,6 +118,9 @@ auto-added or template-validated; compile-proven to PDF.
   token contract (comment-aware counting/rendering, unknown-token
   errors, exclusion vs `preamble_file`), shipped
   `skeleton-plain.tex`, compile-proven to PDF.
-- **M5.3 Markdown AST spike.** pulldown-cmark event-diff vs the
-  hand scanner on the paper manuscript; switch only on empty diff
-  + byte-identical golden `.tex`. Document the verdict here.
+- **M5.3 Markdown AST spike.** ✅ SPIKE DONE 2026-10-07 —
+  pulldown-cmark 0.13.4 event-diff vs the hand scanner: all four
+  required properties hold (verbatim info strings, identical
+  headings, matching table shapes, aligned paras modulo the
+  `%%` directive line, which stays pre-processing either way).
+  Switch viable, deferred to its own golden-parity milestone.

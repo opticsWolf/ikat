@@ -7,6 +7,8 @@ use pyo3::prelude::*;
 mod config;
 mod doc;
 mod esc;
+#[cfg(test)]
+mod md_spike;
 mod mermaid;
 mod plot;
 mod table;

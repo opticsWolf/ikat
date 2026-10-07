@@ -187,6 +187,22 @@ block structure.
 
 ### C.2 Decision: spike pulldown-cmark, switch only on parity
 
+✅ SPIKE DONE 2026-10-07 (`src/md_spike.rs`, pulldown-cmark 0.13.4
+as a dev-dependency — ships in no wheel). Verdict: all four
+required properties HOLD — fenced info strings arrive verbatim
+(`{span=column pos=both}` intact), headings identical
+(levels + text), table shapes match (hand rows=4/cols=2 vs
+head+2×2), paragraph breaks aligned. The ONLY structural
+difference is the `%% table {}` directive line, which
+pulldown-cmark sees as paragraph text: inherent, not closable —
+directives stay a pre-processing pass under BOTH options, so it
+does not count against switching.
+
+Switch verdict: VIABLE but NOT DONE. Rewriting `convert()` on
+the event stream plus proving the golden paper byte-identical is
+a milestone of its own, not part of this spike (which changes no
+behavior by design). Until that PR lands: stay hand-rolled.
+
 1. Spike (no behavior change): parse the paper manuscript with
    BOTH the hand scanner and pulldown-cmark; diff the event
    stream (headings/fences/tables/paragraph breaks) in a cargo
