@@ -15,10 +15,6 @@ pipeline whose compute core is Rust (via PyO3/maturin) with thin Python
 wrappers: Markdown documents go in, conference-ready PDFs come out, and
 every figure is generated — never screenshotted.
 
-Version 0.2.0 · MIT OR Apache-2.0 · `https://github.com/opticsWolf/ikat`
-Tagged `v*` releases ship to PyPI and crates.io from CI
-(`.github/workflows/release.yml`).
-
 The name is a fabric pattern: in *ikat* weaving, threads are patterned
 **before** they reach the loom, so the design is carried by the material
 itself. Likewise, an ikat document carries its figures as data and
