@@ -3,7 +3,7 @@
 Status 2026-10-08 (Phase A gate, 0.3.0): Phases 1, 2 (plots),
 4 (core), 5, 6 done — 67 cargo + 52 pytest green, showcase +
 regen build (6-page paper, 4 regen plots, 0 undefined citations).
-Open: M3.1–M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
+Open: M3.2–M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
 tectonic crate embedding, Phase D.2 heading guards.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
@@ -82,10 +82,12 @@ anywhere in the loop.
 
 ## Phase 3 — Figures advanced (all OPEN)
 
-- **M3.1 standalone export.** `\documentclass[tikz]{standalone}`
-  wrapper for precompiled, arXiv-safe figure PDFs. Entry point:
-  new `ikat standalone` subcommand or `compile_standalone()`
-  taking one fence's TikZ + auto-detected preamble.
+- **M3.1 standalone export.** ✅ DONE 2026-10-08 (Phase B,
+  0.3.1+0.4.0) — `python/ikat/standalone.py` (`wrap_standalone`
+  + `compile_standalone`), `ikat standalone` (exactly-one-fence
+  rule), MCP `standalone_figure` (returns source, workdir rule),
+  `tikz_needed`/`plots_needed` predicates, four paper-diagram
+  proofs with ledger scores in `examples/regen/ACCEPTED.md`.
 - **M3.2 sequence subset**, **M3.3 state subset** behind the same
   `flowchart_to_tikz` entry point (separate grammars, shared emitter).
 - **M3.4 layout.** Edge routing that avoids node interiors, subgraph

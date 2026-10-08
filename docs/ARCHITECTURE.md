@@ -229,9 +229,13 @@ CLI, MCP, and headsproof alike.
 - `texenv.py`: `check` (report) / `ensure` (install + re-probe)
   around the Rust scan; failure carries the manual texmf-install
   recipe and the MiKTeX Portable fallback.
-- `cli.py`: twelve subcommands (`build weave check templates
+- `standalone.py`: `fence_to_tikz` (`mermaid`|`chart`), `wrap_standalone`
+  (minimal `[tikz,border=5pt]{standalone}` + detected libraries),
+  `compile_standalone` (writes `fig.tex`, drives `compile_pdf`).
+  MCP gets the source only (`standalone_figure`), never the binary.
+- `cli.py`: thirteen subcommands (`build weave check templates
   template skeletons skeleton flowchart barchart lineplot
-  version`), each a thin call into the API. Plot commands take a
+  standalone version`), each a thin call into the API. Plot commands take a
   JSON payload (file or stdin) with an optional `--legend`
   override.
 - `mcp_server.py`: FastMCP stdio, twelve tools mirroring the
