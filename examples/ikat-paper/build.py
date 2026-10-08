@@ -140,7 +140,7 @@ def make_paper(engine: str = "pdflatex") -> None:
             ("fig-loc", "Rust lines of code by shipped module (wc, HEAD; test-only spike excluded)."),
             ("fig-tests", "Test functions per commit, both suites (grep, no smoothing)."),
         ],
-        plot_attrs={"fig-tests": "pos=bottom"},
+        plot_attrs={"fig-loc": "pos=force width=0.75", "fig-tests": "pos=force width=0.75"},
         table_captions=[
             "Per-element float attributes.",
             "Test suites and what they guard.",
@@ -148,7 +148,7 @@ def make_paper(engine: str = "pdflatex") -> None:
             "Skeleton token contract.",
         ],
         table_specs={"3": "XXl"},
-        plot_insert_before="\\section{Engines",
+        plot_insert_before="\\subsection{Where",
         title_thanks=THANKS,
         author="opticsWolf",
         bib_name="ikat-refs",

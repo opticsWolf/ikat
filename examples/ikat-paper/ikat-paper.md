@@ -49,8 +49,9 @@ four diagrams, four tables, and two plots were woven from the
 Markdown source beside this PDF: no hand-placed floats, no
 touched-up `.tex`. Two of the diagrams sit anchored in their
 paragraphs (`span=column pos=here`, scaled to the column with
-`width`), one floats the page width and one the column; §3 walks
-that choice as a worked example. Nothing here was pasted.
+`width`); Figures 3 and 4 share a dedicated float page
+(`pos=page`). §3 walks that choice as a worked example. Nothing
+here was pasted.
 
 ## 2. Architecture
 
@@ -76,8 +77,10 @@ inputs: unknown `{pos=center}` dies in Rust with the fence number,
 a template that drops a needed package dies naming it, a missing
 binary dies with the install command. Nothing fails in a log.
 Figure 1 is anchored where it is declared, so it reads as part of
-this section rather than floating to the page top; Figure 3 keeps
-the wide floating placement for contrast.
+this section rather than floating to the page top; Figures 3 and 4
+share the float page after this section (`pos=page` queues both
+for the same dedicated page): tall floats that queue together
+land together.
 
 The subset boundary is deliberate. The block splitter runs on
 pulldown-cmark [the CommonMark pull parser: `pulldown-cmark`],
@@ -121,7 +124,7 @@ and `alt`/`else`/`opt`/`end` boxes span all columns. The subset is
 strict like the flowchart one: `loop`, `par`, `Note`, and
 self-messages are string errors naming the statement.
 
-```mermaid {span=wide pos=top}
+```mermaid {span=column pos=page}
 stateDiagram-v2
 [*] --> Fences
 Fences --> Convert : strict subset
@@ -144,9 +147,7 @@ level of `state Name { … }` boxes drawn around laid-out members,
 so a box can never move coordinates. Nested composites are a build
 error, like everything else outside the subset.
 
-## 3. Floats without fear
-
-```mermaid {span=column pos=both width=0.9}
+```mermaid {span=column pos=page}
 graph TD
 el[element<br/>kind + {attrs}]-->res[resolve span + pos]
 res-->col{span?}
@@ -157,6 +158,13 @@ f2-->p2[pos: top bottom<br/>both page barrier]
 p1-->pkg[packages as needed<br/>float placeins<br/>dblfloatfix]
 p2-->pkg
 ```
+
+Figure 4 maps the same policy as a flowchart: element kind and
+`{attrs}` resolve against `[spans]` and `[floats]`, and each
+combination loads only the packages it needs. It shares a float
+page with Figure 3 because both queue with `pos=page`.
+
+## 3. Floats without fear
 
 LaTeX float placement is where manuscripts go to drift: a figure
 declared `[t]` lands three pages later and nobody knows why. ikat
@@ -169,7 +177,7 @@ at the bottom load `dblfloatfix` automatically; `force` and
 `barrier` load `float` and `placeins`, or require them in template
 heads. Table 1 lists the attribute surface.
 
-%% table {pos=bottom}
+%% table {pos=force}
 
 | Attribute | Values | Default |
 |---|---|---|
@@ -185,15 +193,23 @@ next to the paragraphs that reference them.
 Document-wide tuning lives in `[floats]`: this paper sets
 `topfraction` 0.9, `bottomfraction` 0.7, `textfraction` 0.1,
 `topnumber` 3, `bottomnumber` 2, and `pos_default` top: six lines
-that are the only float preamble it emits, everything else LaTeX
-default, so the tuning is visible and minimal. `barrier_sections`
-caps the worst case by holding floats inside their section; the
-engines table in §5 demonstrates the per-element `barrier`
-instead, pinning itself above its own section.
+that are the only float preamble it emits. The numbers are LaTeX
+counters, not suggestions: `topnumber` caps how many floats may
+share a column top, `textfraction` guarantees text at least a tenth
+of every text page, and a float that fits nowhere waits in the
+queue instead of squeezing in. Short floats referenced mid-paragraph
+(like Tables 1 and 2) take `pos=force` ([H]) and never queue at
+all; tall ones (Figures 3 and 4) take `pos=page` and share one
+dedicated float page.
+Everything else is LaTeX default, so the tuning stays visible and
+minimal. `barrier_sections` is on in this paper: each section
+starts with its predecessor's floats flushed, so no heading
+strands pages from its text. The engines table in §5 adds the
+per-element `barrier` on top, pinning itself above its own section.
 
 ## 4. Evidence
 
-%% table {captionpos=bottom}
+%% table {captionpos=bottom pos=force}
 
 | Suite | What it guards | Count |
 |---|---|---|
@@ -256,8 +272,32 @@ hatch this paper uses). Level 1 heads carry `{{{title}}}` tokens;
 level 3 carries the contract in §6. Plotting needs no matplotlib:
 bar and line emitters write pgfplots directly [the TeX plotting
 package: `pgfplots-manual`], compiled standalone to the PDFs below.
+Engine choice is per build, not per document: the same woven body
+compiles under either engine from one flag (`--engine`), and both
+PDFs ship the same page count and geometry (the showcase rebuilds
+clean under tectonic in CI). Templates compose with engines
+freely: no head names an engine, and no engine names a head. The
+cost of the second engine is one probe document and a
+checksum-pinned binary, both in the tree.
 
 ## 6. Appendix: skeleton token contract
+
+The contract is small on purpose: four token families cover title,
+body, bibliography, and abstract, each filled exactly once.
+`{{thanks}}` rides with `{{title}}` because only some heads set it;
+empty thanks emit nothing rather than an empty footnote.
+`{{bibliography}}` is conditional on `bib_name`: an engine that
+auto-runs BibTeX dies on an empty `{{bibliography}}` line, so the
+core omits it instead of emitting it. Unknown and doubled tokens
+are build errors naming the file and line; TeX comment lines never
+count as content. Skeletons are the escape hatch, not the default:
+nine publisher heads cover the common cases, and level 3 exists
+for the tenth. Submissions want sources, not PDFs: arXiv takes
+the `.tex`, the `.bib`, and every figure file, and rebuilds. The
+build directory holds exactly that set after one command: woven
+`.tex`, staged `.bib`, and standalone plot PDFs beside it. Nothing
+in the manuscript names an engine or a template, so the same
+sources submit anywhere a head exists.
 
 %% table {span=wide}
 
