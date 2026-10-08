@@ -93,6 +93,13 @@ every section (`min_lines+1`; `min_lines = 2` default). Set
 `ikat check` / `validate_template` reject it; the built-in
 guards are the replacement.
 
+Error format: `path:line: message` + echo (+ `^` caret where
+the grammar knows the token). Manuscript lines for content
+errors, head-file lines for template/skeleton errors, no line
+part for data errors (ragged JSON series etc. — the echo
+carries shapes/values). String-API errors keep the Rust
+rendering (` --> line N`) verbatim.
+
 ## Templates
 
 ```toml

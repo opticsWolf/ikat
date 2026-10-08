@@ -69,6 +69,9 @@ Validation: rectangular series, `min ≤ value ≤ max` elementwise,
   template/skeleton tokens, wide+here floats, unknown attrs/keys,
   line-starting `[label]: ...` reference definitions
   all raise — never catch-and-continue into a TeX log mystery.
+  Errors render `msg` + ` --> line N` + echo (+ `^` caret where
+  the grammar knows the token); `build_from_paths` upgrades to
+  `file:line:` (head file for template errors).
 - No invented numbers in figures: plot data comes from measurement
   (grep/wc/benches), marked `[NOT YET MEASURED]` otherwise.
 - `compile_pdf` is workdir-bound and slow: batch builds, don't

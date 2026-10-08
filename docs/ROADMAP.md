@@ -1,12 +1,12 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase E gate, 0.7.0): Phases 1, 2 (plots),
+Status 2026-10-08 (Phase F gate, 0.8.0): Phases 1, 2 (plots),
 3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
-heading guards), E (parser switch) done — 98 cargo + 69 pytest
-green, showcase (10 pages, 4 diagrams) + regen + standalone +
-heads proofs build, golden paper byte-identical (`ebe698db`),
-0 undefined citations.
-Open: M4.1, M4.10, tectonic crate embedding.
+heading guards), E (parser switch), F (line-numbered errors)
+done — 118 cargo + 75 pytest green, showcase (10 pages,
+4 diagrams) + regen + standalone + heads proofs build, golden
+paper byte-identical (`ebe698db`), 0 undefined citations.
+Open: M4.10, tectonic crate embedding.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -119,13 +119,20 @@ no hand-tuning.
 
 ## Phase 4 — Harden & release
 
-- **M4.1 errors.** OPEN — line-numbered parse errors (statement
-  echo + caret) instead of bare strings. Concrete scope: thread
-  source line numbers from the md scanner through `convert()` so
-  failures in mermaid fences (`flowchart_to_tikz`), `%% table`
-  attrs, `plot_attrs` names, template tokens, and legend keywords
-  report `file:line: message` with the offending line echoed.
-  Today all of these return context-free `String`s.
+- **M4.1 errors.** ✅ DONE 2026-10-08 (Phase F, 0.7.1 → gate
+  0.8.0) — `src/error.rs::Error { msg, line, col, echo }` at
+every fail-fast site (61 `Err`s audited: mermaid/sequence/state
+statements + edge targets + empty diagrams, router exhaustion,
+subgraph/composite errors, ragged plot/preset series, dangling
+keys, template/skeleton tokens, titlesec, float attrs, legend
+words, refdefs). Manuscript lines via `md.rs` original-number
+blocks (fence bodies `line + row`), head-file lines for
+templates, line 0 (no line part) for JSON/TOML data errors;
+carets where the grammar knows the token (char columns,
+indent-exact). Python `document.with_file` upgrades to
+`file:line:` (head-path routing for template errors); CLI
+prints verbatim; MCP returns the text. 118 cargo + 75 pytest
+(16 + 6 new error tests); golden untouched (`ebe698db`).
 - **M4.2 CLI.** ✅ DONE 2026-10-07 — `ikat build/weave/check/templates/template/flowchart/version`
   (`python/ikat/cli.py`, `ikat` console script): same operations as
   the API, `--spec` BuildSpec JSON, `--ensure-packages` gate.

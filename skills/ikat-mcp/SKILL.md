@@ -38,8 +38,10 @@ description: >
 ## Results and errors
 
 - Tools return values directly (no okf-style envelope): strings,
-  dicts, lists. Failures raise with the message a CLI user would
-  see (`ikat <cmd>: ...` semantics): dangling citation keys,
+  dicts, lists. Failures raise with the multi-line rendering a
+  CLI user would see (`path:line: message` + echo + `^` caret
+  where known; no file prefix on string inputs — the Rust
+  ` --> line N` form crosses verbatim): dangling citation keys,
   unknown tokens/attrs/legend words, registry misses.
 - There is deliberately NO `compile_pdf` tool (workdir-bound,
   minutes-long): weave here, compile via the `ikat build` CLI.

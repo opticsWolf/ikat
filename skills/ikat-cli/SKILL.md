@@ -47,11 +47,14 @@ ikat version
 
 ## Errors
 
-Non-zero exit with `ikat <cmd>: <message>` on stderr: bad JSON
-payload, unknown legend word (names the set), missing registry
-entry (`mermaid fence #N has no registry entry` → add `--spec`
-with a `diagrams` entry), template dropping a needed package
-(names it), missing binary (names the install). Nothing fails
-inside a TeX log that could have failed here. Line numbers on
-errors are still open work (M4.1) — messages are context-free
-strings today.
+Non-zero exit, multi-line rendering printed verbatim on stderr:
+`path:line: message` + echo (+ `^` caret where the grammar
+knows the token). Manuscript lines for content errors (diagram
+statements, dangling keys, table attrs), head-file lines for
+template/skeleton errors, no line part for data errors (ragged
+JSON series — the echo carries shapes). Same catalog as ever:
+bad JSON payload, unknown legend word (names the set), missing
+registry entry (`mermaid fence #N …` → add `--spec` with a
+`diagrams` entry), template dropping a needed package (names
+it), missing binary (names the install). Nothing fails inside
+a TeX log that could have failed here.

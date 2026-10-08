@@ -333,17 +333,46 @@ preloaded) is the starting point. Validation scans the whole
 skeleton for package needs — the generated tail's assumptions do
 not leak into custom documents.
 
-## 7. Strictness catalog
+## 7. Strictness catalog (M4.1 closed, Phase F — 0.8.0)
 
 Fail-fast sites, each with a test: unknown mermaid statements,
 missing edge targets, empty diagrams; ragged plot series;
 dangling citation keys; unknown template/skeleton tokens and
 duplicates; template heads missing class or packages; wide floats
 with `here`/`force`; unknown float attrs or keys; unknown legend
-words; `--bib` keysets that exclude a cited key. The doctrine:
-nothing fails in a TeX log that could have failed in Rust or in
-the wrapper. Line-numbered errors (statement echo + caret) are
-the known gap (M4.1) — today these are context-free strings.
+words; `--bib` keysets that exclude a cited key; reference
+definitions; router exhaustion; subgraph/composite nesting. The
+doctrine: nothing fails in a TeX log that could have failed in
+Rust or in the wrapper.
+
+Errors are `src/error.rs::Error { msg, line, col, echo }`
+(`--help` never needed: the message IS the documentation):
+
+- `line` is 1-based in the relevant source — manuscript lines
+  for scanner/diagram/table errors (fence bodies resolve as
+  `fence line + row`; `md.rs` blocks carry original numbers
+  across pre-pass deletions), head-file lines for template
+  errors, snippet-relative for direct API calls. `line == 0`
+  means no manuscript line applies (JSON/TOML data errors:
+  ragged series, preset shapes, config values) — the `--> line`
+  part is then omitted, never rendered as `0`, and the echo
+  (offending shapes/values) carries the context.
+- `col` is `Some` where the grammar knows the token span
+  (attr keys, direction words, edge stop positions, template
+  token braces, citation keys, the `titlesec` word) and the
+  renderer adds a `^` line in character columns — including
+  through leading whitespace (the classic off-by-indent is
+  pinned by test). Elsewhere `col` stays `None`: absence of a
+  caret is never a failure, only missing precision.
+- `echo` is the offending source text — raw lines (indent
+  kept) so carets align under it.
+- The PyO3 boundary carries the Display string unchanged
+  (exception type still `ValueError`); Python — the only layer
+  that sees paths — upgrades to `file:line: message` in
+  `document.with_file` (template/skeleton lines resolve against
+  the head file, everything else against the md; line-less
+  errors become `path: message`). The CLI prints the rendering
+  verbatim; MCP returns it as the error text.
 
 ## 8. Testing and CI
 
@@ -368,6 +397,6 @@ M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
 workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
 Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
-0.6.0), parser switch (M5.4, Phase E — 0.7.0). The open
-frontier: line-numbered errors (M4.1), tectonic hardening
-(M4.10).
+0.6.0), parser switch (M5.4, Phase E — 0.7.0), line-numbered
+errors (M4.1, Phase F — 0.8.0). The open frontier: tectonic
+hardening (M4.10).
