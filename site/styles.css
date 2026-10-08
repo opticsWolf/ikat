@@ -361,31 +361,45 @@ h1 span,
   border-top-color: var(--cobalt);
   background: var(--white);
   box-shadow: 0 7px 15px rgb(17 29 44 / 12%);
-  transition: left 700ms cubic-bezier(0.16, 1, 0.3, 1), top 700ms cubic-bezier(0.16, 1, 0.3, 1), border-color 260ms ease-out, box-shadow 260ms ease-out;
+  transition:
+    left 780ms cubic-bezier(0.22, 1, 0.36, 1) var(--phase-delay, 0ms),
+    top 780ms cubic-bezier(0.22, 1, 0.36, 1) var(--phase-delay, 0ms),
+    width 780ms cubic-bezier(0.22, 1, 0.36, 1) var(--phase-delay, 0ms),
+    transform 780ms cubic-bezier(0.22, 1, 0.36, 1) var(--phase-delay, 0ms),
+    border-color 300ms ease-out,
+    box-shadow 420ms ease-out;
 }
 
 .part-source {
-  top: 4%;
+  --phase-delay: 0ms;
+  top: 2%;
   left: 2%;
   width: 45%;
+  transform: rotate(-3deg) scale(0.93);
 }
 
 .part-figures {
-  top: 12%;
-  left: 53%;
-  width: 45%;
+  --phase-delay: 90ms;
+  top: 19%;
+  left: 56%;
+  width: 42%;
+  transform: rotate(2.5deg) scale(0.93);
 }
 
 .part-engine {
-  top: 54%;
-  left: 7%;
-  width: 42%;
+  --phase-delay: 180ms;
+  top: 55%;
+  left: 11%;
+  width: 40%;
+  transform: rotate(-2deg) scale(0.94);
 }
 
 .part-output {
-  top: 57%;
+  --phase-delay: 270ms;
+  top: 68%;
   left: 57%;
   width: 41%;
+  transform: rotate(2.8deg) scale(0.93);
   border-color: var(--cobalt);
   border-top-color: var(--signal);
 }
@@ -457,54 +471,59 @@ h1 span,
   height: 1px;
   transform-origin: left center;
   background: var(--signal);
-  transition: opacity 360ms ease-out;
+  transition: none;
 }
 
 .leader-one {
-  top: 31%;
-  left: 42%;
-  width: 21%;
-  transform: rotate(-10deg);
+  top: 35.5%;
+  left: 24.5%;
+  width: 16%;
+  transform: rotate(65deg);
 }
 
 .leader-two {
-  top: 48%;
-  left: 29%;
-  width: 23%;
-  transform: rotate(81deg);
+  top: 50.5%;
+  left: 57%;
+  width: 6%;
+  transform: rotate(147deg);
 }
 
 .leader-three {
-  top: 69%;
-  left: 48%;
-  width: 19%;
-  transform: rotate(-5deg);
+  top: 67%;
+  left: 52%;
+  width: 12.2%;
+  transform: rotate(71deg);
 }
 
 .assembly-board[data-state="assembled"] .part-source {
   top: 7%;
   left: 2%;
+  width: 45%;
+  transform: none;
 }
 
 .assembly-board[data-state="assembled"] .part-figures {
   top: 7%;
   left: 53%;
+  width: 45%;
+  transform: none;
 }
 
 .assembly-board[data-state="assembled"] .part-engine {
   top: 54%;
   left: 2%;
+  width: 45%;
+  transform: none;
 }
 
 .assembly-board[data-state="assembled"] .part-output {
   top: 54%;
   left: 53%;
+  width: 45%;
+  transform: none;
   box-shadow: 0 12px 22px rgb(22 73 232 / 18%);
 }
 
-.assembly-board[data-state="assembled"] .leader {
-  opacity: 0;
-}
 
 .assembly-status {
   min-height: 1.5em;
@@ -1155,27 +1174,27 @@ h1 span,
   }
 
   .part-source {
-    top: 3%;
+    top: 2%;
     left: 2%;
     width: 65%;
   }
 
   .part-figures {
-    top: 24%;
-    left: 32%;
-    width: 65%;
+    top: 23%;
+    left: 40%;
+    width: 58%;
   }
 
   .part-engine {
-    top: 51%;
+    top: 52%;
     left: 2%;
     width: 61%;
   }
 
   .part-output {
-    top: 74%;
-    left: 35%;
-    width: 63%;
+    top: 75%;
+    left: 41%;
+    width: 57%;
   }
 
   .assembly-board[data-state="assembled"] {
@@ -1187,6 +1206,8 @@ h1 span,
   .assembly-board[data-state="assembled"] .part-engine,
   .assembly-board[data-state="assembled"] .part-output {
     left: 17%;
+    width: 66%;
+    transform: none;
   }
 
   .assembly-board[data-state="assembled"] .part-source { top: 1%; }
@@ -1204,25 +1225,26 @@ h1 span,
   }
 
   .leader-one {
-    top: 28%;
-    left: 55%;
-    width: 24%;
-    transform: rotate(52deg);
+    top: 22%;
+    left: 32.5%;
+    width: 42%;
+    transform: rotate(93deg);
   }
 
   .leader-two {
-    top: 48%;
-    left: 41%;
-    width: 23%;
-    transform: rotate(117deg);
+    top: 41%;
+    left: 40%;
+    width: 26%;
+    transform: rotate(36deg);
   }
 
   .leader-three {
-    top: 72%;
-    left: 51%;
-    width: 22%;
-    transform: rotate(51deg);
+    top: 59%;
+    left: 61%;
+    width: 29%;
+    transform: rotate(128deg);
   }
+
 
   .section-heading h2,
   .try-intro h2,
