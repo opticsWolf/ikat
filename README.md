@@ -46,7 +46,14 @@ no font mismatch between text and figures.
   global — each element kind (diagram, plot, table) declares
   `column` or `wide`, overridable per element from Markdown.
 - **Compile** (`ikat.compile`): `pdflatex`/`bibtex` driver that turns
-  the woven tree into PDF.
+  the woven tree into PDF, with a `tectonic` engine option
+  (`compile_pdf(..., engine="tectonic")`, `--engine` on the
+  `build`/`weave` CLIs and the example builders). The tectonic
+  Rust crate does NOT link on Windows (C dependencies) — the
+  supported path is the `tectonic` binary (`TECTONIC_EXE` or
+  PATH; CI pins 0.17.0 by checksum). Crate embedding stays a
+  Linux-CI exercise by design; wheels stay lean (feature-gated,
+  off by default).
 
 ## Showcase paper
 

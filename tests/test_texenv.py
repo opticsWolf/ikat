@@ -120,3 +120,20 @@ def test_ensure_no_tlmgr_gives_hint(monkeypatch):
 def test_live_probe_sees_base_files():
     assert texenv.probe(["article.cls", "graphicx.sty"]) == {
         "article.cls": True, "graphicx.sty": True}
+
+
+def test_compile_pdf_engine_passthrough(monkeypatch, tmp_path):
+    # G.2: `engine=` is honored — tectonic routes to the tectonic
+    # path, anything else names the options. No binary needed.
+    from ikat import compile as compile_mod
+    from ikat.compile import CompileError, compile_pdf
+
+    seen = {}
+    monkeypatch.setattr(
+        compile_mod, "_compile_tectonic",
+        lambda workdir, main: seen.update(workdir=workdir, main=main) or tmp_path / "x.pdf",
+    )
+    compile_pdf(tmp_path, "doc.tex", engine="tectonic")
+    assert (seen["workdir"], seen["main"]) == (tmp_path, "doc.tex")
+    with pytest.raises(CompileError, match="pdflatex\|tectonic"):
+        compile_pdf(tmp_path, "doc.tex", engine="luatex")

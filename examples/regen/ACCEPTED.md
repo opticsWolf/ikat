@@ -1,7 +1,9 @@
-# Regen acceptance ledger (Phase A.3)
+# Regen acceptance ledger (Phase A.3; engine deltas G.2)
 
 One ledger for all pinned diffs/scores/deltas (standing rule 6).
 Reviewed 2026-10-08 against `paper/figs/fig-*.pdf` (matplotlib).
+Engine comparison reviewed 2026-10-08 (pdfTeX/TinyTeX vs
+tectonic 0.17.0, method + verdict below).
 
 ## Baselines (`diff.py --check`, tolerance +0.02)
 
@@ -62,3 +64,31 @@ The proof is the unbroken path (fence → PDF, zero manual
 coordinates), not a pixel match: the staged figures carry
 custom colors and `positioning` anchors the emitter does not
 produce. Scores are pinned here as the review record.
+
+## Engine deltas (G.2, 2026-10-08): pdfTeX vs tectonic 0.17.0
+
+Both documents build under both engines with 0 undefined
+citations (`paper-2026-10-05-tectonic.pdf` 682153 bytes, 22 pp;
+`ikat-paper-tectonic.pdf` 131730 bytes, 10 pp — same page counts
+and page geometry as pdfTeX). Method: per-page text extraction
+compared as whitespace/underscore/hyphen-blind character
+sequences (order-sensitive, so any content change shows), plus
+the CI log gate on both engines' `.log` files.
+
+- Showcase: ZERO character diffs on all 10 pages. Identical content.
+- Main paper: 10/22 pages with micro-diffs, all ratio ≥ 0.9988,
+  all in one class — font-encoding extraction, not content:
+  (a) underscores (`recorded_at` splits into 2–3 words under
+  pdfTeX/Type1 extraction, stays whole under XeTeX);
+  (b) OT1-vs-TU quote glyphs (`` `links` `` curls under pdfTeX,
+  stays straight under XeTeX — the engine's font stack, same
+  source bytes);
+  (c) diacritic composition (`Šafárik` extracts decomposed one
+  side, composed the other);
+  (d) line-break hyphenation points (fonts break lines
+  differently; the `-` vanishes in the comparison).
+- Verdict: no content delta. Nothing filed against the emitter.
+  The `.tex` both engines compile is byte-identical; the
+  differences come from the engines' font stacks (Type1/OT1 vs
+  OTF/TU), which is precisely what "same source, two engines"
+  is allowed to do.
