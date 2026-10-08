@@ -12,6 +12,7 @@ dist/
 examples/demo-out/
 examples/ikat-paper/out/
 examples/regen/out/
+examples/standalone/out/
 *.aux
 *.log
 *.out

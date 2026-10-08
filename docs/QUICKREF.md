@@ -27,6 +27,7 @@ ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{...}' | ikat barchart - [--legend WORD]    # JSON payload, stdout tikzpicture
 echo '{...}' | ikat lineplot - [--legend WORD]
+ikat standalone FIG.md --out fig.pdf             # one mermaid|chart fence → PDF
 ikat version
 ```
 
@@ -89,7 +90,7 @@ bib_style + toml snippet).
 The same Rust-backed operations are available through four entry points:
 
 - **Python API:** build documents and emit TikZ/pgfplots in process.
-- **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, templates, and skeletons.
+- **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, `standalone`, templates, and skeletons.
 - **MCP:** optional stdio tools for connected agents; install `mcp>=1,<2` and run `python -m ikat.mcp_server`.
 - **Skills:** focused [Python API](../skills/ikat-api/SKILL.md), [CLI](../skills/ikat-cli/SKILL.md), and [MCP](../skills/ikat-mcp/SKILL.md) guides, plus a general [ikat guide](../skills/ikat/SKILL.md). Install a chosen skill directory in the agent's configured skill location.
 

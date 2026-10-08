@@ -143,7 +143,7 @@ def test_mcp_tools_registered():
     names = sorted(t.name for t in asyncio.run(mcp_server.mcp.list_tools()))
     assert names == ["barchart_to_tikz", "check_tex_packages", "ensure_tex_packages",
                      "float_packages", "flowchart_to_tikz", "get_skeleton", "get_template", "lineplot_to_tikz",
-                     "list_skeletons", "list_templates", "version", "weave_document"]
+                     "list_skeletons", "list_templates", "standalone_figure", "version", "weave_document"]
 
 
 @needs_mcp

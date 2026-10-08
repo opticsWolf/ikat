@@ -446,6 +446,17 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     out
 }
 
+/// Does this `.tex` fragment need TikZ? (standalone preamble builder)
+/// Python could ask with `in`, but the scan lives with the detector.
+pub fn tikz_needed(tex: &str) -> bool {
+    tex.contains("\\begin{tikzpicture}")
+}
+
+/// Does this `.tex` fragment need pgfplots?
+pub fn plots_needed(tex: &str) -> bool {
+    tex.contains("\\begin{axis}")
+}
+
 /// LaTeX packages a woven body needs, detected from what it contains.
 /// Precompiled PDF figures need nothing; inline `tikzpicture`s need
 /// TikZ + shape/arrow libraries; pgfplots `axis` environments need

@@ -44,3 +44,21 @@ Regen outputs live in `examples/regen/out/` (+ snapshots in
 artifacts is the paper track's call (paper track is tracked
 elsewhere in ROADMAP). The M2 gate — producible with no
 matplotlib in the loop — is met by `regen.py`.
+
+## Standalone proofs (Phase B.1, reviewed 2026-10-08)
+
+`examples/standalone/fig-*.md` (one mermaid fence each, no
+hand-tuning) → emitter TikZ → `compile_standalone` → PDF.
+Pixel scores vs the staged hand-tuned `paper/figs/tikz/*.pdf`:
+
+| figure | score | delta |
+|---|---|---|
+| fig-branch-tree | 0.0386 | same tree, gray emitter boxes vs okfill colors |
+| fig-ledger-flow | 0.0592 | same pipeline, no dashed group/delta annotations |
+| fig-read-questions | 0.0620 | same 3-question fan-in, simpler labels/anchors |
+| fig-stratum | 0.1716 | same 4-box stack; hand-tuned dashed group boxes, black boundary bar, and exact captions absent |
+
+The proof is the unbroken path (fence → PDF, zero manual
+coordinates), not a pixel match: the staged figures carry
+custom colors and `positioning` anchors the emitter does not
+produce. Scores are pinned here as the review record.

@@ -24,6 +24,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 | Single figure, no registries | `weave_fragment(md, toml_src)` → `[Element]` |
 | Build the spec | `spec_from_dict(raw)` — the ONE constructor (CLI `--spec` and MCP `spec_json` share it); unknown keys ignored |
 | Bar chart / line plot → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword, or `load_preset(path_or_json)` for benchmark JSON |
+| Standalone figure | `compile_standalone(tikz_src, workdir, engine=)` → PDF `Path`; `wrap_standalone(tikz)` → `fig.tex` source; `fence_to_tikz(lang, body)` for `mermaid`\|`chart` fences |
 | Compile | `compile_pdf(workdir, main, ensure_packages=False, engine="pdflatex"\|"tectonic")`; raises `CompileError` with the log tail |
 | TeX env | `check_tex_env(tex)` report / `ensure_tex_packages(tex)` install+re-probe |
 | Templates | `list_templates()`, `template_path(name)`, `template_preset(name)`, `list_skeletons()` |

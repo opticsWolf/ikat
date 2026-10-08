@@ -171,6 +171,18 @@ fn bib_keys(bib_src: &str) -> Vec<String> {
     v
 }
 
+/// Does this `.tex` fragment contain a `tikzpicture`? (standalone builder)
+#[pyfunction]
+fn tikz_needed(tex: &str) -> bool {
+    doc::tikz_needed(tex)
+}
+
+/// Does this `.tex` fragment contain a pgfplots `axis`?
+#[pyfunction]
+fn plots_needed(tex: &str) -> bool {
+    doc::plots_needed(tex)
+}
+
 /// LaTeX packages a woven body needs: TikZ for inline diagrams,
 /// pgfplots for data plots. Precompiled PDFs need neither.
 #[pyfunction]
@@ -226,6 +238,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
     m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
     m.add_function(wrap_pyfunction!(tex_requirements, m)?)?;
+    m.add_function(wrap_pyfunction!(tikz_needed, m)?)?;
+    m.add_function(wrap_pyfunction!(plots_needed, m)?)?;
     m.add_function(wrap_pyfunction!(tex_extra_packages, m)?)?;
     m.add_function(wrap_pyfunction!(used_packages, m)?)?;
     m.add_function(wrap_pyfunction!(document_class, m)?)?;

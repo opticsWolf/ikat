@@ -99,6 +99,7 @@ ikat templates | ikat template arxiv --show-preset
 ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{"title":"t",...}' | ikat barchart - [--legend top-left]
+ikat standalone fig.md --out fig.pdf   # one mermaid|chart fence → PDF
 ikat version
 ```
 
@@ -123,6 +124,7 @@ python -m ikat.mcp_server
 | flowchart | `flowchart_to_tikz` | `ikat flowchart` | `flowchart_to_tikz` |
 | bar chart | `barchart_to_tikz` / `load_preset` | `ikat barchart` (JSON or `--preset`, `--legend`) | `barchart_to_tikz` (`preset_json=`) |
 | line plot | `lineplot_to_tikz` / `load_preset` | `ikat lineplot` (JSON or `--preset`, `--legend`) | `lineplot_to_tikz` (`preset_json=`) |
+| standalone | `compile_standalone` / `wrap_standalone` / `fence_to_tikz` | `ikat standalone` | `standalone_figure` (.tex only) |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |

@@ -10,6 +10,8 @@ Same operations, three surfaces:
 | weave document | build_document /        | ikat build / weave     | weave_document      |
 |                | build_from_paths        |                        |                     |
 | flowchart      | flowchart_to_tikz       | ikat flowchart         | flowchart_to_tikz   |
+| standalone fig | compile_standalone /    | ikat standalone        | standalone_figure   |
+|                | wrap_standalone         |                        | (returns .tex only) |
 | bar chart      | barchart_to_tikz        | —                      | barchart_to_tikz    |
 | line plot      | lineplot_to_tikz        | —                      | lineplot_to_tikz    |
 | check packages | check_tex_env           | ikat check             | check_tex_packages  |
@@ -98,6 +100,28 @@ def lineplot_to_tikz(title: str, xlabel: str, ylabel: str, xs: list[float],
         from ikat.preset import load_preset
         return load_preset(preset_json)
     return _line(title, xlabel, ylabel, xs, names, yss, errs, legend)
+
+
+@mcp.tool()
+def standalone_figure(md_text: str) -> dict:
+    """One mermaid/chart fence -> wrapped standalone `fig.tex` source.
+
+    Returns {lang, tex, needs}; the CALLER compiles (workdir-bound
+    binaries stay out of MCP — same rule as `compile_pdf`; drive it
+    from `ikat standalone` / `ikat build`). Exactly one fence is
+    accepted; more is an error naming the count."""
+    from ikat.pipeline import extract_fences
+    from ikat.standalone import fence_to_tikz, wrap_standalone
+
+    fences = [(l, b) for l, _, b in extract_fences(md_text) if l in ("mermaid", "chart")]
+    if not fences:
+        raise ValueError("no mermaid/chart fence found")
+    if len(fences) > 1:
+        raise ValueError(f"{len(fences)} mermaid/chart fences found, need exactly 1")
+    lang, body = fences[0]
+    tikz = fence_to_tikz(lang, body)
+    needs = [n for n, has in (("tikz", True), ("pgfplots", "\\begin{axis}" in tikz)) if has]
+    return {"lang": lang, "tex": wrap_standalone(tikz), "needs": needs}
 
 
 @mcp.tool()

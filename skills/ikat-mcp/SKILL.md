@@ -3,8 +3,8 @@ name: ikat-mcp
 description: >
   ikat Markdown→LaTeX/PDF pipeline via its FastMCP stdio server
   (weave_document, flowchart_to_tikz, barchart_to_tikz,
-  lineplot_to_tikz, check/ensure/float packages, list/get templates
-  and skeletons, version). Use when the task needs to weave documents
+  lineplot_to_tikz, standalone_figure, check/ensure/float packages,
+  list/get templates and skeletons, version). Use when the task needs to weave documents
   or emit TikZ/pgfplots and okf-style MCP tools are wired. Prefers
   these tools over shelling out. For shell-only environments use the
   ikat-cli skill; for in-process work use the ikat-api skill.
@@ -26,6 +26,7 @@ description: >
 |---|---|
 | Weave markdown → `.tex` | `weave_document(md_text, toml_text, spec_json)` — `spec_json` is BuildSpec JSON, same shape as CLI `--spec` |
 | Mermaid fence → tikzpicture | `flowchart_to_tikz(src)` — strict subset, errors name the statement |
+| One fence → standalone source | `standalone_figure(md_text)` → `{lang, tex, needs}` — the WRAPPED `fig.tex`, not PDF bytes; the caller compiles (same workdir rule as `compile_pdf`) |
 | Bar / line data → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword (`auto` default; unknown words error naming the set), `preset_json=` (preset document string; when set, explicit data args ignored) |
 | What does this `.tex` need | `check_tex_packages(tex_source)` → `{missing, ok}` |
 | Install what's missing | `ensure_tex_packages(tex_source, install=true)` |

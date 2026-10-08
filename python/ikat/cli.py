@@ -216,6 +216,37 @@ def cmd_lineplot(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_standalone(a: argparse.Namespace) -> int:
+    from ikat import compile_standalone, fence_to_tikz
+    from ikat.pipeline import extract_fences
+
+    md = sys.stdin.read() if a.md == "-" else Path(a.md).read_text(encoding="utf-8")
+    fences = [(lang, body) for lang, _, body in extract_fences(md) if lang in ("mermaid", "chart")]
+    if not fences:
+        print("ikat standalone: no mermaid/chart fence found", file=sys.stderr)
+        return 1
+    if len(fences) > 1:
+        print(f"ikat standalone: {len(fences)} mermaid/chart fences found, need exactly 1", file=sys.stderr)
+        return 1
+    lang, body = fences[0]
+    try:
+        tikz = fence_to_tikz(lang, body)
+    except ValueError as e:
+        print(f"ikat standalone: {e}", file=sys.stderr)
+        return 1
+    out = Path(a.out or "fig.pdf")
+    try:
+        pdf = compile_standalone(tikz, out.parent if str(out.parent) != "" else ".", engine=a.engine)
+    except Exception as e:
+        print(f"ikat standalone: compile failed: {e}", file=sys.stderr)
+        return 1
+    if pdf.resolve() != out.resolve():
+        out.unlink(missing_ok=True)
+        pdf.rename(out)
+    print(f"pdf: {out} ({out.stat().st_size} bytes)")
+    return 0
+
+
 def cmd_skeletons(a: argparse.Namespace) -> int:
     from ikat import list_skeletons
 
@@ -300,6 +331,12 @@ def build_parser() -> argparse.ArgumentParser:
     lp.add_argument("--preset", default=None, help="preset JSON file or - for stdin (conflicts with FILE)")
     lp.add_argument("--legend", default=None, help="position keyword (overrides payload)")
     lp.set_defaults(func=cmd_lineplot)
+
+    s = sub.add_parser("standalone", help="one mermaid/chart fence -> figure PDF")
+    s.add_argument("md", help="markdown file or - for stdin")
+    s.add_argument("--out", default=None, help="PDF path (default fig.pdf)")
+    s.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
+    s.set_defaults(func=cmd_standalone)
 
     k = sub.add_parser("skeletons", help="list shipped skeleton documents")
     k.set_defaults(func=cmd_skeletons)
