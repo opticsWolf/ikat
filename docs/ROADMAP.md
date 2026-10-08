@@ -1,12 +1,12 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase D gate, 0.6.0): Phases 1, 2 (plots),
+Status 2026-10-08 (Phase E gate, 0.7.0): Phases 1, 2 (plots),
 3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
-heading guards) done — 96 cargo + 69 pytest green, showcase
-(10 pages, 4 diagrams) + regen + standalone + heads proofs
-build, 0 undefined citations.
-Open: M4.1, M4.10, M5.4 (the pulldown-cmark switch), tectonic
-crate embedding.
+heading guards), E (parser switch) done — 98 cargo + 69 pytest
+green, showcase (10 pages, 4 diagrams) + regen + standalone +
+heads proofs build, golden paper byte-identical (`ebe698db`),
+0 undefined citations.
+Open: M4.1, M4.10, tectonic crate embedding.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -220,12 +220,17 @@ auto-added or template-validated; compile-proven to PDF.
   headings, matching table shapes, aligned paras modulo the
   `%%` directive line, which stays pre-processing either way).
   Switch viable, deferred to its own golden-parity milestone.
-- **M5.4 pulldown-cmark switch.** OPEN — rewrite `convert()` on
-  the pulldown-cmark event stream. Acceptance: empty diff on the
-  spike corpus AND the golden paper rebuilds byte-identical AND
-  all 54 cargo + 43 pytest stay green. The hand scanner
-  (`%%` directive pre-processing, `esc.rs` map) stays regardless:
-  only the block splitter moves.
+- **M5.4 pulldown-cmark switch.** ✅ DONE 2026-10-08 (Phase E,
+  0.6.1 → gate 0.7.0) — `src/md.rs` production mapping +
+  `convert()` on `MdBlock`s. Acceptance met: empty diff on the
+  harness (141+35+3 corpus blocks + latent synthetics), golden
+  paper byte-identical (`ebe698db`, 0 edits to the golden file),
+  98 cargo + 69 pytest green, all proofs build. One consumption
+  bug found mid-switch (blank-separated Paras merged — `convert`
+  now flushes between consecutive `Para` blocks); one orphaned
+  `#[cfg(test)]` on `mod mermaid` found via a failed
+  `maturin develop` (probe-cleanup scar, fixed). `esc.rs`
+  untouched, as the spike predicted.
 
 ## Phase 6 — Showcase paper ✅ DONE 2026-10-07
 

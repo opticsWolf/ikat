@@ -201,7 +201,7 @@ non-default, so a default document weaves byte-identically before
 and after the feature existed. Non-default values are validated
 at parse time, not at TeX time.
 
-### 3.5 `texenv.rs`, `tectonic.rs`, `md_spike.rs`
+### 3.5 `texenv.rs`, `tectonic.rs`, `md.rs`, `md_spike.rs`
 
 - `texenv.rs`: scans any preamble into `(probe file, tlmgr
   package)` needs — the static half of the texliveonfly trick.
@@ -214,10 +214,26 @@ at parse time, not at TeX time.
   `\bibliography{}`. Crate embedding does not link on Windows
   (C deps) — the supported path is the `TECTONIC_EXE`/PATH
   binary cascade, and embedding is a Linux-CI exercise.
-- `md_spike.rs`: test-only harness comparing the hand scanner
-  against pulldown-cmark events (verbatim info strings, identical
-  headings, matching table shapes). The switch itself (M5.4) is
-  gated on an empty diff plus a byte-identical golden paper.
+- `md.rs` (E.1/M5.4): the block splitter. pulldown-cmark owns
+  boundaries (`Parser::into_offset_iter`, `TABLES` only — no
+  other extensions); content comes from raw source slices, so
+  `esc.rs`, fence attrs, tables, and directives behave exactly as
+  the retired hand scanner did. Inline events are ignored. The
+  fence-aware pre-pass drops `>` quotes (the old scanner dropped
+  them mid-paragraph too), extracts `%% table` directives by
+  table sequence number, and errors loudly on `[label]:`
+  reference definitions (the stream would swallow them silently).
+  Paragraphs break only on blank lines (line arithmetic, never
+  newline counting — spans swallow newlines); consecutive `Para`
+  blocks are blank-separated by construction, so `convert()`
+  flushes between them (the one consumption bug the golden test
+  caught mid-switch).
+- `md_spike.rs`: the frozen hand-scanner oracle beside a thin
+  production-backed mapping. Post-switch it runs as the permanent
+  cross-check: oracle vs `md::blocks()` on the full corpus
+  (141+35+3 blocks, empty diff) plus latent-divergence synthetics.
+  If the mapping ever drifts from the hand rules, this reddens
+  before the golden does.
 
 ## 4. Python layer (`python/ikat/`)
 
@@ -352,5 +368,6 @@ M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
 workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
 Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
-0.6.0). The open frontier: line-numbered errors (M4.1), the
-pulldown-cmark switch (M5.4), tectonic hardening (M4.10).
+0.6.0), parser switch (M5.4, Phase E — 0.7.0). The open
+frontier: line-numbered errors (M4.1), tectonic hardening
+(M4.10).
