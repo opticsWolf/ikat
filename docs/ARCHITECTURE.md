@@ -208,12 +208,23 @@ at parse time, not at TeX time.
   The subprocess half lives in Python (`texenv.py`: one
   `kpsewhich` call to probe, one `tlmgr install` to fix).
 - `tectonic.rs`: the optional engine path (cargo feature, off by
-  default so wheels stay lean). `tex_for_tectonic` drops the
-  `inputenc` line; empty `bib_name` emits no bibliography lines
-  because tectonic auto-runs BibTeX and dies on an empty
-  `\bibliography{}`. Crate embedding does not link on Windows
-  (C deps) — the supported path is the `TECTONIC_EXE`/PATH
-  binary cascade, and embedding is a Linux-CI exercise.
+  default so wheels stay lean; hardened Phase G — 0.9.0).
+  `tex_for_tectonic` drops the `inputenc` line; empty `bib_name`
+  emits no bibliography lines because tectonic auto-runs BibTeX
+  and dies on an empty `\bibliography{}`. CI (`tex` job)
+  installs the pinned 0.17.0 binary (checksum-verified) and
+  builds demo + showcase with `--engine tectonic` under the
+  same undefined-citation gate: `_compile_tectonic` passes
+  `--keep-logs` (tectonic otherwise swallows the XeTeX log and
+  undefined citations would pass silently — found during G.1
+  verification) and the gate greps both engines' `.log` files.
+  Both papers build under both engines with 0 undefined
+  citations (22 + 10 pages, same geometry; engine deltas —
+  all font-encoding class — ledgered in `ACCEPTED.md`). Crate
+  embedding does not link on Windows (C deps) — the supported
+  path is the `TECTONIC_EXE`/PATH binary cascade, and embedding
+  stays a Linux-CI exercise by design (recorded so it stops
+  being re-proposed).
 - `md.rs` (E.1/M5.4): the block splitter. pulldown-cmark owns
   boundaries (`Parser::into_offset_iter`, `TABLES` only — no
   other extensions); content comes from raw source slices, so
@@ -398,5 +409,6 @@ M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
 Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
 0.6.0), parser switch (M5.4, Phase E — 0.7.0), line-numbered
-errors (M4.1, Phase F — 0.8.0). The open frontier: tectonic
-hardening (M4.10).
+errors (M4.1, Phase F — 0.8.0), tectonic hardening (M4.10,
+Phase G — 0.9.0). No open milestones; tectonic crate embedding
+remains a Linux-CI exercise by design.

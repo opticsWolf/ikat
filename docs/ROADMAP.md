@@ -1,12 +1,14 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase F gate, 0.8.0): Phases 1, 2 (plots),
+Status 2026-10-08 (Phase G gate, 0.9.0): Phases 1, 2 (plots),
 3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
-heading guards), E (parser switch), F (line-numbered errors)
-done — 118 cargo + 75 pytest green, showcase (10 pages,
-4 diagrams) + regen + standalone + heads proofs build, golden
-paper byte-identical (`ebe698db`), 0 undefined citations.
-Open: M4.10, tectonic crate embedding.
+heading guards), E (parser switch), F (line-numbered errors),
+G (tectonic hardening) done — 118 cargo + 76 pytest green,
+showcase (10 pages, 4 diagrams) + regen + standalone + heads
+proofs build under pdflatex AND tectonic, golden paper
+byte-identical (`ebe698db`), 0 undefined citations both
+engines. Open: tectonic crate embedding (Linux-CI exercise,
+by design — not a milestone).
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -185,13 +187,23 @@ prints verbatim; MCP returns the text. 118 cargo + 75 pytest
   M4.2b); empty `bib_name` now emits no bibliography lines (tectonic auto-runs
   BibTeX and dies on empty `\bibliography{}`).
   What M4.9 did NOT cover is itemized in M4.10.
-- **M4.10 tectonic hardening.** OPEN — three items: (1) a
-  tectonic step in the CI `tex` job (install the 0.17.0 binary,
-  build demo + showcase with `--engine tectonic`, same
-  undefined-citation gate); (2) showcase paper and main paper
-  verified under tectonic (only a probe doc is proven; XeTeX
-  font handling differs from pdfTeX); (3) the Windows-embedding
-  limitation documented in README's LaTeX section.
+- **M4.10 tectonic hardening.** ✅ DONE 2026-10-08 (Phase G,
+  0.8.1 → gate 0.9.0) — (1) CI `tex` job installs the pinned
+  0.17.0 binary (checksum-verified linux-gnu tarball) and builds
+  demo + showcase with `--engine tectonic` (new flag on both
+  builders, default pdflatex); (2) showcase (10 pp) AND main
+  paper (22 pp) verified under tectonic, 0 undefined citations
+  both engines, engine deltas (all font-encoding class: TU/OTF
+  vs OT1/Type1 extraction, quote glyphs, hyphenation points)
+  ledgered in `ACCEPTED.md` — no content delta, nothing filed;
+  (3) Windows-embedding limitation in README (binary cascade is
+  the supported path; embedding stays Linux-CI by design).
+  Found in passing: tectonic swallows the XeTeX log without
+  `--keep-logs` (undefined citations would pass silently) —
+  `_compile_tectonic` now passes it and writes the transcript
+  beside the kept log; the gate grep covers both. Red-then-green
+  proven locally with the exact gate patterns (broken citation
+  → 2 matches; clean → 0).
 
 ## Non-goals
 
