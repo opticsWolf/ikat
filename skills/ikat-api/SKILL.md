@@ -66,7 +66,8 @@ Validation: rectangular series, `min ≤ value ≤ max` elementwise,
 ## Doctrine (do not work around)
 
 - Strict subset, fail-fast: dangling citation keys, unknown
-  template/skeleton tokens, wide+here floats, unknown attrs/keys
+  template/skeleton tokens, wide+here floats, unknown attrs/keys,
+  line-starting `[label]: ...` reference definitions
   all raise — never catch-and-continue into a TeX log mystery.
 - No invented numbers in figures: plot data comes from measurement
   (grep/wc/benches), marked `[NOT YET MEASURED]` otherwise.

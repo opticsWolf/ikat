@@ -78,6 +78,13 @@ Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 `[floats]` tuning (fractions, counters, `barrier_sections`) emits
 only when non-default.
 
+Markdown subset notes (the parser is CommonMark-shaped, the subset
+is strict): line-starting `[label]: ...` reference definitions are
+a build error (the text would vanish silently — write it inline);
+`~~~` fences, indented code, lists, HTML blocks, setext headings,
+and H4+ feed their raw lines as paragraph text (as the old scanner
+did); `>` quote lines are dropped without breaking paragraphs.
+
 `[typography]` keep-with-next (default ON): `\clubpenalty` +
 `\widowpenalty` at 10000, `\needspace{3\baselineskip}` before
 every section (`min_lines+1`; `min_lines = 2` default). Set

@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config::{CaptionPos, Config, FloatNeeds, Pos, Span};
 use crate::esc::inline;
+use crate::md::MdBlock;
 use crate::mermaid::flowchart_to_tikz;
 use crate::table::table_block;
 
@@ -170,7 +171,7 @@ pub fn parse_attrs(attr: &str, what: &str) -> Result<(ElemAttrs, bool), String> 
 }
 
 /// Extract the `{...}` attribute string from a fence info line.
-fn fence_attr_str(line: &str) -> &str {
+pub(crate) fn fence_attr_str(line: &str) -> &str {
     match (line.find('{'), line.rfind('}')) {
         (Some(a), Some(b)) if b > a => &line[a + 1..b],
         _ => "",
@@ -514,169 +515,145 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
         Ok(())
     };
 
-    let mut i = 0;
-    while i < lines.len() {
-        let s = lines[i].trim();
-        if s.is_empty() {
-            flush(&mut out, &mut para)?;
-            i += 1;
-            continue;
-        }
-        if s.starts_with('>') {
-            i += 1;
-            continue;
-        }
-        if s.starts_with("```") {
-            flush(&mut out, &mut para)?;
-            if s.contains("mermaid") {
-                if diagram_idx >= spec.diagrams.len() {
-                    return Err(format!("mermaid fence #{diagram_idx} has no registry entry"));
+    // E.1 (M5.4): the line walk is gone — `crate::md::blocks()`
+    // owns boundaries (pulldown-cmark) with raw-slice content, and
+    // every arm below is the old branch body verbatim on the same
+    // inputs. `lines` is rejoined because offsets need one source.
+    let md_text = lines.join("\n");
+    for b in crate::md::blocks(&md_text)? {
+        match b {
+            MdBlock::Fence { info: s, body: fence_body } => {
+                flush(&mut out, &mut para)?;
+                if s.contains("mermaid") {
+                    if diagram_idx >= spec.diagrams.len() {
+                        return Err(format!("mermaid fence #{diagram_idx} has no registry entry"));
+                    }
+                    let entry = &spec.diagrams[diagram_idx];
+                    let (attrs, inline_flag) = parse_attrs(
+                        fence_attr_str(&s),
+                        &format!("mermaid fence #{diagram_idx}"),
+                    )?;
+                    let mode = if inline_flag || s.contains("{inline}") {
+                        "inline"
+                    } else {
+                        entry.mode.as_str()
+                    };
+                    let kind = if mode == "inline" { "diagram" } else { "picture" };
+                    let span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
+                    let pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
+                    let body = if mode == "inline" {
+                        flowchart_to_tikz(&fence_body)?
+                    } else {
+                        format!("{}{}", entry.path_prefix, entry.key)
+                    };
+                    let caption_bottom =
+                        attrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
+                    let (fig, n) = figure_block(
+                        &body,
+                        &inline(&entry.caption, keys)?,
+                        &format!("fig:{}", entry.key),
+                        span,
+                        pos,
+                        attrs.width.as_deref(),
+                        caption_bottom,
+                    )
+                    .map_err(|e| format!("mermaid fence #{diagram_idx}: {e}"))?;
+                    needs.add(n);
+                    out.push(fig + "\n");
+                    diagram_idx += 1;
                 }
-                let mut fence = Vec::new();
-                let mut j = i + 1;
-                while j < lines.len() && !lines[j].trim().starts_with("```") {
-                    fence.push(lines[j].trim_end_matches('\n').to_string());
-                    j += 1;
-                }
-                let entry = &spec.diagrams[diagram_idx];
-                let (attrs, inline_flag) =
-                    parse_attrs(fence_attr_str(s), &format!("mermaid fence #{diagram_idx}"))?;
-                let mode = if inline_flag || s.contains("{inline}") {
-                    "inline"
-                } else {
-                    entry.mode.as_str()
-                };
-                let kind = if mode == "inline" { "diagram" } else { "picture" };
-                let span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
-                let pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
-                let body = if mode == "inline" {
-                    flowchart_to_tikz(&fence.join("\n"))?
-                } else {
-                    format!("{}{}", entry.path_prefix, entry.key)
-                };
-                let caption_bottom = attrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
-                let (fig, n) = figure_block(
-                    &body,
-                    &inline(&entry.caption, keys)?,
-                    &format!("fig:{}", entry.key),
-                    span,
-                    pos,
-                    attrs.width.as_deref(),
-                    caption_bottom,
-                )
-                .map_err(|e| format!("mermaid fence #{diagram_idx}: {e}"))?;
-                needs.add(n);
-                out.push(fig + "\n");
-                diagram_idx += 1;
-                i = j + 1;
-                continue;
+                // Non-mermaid fences: skipped silently, exactly as
+                // the hand scanner skipped them.
             }
-            i += 1;
-            while i < lines.len() && !lines[i].trim().starts_with("```") {
-                i += 1;
-            }
-            i += 1;
-            continue;
-        }
-        if s.starts_with("%% table") {
-            // Attribute comment for the table below: consume it here so
-            // it never becomes paragraph text; the table branch below
-            // picks the stashed attrs up.
-            let mut j = i + 1;
-            while j < lines.len() && lines[j].trim().is_empty() {
-                j += 1;
-            }
-            if j < lines.len() && lines[j].trim().starts_with('|') {
-                let (attrs, _) = parse_attrs(fence_attr_str(s), &format!("table #{table_idx}"))?;
-                if attrs.span.is_some() || attrs.pos.is_some() || attrs.width.is_some() || attrs.captionpos.is_some() {
+            MdBlock::Directive(a) => {
+                // Same stash rule, parsed with the same `table #N`
+                // context; the Table arm below takes it. (A
+                // dangling `%% table` never becomes a Directive —
+                // the pre-pass leaves it as paragraph text.)
+                let (attrs, _) = parse_attrs(&a, &format!("table #{table_idx}"))?;
+                if attrs.span.is_some()
+                    || attrs.pos.is_some()
+                    || attrs.width.is_some()
+                    || attrs.captionpos.is_some()
+                {
                     pending_table = Some(attrs);
                 }
-                i = j;
-                continue;
+            }
+            MdBlock::Table(rows) => {
+                flush(&mut out, &mut para)?;
+                if table_idx >= spec.table_captions.len() {
+                    return Err(format!("table #{table_idx} has no caption"));
+                }
+                let tattrs = pending_table.take().unwrap_or_default();
+                let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
+                let tpos = tattrs.pos.unwrap_or(cfg.floats.pos_default);
+                let caption_top = tattrs.captionpos.map(|c| c == CaptionPos::Top).unwrap_or(true);
+                let (tab, n) = table_block(
+                    &rows,
+                    &spec.table_captions[table_idx],
+                    keys,
+                    spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
+                    tspan,
+                    tpos,
+                    caption_top,
+                    tattrs.width.as_deref(),
+                )
+                .map_err(|e| format!("table #{table_idx}: {e}"))?;
+                needs.add(n);
+                out.push(tab + "\n");
+                table_idx += 1;
+            }
+            MdBlock::Appendix => {
+                flush(&mut out, &mut para)?;
+                out.push("\\appendix\n\\section{Claim-to-decision map}\n".to_string());
+            }
+            MdBlock::Abstract => {
+                flush(&mut out, &mut para)?;
+                out.push("\\begin{abstract}\n".to_string());
+                in_abstract = true;
+            }
+            MdBlock::H2(h) => {
+                flush(&mut out, &mut para)?;
+                if in_abstract {
+                    out.push("\\end{abstract}\n".to_string());
+                    in_abstract = false;
+                }
+                let head = strip_section_number(&h);
+                if cfg.floats.barrier_sections {
+                    out.push("\\FloatBarrier\n".to_string());
+                    needs.barrier = true;
+                }
+                if cfg.typography.keep_with_next {
+                    out.push(cfg.typography.needspace_line() + "\n");
+                }
+                out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
+            }
+            MdBlock::H3(h) => {
+                flush(&mut out, &mut para)?;
+                let head = strip_section_number(&h);
+                if cfg.floats.barrier_sections {
+                    out.push("\\FloatBarrier\n".to_string());
+                    needs.barrier = true;
+                }
+                if cfg.typography.keep_with_next {
+                    out.push(cfg.typography.needspace_line() + "\n");
+                }
+                out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
+            }
+            MdBlock::Title(t) => {
+                title = inline(&t, keys)?;
+            }
+            MdBlock::Para(ls) => {
+                // Consecutive Para blocks are always blank-separated
+                // (`blocks()` splits there), so a pending para must
+                // flush first — the old scanner flushed on the blank
+                // line itself. Lines WITHIN one block join safely.
+                if !para.is_empty() {
+                    flush(&mut out, &mut para)?;
+                }
+                para.extend(ls);
             }
         }
-        if s.starts_with('|') {
-            flush(&mut out, &mut para)?;
-            let mut rows = Vec::new();
-            while i < lines.len() && lines[i].trim().starts_with('|') {
-                rows.push(lines[i].trim().to_string());
-                i += 1;
-            }
-            if table_idx >= spec.table_captions.len() {
-                return Err(format!("table #{table_idx} has no caption"));
-            }
-            let tattrs = pending_table.take().unwrap_or_default();
-            let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
-            let tpos = tattrs.pos.unwrap_or(cfg.floats.pos_default);
-            let caption_top = tattrs.captionpos.map(|c| c == CaptionPos::Top).unwrap_or(true);
-            let (tab, n) = table_block(
-                &rows,
-                &spec.table_captions[table_idx],
-                keys,
-                spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
-                tspan,
-                tpos,
-                caption_top,
-                tattrs.width.as_deref(),
-            )
-            .map_err(|e| format!("table #{table_idx}: {e}"))?;
-            needs.add(n);
-            out.push(tab + "\n");
-            table_idx += 1;
-            continue;
-        }
-        if s.starts_with("## Appendix") {
-            flush(&mut out, &mut para)?;
-            out.push("\\appendix\n\\section{Claim-to-decision map}\n".to_string());
-            i += 1;
-            continue;
-        }
-        if s.starts_with("## Abstract") {
-            flush(&mut out, &mut para)?;
-            out.push("\\begin{abstract}\n".to_string());
-            in_abstract = true;
-            i += 1;
-            continue;
-        }
-        if s.starts_with("## ") {
-            flush(&mut out, &mut para)?;
-            if in_abstract {
-                out.push("\\end{abstract}\n".to_string());
-                in_abstract = false;
-            }
-            let head = strip_section_number(&s[3..]);
-            if cfg.floats.barrier_sections {
-                out.push("\\FloatBarrier\n".to_string());
-                needs.barrier = true;
-            }
-            if cfg.typography.keep_with_next {
-                out.push(cfg.typography.needspace_line() + "\n");
-            }
-            out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
-            i += 1;
-            continue;
-        }
-        if s.starts_with("### ") {
-            flush(&mut out, &mut para)?;
-            let head = strip_section_number(&s[4..]);
-            if cfg.floats.barrier_sections {
-                out.push("\\FloatBarrier\n".to_string());
-                needs.barrier = true;
-            }
-            if cfg.typography.keep_with_next {
-                out.push(cfg.typography.needspace_line() + "\n");
-            }
-            out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
-            i += 1;
-            continue;
-        }
-        if s.starts_with("# ") {
-            title = inline(&s[2..], keys)?;
-            i += 1;
-            continue;
-        }
-        para.push(s.to_string());
-        i += 1;
     }
     flush(&mut out, &mut para)?;
     if in_abstract {

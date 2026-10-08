@@ -1,6 +1,6 @@
 [package]
 name = "ikat"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "Weave Markdown into camera-ready LaTeX: mermaid-to-TikZ, pgfplots figures, publisher templates"
 authors = ["opticsWolf"]
@@ -14,6 +14,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.29", features = ["extension-module"] }
+# Block splitter since E.1 (M5.4): 0.13.x pinned — parser version
+# bumps are their own commits with a golden re-run.
+pulldown-cmark = "0.13"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -21,7 +24,6 @@ tectonic = { version = "0.17.0", optional = true }
 toml = "1"
 
 [dev-dependencies]
-pulldown-cmark = "0.13.4"
 
 [features]
 tectonic = ["dep:tectonic"]

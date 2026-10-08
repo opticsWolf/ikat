@@ -40,7 +40,7 @@ from .texenv import check as check_tex_env
 from .texenv import ensure as ensure_tex_packages
 from .texenv import needs as tex_package_needs
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 __all__ = [
     "BuildResult",
