@@ -65,7 +65,7 @@ def main() -> int:
             if p.returncode != 0:
                 print(f"pdflatex failed on {name}:\n{(p.stdout + p.stderr)[-1500:]}")
                 return 2
-            (OUT / f"{name}-ikat.pdf").unlink(missing_ok=True)
+            (OUT / f"{name}-ikat.pdf").unlink(missing_ok=True)  # Windows rename won't overwrite
             (OUT / f"{name}.pdf").rename(OUT / f"{name}-ikat.pdf")
             print(f"pdf  {name} ok")
     return 1 if failed else 0

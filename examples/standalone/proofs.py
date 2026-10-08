@@ -33,6 +33,7 @@ def main() -> int:
         tikz = fence_to_tikz(*fences[0])
         (OUT / f"{name}.tex").write_text(tikz, encoding="utf-8")
         pdf = compile_standalone(tikz, OUT, engine="pdflatex")
+        (OUT / f"{name}.pdf").unlink(missing_ok=True)  # Windows rename won't overwrite
         pdf.rename(OUT / f"{name}.pdf")
         print(f"pdf  {name} ok")
     return 0

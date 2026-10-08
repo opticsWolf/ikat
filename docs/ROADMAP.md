@@ -1,9 +1,11 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase A gate, 0.3.0): Phases 1, 2 (plots),
-4 (core), 5, 6 done — 67 cargo + 52 pytest green, showcase +
-regen build (6-page paper, 4 regen plots, 0 undefined citations).
-Open: M3.2–M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
+Status 2026-10-08 (Phase C gate, 0.5.0): Phases 1, 2 (plots),
+3 (standalone, sequence, state),
+4 (core), 5, 6 done — 81 cargo + 62 pytest green, showcase
+(9 pages, 4 diagrams) + regen + standalone proofs build, 0
+undefined citations.
+Open: M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
 tectonic crate embedding, Phase D.2 heading guards.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
@@ -88,8 +90,12 @@ anywhere in the loop.
   rule), MCP `standalone_figure` (returns source, workdir rule),
   `tikz_needed`/`plots_needed` predicates, four paper-diagram
   proofs with ledger scores in `examples/regen/ACCEPTED.md`.
-- **M3.2 sequence subset**, **M3.3 state subset** behind the same
-  `flowchart_to_tikz` entry point (separate grammars, shared emitter).
+- **M3.2 sequence subset**, **M3.3 state subset** ✅ DONE
+  2026-10-08 (Phase C, 0.4.1+0.4.2+0.5.0) — `src/sequence.rs`
+  (columns in declaration order, alt/else/opt boxes) +
+  `src/state.rs` (shared placer, composite boxes) behind the same
+  `flowchart_to_tikz` entry; `emit.rs` holds the shared TikZ
+  vocabulary; showcase Figures 2+3 are the proofs.
 - **M3.4 layout.** Edge routing that avoids node interiors, subgraph
   cluster boxes, wider DAG support (today: layered trees/DAGs only).
 
