@@ -26,3 +26,6 @@ examples/standalone/out/
 # Another agent/design round scratch space (impeccable) — not part of ikat
 PRODUCT.md
 .impeccable/
+
+# Local-only scratch (tectonic binary, downloads)
+.cache-tex/

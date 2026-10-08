@@ -68,7 +68,13 @@ def _compile_tectonic(workdir: str | Path, main_tex: str) -> Path:
         return pdf
     src = workdir / f"{Path(main_tex).stem}-tectonic.tex"
     src.write_text(tex, encoding="utf-8")  # adapted copy; source untouched
-    _run(exe, [src.name], workdir)
+    # `--keep-logs`: tectonic otherwise swallows the XeTeX log and
+    # undefined citations would pass silently. The kept `.log` lets
+    # the CI gate grep the same patterns as for pdflatex; the
+    # stdout transcript lands beside it as a run record.
+    out = _run(exe, ["--keep-logs", src.name], workdir)
+    log = workdir / f"{Path(main_tex).stem}-tectonic-stdout.log"
+    log.write_text(out, encoding="utf-8")
     pdf = workdir / f"{Path(main_tex).stem}-tectonic.pdf"
     if not pdf.exists():
         raise CompileError(f"no PDF produced for {main_tex}")

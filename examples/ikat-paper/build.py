@@ -127,7 +127,7 @@ def stage_bib_style(out: Path, style: str = "IEEEtran") -> None:
     raise SystemExit(f"no {style}.bst found (kpsewhich + texmf); install it")
 
 
-def make_paper() -> None:
+def make_paper(engine: str = "pdflatex") -> None:
     ref_bib = (HERE / "refs.bib").read_text(encoding="utf-8")
     spec = BuildSpec(
         diagrams=[
@@ -158,15 +158,20 @@ def make_paper() -> None:
     (OUT / "ikat-paper.tex").write_text(r.tex, encoding="utf-8")
     shutil.copy(HERE / "refs.bib", OUT / "ikat-refs.bib")
     stage_bib_style(OUT, spec.bib_style)
-    pdf = compile_pdf(OUT, "ikat-paper.tex")
+    pdf = compile_pdf(OUT, "ikat-paper.tex", engine=engine)
     print(f"paper: {pdf} ({pdf.stat().st_size} bytes, "
           f"diagrams={r.n_diagrams} tables={r.n_tables})")
 
 
 if __name__ == "__main__":
-    if shutil.which("pdflatex") is None:
-        raise SystemExit("pdflatex not on PATH")
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic"])
+    engine = ap.parse_args().engine
+    if shutil.which(engine) is None:
+        raise SystemExit(f"{engine} not on PATH")
     OUT.mkdir(exist_ok=True)
     FIGS.mkdir(exist_ok=True)
     make_plots()
-    make_paper()
+    make_paper(engine)
