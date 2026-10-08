@@ -94,7 +94,7 @@ pub fn to_tikz(src: &str, base: usize) -> Result<String, crate::error::Error> {
         let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
         let t = cut.trim();
         if !t.is_empty() {
-            raw_lines.push((t.to_string(), l.trim().to_string(), idx));
+            raw_lines.push((t.to_string(), l.to_string(), idx));
         }
     }
     let mut lines = raw_lines.iter();

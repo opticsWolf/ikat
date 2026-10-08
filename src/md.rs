@@ -112,7 +112,7 @@ pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String,
                         "reference definitions `[label]: ...` are not in the subset (write the text inline)",
                         n + 1,
                         s.to_string(),
-                    ));
+                    ).with_col(Some(1)));
                 }
             }
         }

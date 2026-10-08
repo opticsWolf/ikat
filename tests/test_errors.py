@@ -75,6 +75,21 @@ def test_data_error_has_no_line_part():
     assert "middle" in text
 
 
+def test_caret_survives_indent_end_to_end(tmp_path):
+    # F.2 headline: inner leading whitespace counts through the
+    # full stack (`{ span=wide bogus=1}` → caret at char 12).
+    md = "# T\n\n```mermaid { span=wide bogus=1}\ngraph TD\na[x]\n```\n"
+    (tmp_path / "doc.md").write_text(md, encoding="utf-8")
+    (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
+    spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="precompiled")])
+    with pytest.raises(ValueError, match=r"doc\.md:3:.*unknown attribute") as ei:
+        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
+    text = str(ei.value)
+    assert "bogus" in text
+    caret = [l for l in text.splitlines() if set(l) == {" ", "^"}]
+    assert caret == [" " * 11 + "^"], text
+
+
 def test_string_api_keeps_rust_rendering():
     # No file anywhere: the Rust Display crosses verbatim.
     spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="inline")])

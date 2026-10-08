@@ -33,6 +33,13 @@ impl Error {
         Self { msg: msg.into(), line, col: None, echo: echo.into() }
     }
 
+    /// Attach a 1-based caret column (F.2 fills these where the
+    /// grammar knows the token span).
+    pub fn with_col(mut self, col: Option<usize>) -> Self {
+        self.col = col;
+        self
+    }
+
     /// Data error: no manuscript line (JSON/TOML values).
     pub fn data(msg: impl Into<String>, echo: impl Into<String>) -> Self {
         Self::new(msg, 0, echo)
@@ -69,6 +76,13 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// 1-based character column of the byte index inside `line`
+/// (caret arithmetic is in chars — echoes may hold multibyte
+/// text, and byte columns would misplace the caret).
+pub fn col_of(line: &str, byte_idx: usize) -> usize {
+    line[..byte_idx.min(line.len())].chars().count() + 1
+}
 
 /// `format!` a message into an `Error` at one call site.
 #[macro_export]

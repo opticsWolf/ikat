@@ -151,8 +151,16 @@ pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bo
             inline = true;
             continue;
         }
+        // Caret column of this token inside the attr string (char
+        // columns; leading whitespace inside braces counts — the
+        // classic off-by-indent lives here).
+        let tok_col = attr.find(tok).map(|b| crate::error::col_of(attr, b));
         let Some((k, v)) = tok.split_once('=') else {
-            return Err(Error::new(format!("{what}: bad attribute {tok:?} (want k=v)"), line, attr.to_string()));
+            return Err(Error::new(
+                format!("{what}: bad attribute {tok:?} (want k=v)"),
+                line,
+                attr.to_string()
+            ).with_col(tok_col));
         };
         match k {
             "span" => {
@@ -164,19 +172,25 @@ pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bo
                             format!("{what}: span must be column|wide, got {v:?}"),
                             line,
                             attr.to_string(),
-                        ))
+                        ).with_col(tok_col))
                     }
                 })
             }
             "pos" => {
-                out.pos = Some(Pos::parse(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?)
+                out.pos = Some(Pos::parse(v).map_err(|e| {
+                    Error::new(format!("{what}: {e}"), line, attr.to_string()).with_col(tok_col)
+                })?)
             }
             "width" => {
-                out.width = Some(parse_width(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?)
+                out.width = Some(parse_width(v).map_err(|e| {
+                    Error::new(format!("{what}: {e}"), line, attr.to_string()).with_col(tok_col)
+                })?)
             }
             "captionpos" => {
                 out.captionpos = Some(
-                    CaptionPos::parse(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?,
+                    CaptionPos::parse(v).map_err(|e| {
+                        Error::new(format!("{what}: {e}"), line, attr.to_string()).with_col(tok_col)
+                    })?,
                 )
             }
             _ => {
@@ -184,7 +198,7 @@ pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bo
                     format!("{what}: unknown attribute {k:?} (span|pos|width|captionpos)"),
                     line,
                     attr.to_string(),
-                ))
+                ).with_col(tok_col))
             }
         }
     }
@@ -354,16 +368,19 @@ fn head_line(tex: &str, byte_idx: usize) -> usize {
     tex[..byte_idx.min(tex.len())].matches('\n').count() + 1
 }
 
-/// Line + echo for a `{{token}}` inside a skeleton: the token's
-/// own line when present, else line 1 with an empty echo.
-fn tok_line(skel: &str, tok: &str) -> (usize, String) {
+/// Line + echo + caret for a `{{token}}` inside a skeleton: the
+/// token's own line/column when present, else line 1 with no
+/// position and an empty echo.
+fn tok_line(skel: &str, tok: &str) -> (usize, String, Option<usize>) {
     let pat = format!("{{{{{tok}}}}}");
     match skel.find(&pat) {
-        Some(at) => {
-            let ln = head_line(skel, at);
-            (ln, skel.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string())
+        Some(_) => {
+            let line = skel.lines().find(|l| l.contains(&pat)).unwrap_or("");
+            let ln = head_line(skel, skel.find(&pat).unwrap_or(0));
+            let col = line.find(&pat).map(|b| crate::error::col_of(line, b));
+            (ln, line.trim().to_string(), col)
         }
-        None => (1, String::new()),
+        None => (1, String::new(), None),
     }
 }
 
@@ -392,13 +409,12 @@ pub fn render_skeleton(
         match *tok {
             "title" | "author" | "thanks" | "body" | "abstract" | "bibliography" => {}
             _ => {
-                let at = skel.find(&format!("{{{{{tok}}}}}")).unwrap_or(0);
-                let ln = head_line(skel, at);
+                let (ln, echo, col) = tok_line(skel, tok);
                 return Err(crate::error::Error::new(
                     format!("skeleton has unknown token {{{{{tok}}}}}"),
                     ln,
-                    skel.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string(),
-                ));
+                    echo,
+                ).with_col(col));
             }
         }
     }
@@ -409,13 +425,13 @@ pub fn render_skeleton(
     // at most once and render as nothing (forward-compatible
     // skeletons for manuscripts gaining refs/abstracts later).
     if count("body") != 1 {
-        let (ln, echo) = tok_line(skel, "body");
+        let (ln, echo, _) = tok_line(skel, "body");
         return Err(crate::error::Error::new("skeleton needs {{body}} exactly once", ln, echo));
     }
     for (tok, content) in [("bibliography", bib), ("abstract", abstract_tex)] {
         let n = count(tok);
         if !content.is_empty() && n != 1 {
-            let (ln, echo) = tok_line(skel, tok);
+            let (ln, echo, _) = tok_line(skel, tok);
             return Err(crate::error::Error::new(
                 format!("skeleton needs {{{{{tok}}}}} exactly once"),
                 ln,
@@ -423,7 +439,7 @@ pub fn render_skeleton(
             ));
         }
         if content.is_empty() && n > 1 {
-            let (ln, echo) = tok_line(skel, tok);
+            let (ln, echo, _) = tok_line(skel, tok);
             return Err(crate::error::Error::new(
                 format!("skeleton has {{{{{tok}}}}} {n} times (max once)"),
                 ln,
@@ -471,11 +487,12 @@ pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), cra
     if uses_titlesec && class.map(|c| c.starts_with("IEEE")).unwrap_or(false) {
         let at = preamble_tex.find("titlesec").unwrap_or(0);
         let ln = head_line(preamble_tex, at);
+        let line = preamble_tex.lines().nth(ln.saturating_sub(1)).unwrap_or("");
         return Err(crate::error::Error::new(
             "template loads titlesec under an IEEE class (incompatible sectioning): remove titlesec and use the built-in [typography] keep_with_next guards instead",
             ln,
-            preamble_tex.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string(),
-        ));
+            line.trim().to_string(),
+        ).with_col(line.find("titlesec").map(|b| crate::error::col_of(line, b))));
     }
     Ok(())
 }
@@ -1137,6 +1154,26 @@ mod tests {
         assert!(err.msg.contains("pos must be"), "got: {err}");
         assert_eq!(err.line, 3, "fence info line, got: {err}");
         assert!(err.echo.contains("pos=middle"), "got: {err}");
+    }
+
+    #[test]
+    fn error_attr_caret_counts_leading_whitespace() {
+        // The attr string keeps its inner leading space (`{ ...}`)
+        // — the caret must count it, not the trimmed token.
+        let err = parse_attrs("  span=wide bogus=1", "t", 9).unwrap_err();
+        assert_eq!(err.line, 9, "got: {err}");
+        assert_eq!(err.col, Some(13), "bogus starts char 13, got: {err}");
+        let s = err.to_string();
+        let caret = s.lines().nth(2).unwrap_or("");
+        assert_eq!(caret, format!("{}^", " ".repeat(12)), "got: {s}");
+    }
+
+    #[test]
+    fn error_skeleton_token_caret() {
+        let skel = "\\documentclass{article}\n\\begin{document}\n  {{bogus}} here\n\\end{document}\n";
+        let err = render_skeleton(skel, "T", "A", "", "", "B.", "").unwrap_err();
+        assert_eq!(err.line, 3, "got: {err}");
+        assert_eq!(err.col, Some(3), "token starts char 3, got: {err}");
     }
 
     #[test]

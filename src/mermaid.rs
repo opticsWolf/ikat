@@ -210,7 +210,7 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
         let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
         let t = cut.trim();
         if !t.is_empty() {
-            lines.push((t.to_string(), l.trim().to_string(), idx));
+            lines.push((t.to_string(), l.to_string(), idx));
         }
     }
     let (first, first_raw, first_idx) = lines.first().ok_or_else(|| {
@@ -232,11 +232,15 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
         "LR" | "RL" => Direction::Lr,
         "BT" => Direction::Td, // laid top-down; BT flip is cosmetic
         _ => {
+            // Column in the RAW line (the echo): searching the
+            // trimmed `first` would forget the indent — the
+            // classic off-by-indent, tested.
             return Err(Error::new(
                 format!("unsupported direction `{dir_word}`"),
                 base + first_idx,
                 first_raw.clone(),
-            ))
+            )
+            .with_col(first_raw.find(dir_word).map(|b| crate::error::col_of(&first_raw, b))))
         }
     };
 
@@ -327,6 +331,7 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
                     line,
                     raw.clone(),
                 )
+                .with_col(Some(stmt[..stmt.len() - rest.len()].chars().count() + 1))
             })?;
             rest = r;
             let target = if let Some((id, shape, label, r2)) = parse_node(rest) {
@@ -340,7 +345,8 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
                         format!("missing edge target in `{stmt}`"),
                         line,
                         raw.clone(),
-                    ));
+                    )
+                    .with_col(Some(stmt.chars().count() + 1)));
                 }
                 let id = rest[..end].to_string();
                 g.ensure_node(&id);
@@ -349,6 +355,7 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
             };
             let from = current.clone().ok_or_else(|| {
                 Error::new(format!("edge without source in `{stmt}`"), line, raw.clone())
+                    .with_col(Some(1))
             })?;
             g.edges.push(Edge {
                 from: from.clone(),
@@ -624,6 +631,24 @@ mod tests {
     fn error_empty_block_carries_base() {
         let e = flowchart_to_tikz("", 3).unwrap_err();
         assert_eq!(e.line, 3, "got: {e}");
+    }
+
+    #[test]
+    fn error_direction_caret_counts_indent() {
+        // `   graph XX`: the bad word starts at char 10.
+        let e = flowchart_to_tikz("   graph XX\n   a[x]", 1).unwrap_err();
+        assert!(e.msg.contains("unsupported direction"), "got: {e}");
+        assert_eq!((e.line, e.col), (1, Some(10)), "got: {e}");
+        let caret = e.to_string().lines().nth(2).unwrap_or("").to_string();
+        assert_eq!(caret, format!("{}^", " ".repeat(9)), "got: {caret}");
+    }
+
+    #[test]
+    fn error_edge_stop_caret() {
+        // `a[x] - b`: parsing stops at the lone `-` (char 6).
+        let e = flowchart_to_tikz("graph TD\na[x] - b", 1).unwrap_err();
+        assert!(e.msg.contains("cannot parse edge"), "got: {e}");
+        assert_eq!((e.line, e.col), (2, Some(6)), "got: {e}");
     }
 
     #[test]

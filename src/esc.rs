@@ -142,7 +142,9 @@ fn stash(ph: &mut Vec<String>, s: String) -> String {
     format!("\x00{}\x00", ph.len() - 1)
 }
 
-fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, String> {
+/// The error carries the offending key separately so `inline`
+/// can place the caret on it.
+fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, (String, String)> {
     if !inner.contains('`') {
         return Ok(format!("[{inner}]"));
     }
@@ -153,7 +155,7 @@ fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>)
             let key = &mm[2];
             if let Some(set) = keys {
                 if !set.contains(key) {
-                    return Err(format!("dangling citation key `{key}`"));
+                    return Err((format!("dangling citation key `{key}`"), key.to_string()));
                 }
             }
             match author {
@@ -170,7 +172,7 @@ fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>)
     Ok(stash(ph, joined))
 }
 
-fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, String> {
+fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, (String, String)> {
     // Bracket groups (citations).
     let re = cite_re();
     let mut buf = String::new();
@@ -223,7 +225,16 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
 pub fn inline(text: &str, keys: Option<&HashSet<String>>, line: usize) -> Result<String, crate::error::Error> {
     let mut ph = Vec::new();
     let mut text = inline_inner(text, keys, &mut ph)
-        .map_err(|m| crate::error::Error::new(m, line, text.to_string()))?;
+        .map_err(|(m, key)| {
+            // Caret on the key's backticked occurrence (char
+            // columns — the echo may hold multibyte text).
+            let mut e = crate::error::Error::new(m, line, text.to_string());
+            let pat = format!("`{key}`");
+            if let Some(b) = text.find(&pat) {
+                e.col = Some(text[..b].chars().count() + 1);
+            }
+            e
+        })?;
     for i in (0..ph.len()).rev() {
         text = text.replace(&format!("\x00{i}\x00"), &ph[i].clone());
     }

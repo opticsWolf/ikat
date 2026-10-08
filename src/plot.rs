@@ -138,7 +138,7 @@ impl LegendPos {
                     "legend must be auto|below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
                 ),
                 s.to_string(),
-            )),
+            ).with_col(Some(1))),
         }
     }
 
@@ -451,6 +451,8 @@ mod tests {
         assert_eq!(err.line, 0, "got: {err}");
         assert!(err.echo.contains("middle"), "got: {err}");
         assert!(!err.to_string().contains(" --> line"), "got: {err}");
+        // The echo IS the word: caret at column 1 (renderer pin).
+        assert_eq!(err.col, Some(1), "got: {err}");
     }
 
     #[test]
