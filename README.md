@@ -62,6 +62,7 @@ ikat/
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
   docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
+  skills/ikat/    Agent Skill instructions for LLM workflows
   examples/       mini.md starter + ikat-paper/ showcase (6-page paper
                   built by ikat itself), plot/float/skeleton proofs
 ```
@@ -77,10 +78,16 @@ VIRTUAL_ENV=$PWD/.venv maturin develop
 cargo test                       # Rust unit tests
 ```
 
-## CLI / MCP / API — one surface
+## LLM agent surface: API, MCP, CLI, skills
 
-Same operations three ways. Python API is the reference; the CLI
-and the MCP server call it directly (`ikat[mcp]` pins `mcp>=1,<2`).
+Use ikat programmatically through its Python API, automate it with the
+CLI, or connect the optional stdio MCP server as agent tools. The repo
+also includes an [ikat Agent Skill](skills/ikat/SKILL.md) with workflow
+and syntax guidance. These interfaces use the same Rust-backed pipeline;
+the skill guides the agent but does not install or run ikat.
+
+Same core operations across API, CLI, and MCP. Python API is the reference;
+the CLI and MCP server call it directly (`ikat[mcp]` pins `mcp>=1,<2`).
 
 ```bash
 ikat build doc.md --toml ikat.toml --outdir out --ensure-packages

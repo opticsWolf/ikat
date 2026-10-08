@@ -81,7 +81,16 @@ tokens are errors; `%` comments are ignored by the counter.
 Shipped: 9 heads + `skeleton-plain` (`template_preset(NAME)` →
 bib_style + toml snippet).
 
-## Python API / MCP
+## LLM agent surface
+
+The same Rust-backed operations are available through four entry points:
+
+- **Python API:** build documents and emit TikZ/pgfplots in process.
+- **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, templates, and skeletons.
+- **MCP:** optional stdio tools for connected agents; install `mcp>=1,<2` and run `python -m ikat.mcp_server`.
+- **Skill:** [repository Agent Skill](../skills/ikat/SKILL.md) guides interface selection, supported syntax, and build boundaries; install its directory into the agent's configured skill location.
+
+## Python API
 
 ```python
 from ikat import build_from_paths, BuildSpec, DiagramEntry, bib_keys

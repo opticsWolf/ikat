@@ -23,6 +23,7 @@
       <a href="#pipeline">How it works</a>
       <a href="#try-it">Try it</a>
       <a href="#showcase">Showcase</a>
+      <a href="#agents">Agents</a>
       <a class="nav-repo" href="https://github.com/opticsWolf/ikat">GitHub repository</a>
     </nav>
   </header>
@@ -196,6 +197,33 @@ ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
           </div>
         </dl>
         <p class="tex-note"><strong>TeX boundary:</strong> <code>ikat weave</code> writes TeX without TeX installed. To compile a PDF, use a local <code>pdflatex</code> installation; a bibliography also needs <code>bibtex</code>.</p>
+      </div>
+    </section>
+
+    <section class="agent-section section-rule" id="agents" aria-labelledby="agents-title">
+      <div class="page-width">
+        <div class="section-heading">
+          <h2 id="agents-title">One core. <span>Ready for agents.</span></h2>
+          <p>Use the same Rust-backed pipeline from code, a shell, or an agent connection. Add the repository skill when an LLM needs ikat-specific workflow guidance.</p>
+        </div>
+        <dl class="capability-list">
+          <div class="capability-row">
+            <dt><span class="row-code">API</span>Python</dt>
+            <dd>Build documents and emit diagrams, plots, and TeX package requirements in process.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">MCP</span>Agent tools</dt>
+            <dd>Optional stdio server for weaving, TikZ/pgfplots, package checks, templates, and skeletons. PDF compilation stays in the CLI.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">CLI</span>Shell</dt>
+            <dd>Script builds, TeX-only output, package checks, standalone figure emitters, templates, and skeletons.</dd>
+          </div>
+          <div class="capability-row">
+            <dt><span class="row-code">SKILL</span>Agent guidance</dt>
+            <dd><a href="https://github.com/opticsWolf/ikat/blob/main/skills/ikat/SKILL.md">The ikat Agent Skill</a> helps agents choose an interface and respect syntax and build boundaries.</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
