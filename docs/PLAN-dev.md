@@ -478,6 +478,12 @@ ROADMAP M4.10 DONE, ARCHITECTURE §3.5 updated (prototype →
 5. `dev` is integration; `main` only takes finished phases
    (squash or fast-forward at phase gates — maintainer's call
    at 0.3.0).
+6. Test discipline: during a feature, run ONLY the feature's
+   tests (`cargo test <name>` + `pytest tests/test_<name>.py`)
+   for a fast loop; the FULL suite (`cargo test` + `pytest`
+   + demo/showcase builds) runs once at each phase gate.
+   Push regularly — every feature commit goes to `origin/dev`
+   the same session it is made (small, reviewable, recoverable).
 6. One acceptance ledger: `examples/regen/ACCEPTED.md` records
    every pinned diff/score/delta with review dates. No
    drive-by numbers anywhere else.

@@ -11,6 +11,7 @@ mod esc;
 mod md_spike;
 mod mermaid;
 mod plot;
+mod preset;
 mod table;
 #[cfg(feature = "tectonic")]
 mod tectonic;
@@ -94,6 +95,13 @@ fn lineplot_to_tikz(
         .collect();
     plot::lineplot(title, xlabel, ylabel, &xs, &series, legend)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+}
+
+/// Benchmark-JSON preset → `tikzpicture` (see `plot` for emitters).
+/// `legend`/`footnote` ride inside the JSON; errors name keys.
+#[pyfunction]
+fn preset_to_tikz(src: &str) -> PyResult<String> {
+    preset::preset_to_tikz(src).map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
 }
 
 /// Parse an `ikat.toml` document config. Returns the resolved
@@ -212,6 +220,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(flowchart_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(barchart_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(lineplot_to_tikz, m)?)?;
+    m.add_function(wrap_pyfunction!(preset_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_config, m)?)?;
     m.add_function(wrap_pyfunction!(build_document, m)?)?;
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
