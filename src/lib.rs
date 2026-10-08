@@ -10,6 +10,7 @@ mod emit;
 mod esc;
 #[cfg(test)]
 mod md_spike;
+#[cfg(test)]
 mod mermaid;
 mod plot;
 mod layout;
