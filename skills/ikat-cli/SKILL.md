@@ -23,7 +23,7 @@ ikat weave DOC.md --toml T.toml --spec S.json > doc.tex   # stdout, no TeX neede
 ikat check DOC.tex [--install] [--verbose]                # exit 1 if anything missing
 ikat templates | ikat template NAME [--show-preset]
 ikat skeletons | ikat skeleton skeleton-plain
-printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -   # also sequenceDiagram (header dispatch)
+printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -   # flowcharts, sequenceDiagram, stateDiagram-v2 (header dispatch)
 echo '{...}' | ikat barchart - [--legend WORD]            # JSON payload → tikzpicture
 echo '{...}' | ikat lineplot - [--legend WORD]
 ikat barchart --preset fig.json [--legend WORD]         # preset file (or - for stdin)

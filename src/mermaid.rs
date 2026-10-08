@@ -22,13 +22,13 @@
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Direction {
+pub(crate) enum Direction {
     Td,
     Lr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Shape {
+pub(crate) enum Shape {
     Rect,
     Diamond,
     Stadium,
@@ -36,25 +36,25 @@ enum Shape {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EdgeStyle {
+pub(crate) enum EdgeStyle {
     Arrow,
     Line,
     Thick,
 }
 
 #[derive(Debug, Clone)]
-struct Node {
-    id: String,
-    label: String,
-    shape: Shape,
+pub(crate) struct Node {
+    pub id: String,
+    pub label: String,
+    pub shape: Shape,
 }
 
 #[derive(Debug, Clone)]
-struct Edge {
-    from: String,
-    to: String,
-    label: Option<String>,
-    style: EdgeStyle,
+pub(crate) struct Edge {
+    pub from: String,
+    pub to: String,
+    pub label: Option<String>,
+    pub style: EdgeStyle,
 }
 
 use crate::emit::{edge_label_node, tikz_node, unquote};
@@ -129,15 +129,17 @@ fn parse_edge(s: &str) -> Option<(EdgeStyle, Option<String>, &str)> {
     Some((style, label, rest))
 }
 
-struct Graph {
-    direction: Direction,
-    nodes: Vec<Node>,
-    node_idx: HashMap<String, usize>,
-    edges: Vec<Edge>,
+/// Shared with the state emitter: states are nodes, transitions
+/// are edges, layout is this module's layered placer.
+pub(crate) struct Graph {
+    pub direction: Direction,
+    pub nodes: Vec<Node>,
+    pub node_idx: HashMap<String, usize>,
+    pub edges: Vec<Edge>,
 }
 
 impl Graph {
-    fn ensure_node(&mut self, id: &str) {
+    pub(crate) fn ensure_node(&mut self, id: &str) {
         if !self.node_idx.contains_key(id) {
             self.node_idx.insert(id.to_string(), self.nodes.len());
             self.nodes.push(Node {
@@ -148,7 +150,7 @@ impl Graph {
         }
     }
 
-    fn set_node(&mut self, id: String, shape: Shape, label: String) {
+    pub(crate) fn set_node(&mut self, id: String, shape: Shape, label: String) {
         self.ensure_node(&id);
         let i = self.node_idx[&id];
         self.nodes[i] = Node { id, label, shape };
@@ -245,7 +247,7 @@ fn parse(src: &str) -> Result<Graph, String> {
 }
 
 /// BFS depth from roots (nodes with no incoming edge).
-fn depths(g: &Graph) -> Vec<usize> {
+pub(crate) fn depths(g: &Graph) -> Vec<usize> {
     let mut incoming = vec![0usize; g.nodes.len()];
     for e in &g.edges {
         if let (Some(&a), Some(&b)) = (g.node_idx.get(&e.from), g.node_idx.get(&e.to)) {
@@ -298,17 +300,13 @@ fn first_stmt(src: &str) -> &str {
         .unwrap_or("")
 }
 
-/// Full `tikzpicture` for a mermaid block: flowchart here,
-/// `sequenceDiagram` / `stateDiagram-v2` dispatch to their
-/// grammars on the header line (same entry point, same errors).
-pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
-    if first_stmt(src) == "sequenceDiagram" {
-        return crate::sequence::to_tikz(src);
-    }
-    let g = parse(src)?;
-    let depth = depths(&g);
+pub(crate) const DX: f64 = 4.2;
+pub(crate) const DY: f64 = 2.4;
 
-    // Order siblings by first appearance.
+/// Deterministic layered coordinates: BFS depth from the roots,
+/// siblings ordered by first appearance, explicit cm positions.
+/// Shared with the state emitter (same placer, same parity).
+pub(crate) fn layered_xy(g: &Graph, depth: &[usize]) -> Vec<(f64, f64)> {
     let max_d = depth.iter().copied().max().unwrap_or(0);
     let mut order: HashMap<usize, usize> = HashMap::new();
     let mut counters = vec![0usize; max_d + 1];
@@ -321,12 +319,10 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
         order.insert(i, counters[d]);
         counters[d] += 1;
     }
-
-    const DX: f64 = 4.2;
-    const DY: f64 = 2.4;
-    let mut out = String::from(crate::emit::PICTURE_HEAD);
-    for (i, n) in g.nodes.iter().enumerate() {
-        let (x, y) = match g.direction {
+    g.nodes
+        .iter()
+        .enumerate()
+        .map(|(i, _)| match g.direction {
             Direction::Td => {
                 let w = widths[depth[i]] as f64;
                 let o = order[&i] as f64;
@@ -337,7 +333,27 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
                 let o = order[&i] as f64;
                 ((depth[i] as f64) * DX, -((o - (w - 1.0) / 2.0) * DY))
             }
-        };
+        })
+        .collect()
+}
+
+/// Full `tikzpicture` for a mermaid block: flowchart here,
+/// `sequenceDiagram` / `stateDiagram-v2` dispatch to their
+/// grammars on the header line (same entry point, same errors).
+pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
+    if first_stmt(src) == "sequenceDiagram" {
+        return crate::sequence::to_tikz(src);
+    }
+    if first_stmt(src) == "stateDiagram-v2" {
+        return crate::state::to_tikz(src);
+    }
+    let g = parse(src)?;
+    let depth = depths(&g);
+    let xy = layered_xy(&g, &depth);
+
+    let mut out = String::from(crate::emit::PICTURE_HEAD);
+    for (i, n) in g.nodes.iter().enumerate() {
+        let (x, y) = xy[i];
         let style = match n.shape {
             Shape::Rect => "box",
             Shape::Diamond => "dia",

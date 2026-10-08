@@ -1,6 +1,6 @@
 [package]
 name = "ikat"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 description = "Weave Markdown into camera-ready LaTeX: mermaid-to-TikZ, pgfplots figures, publisher templates"
 authors = ["opticsWolf"]

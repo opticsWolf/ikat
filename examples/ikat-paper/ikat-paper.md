@@ -110,6 +110,29 @@ order, `->>` and `-->>` messages take one row each, and
 strict like the flowchart one — `loop`, `par`, `Note`, and
 self-messages are string errors naming the statement.
 
+```mermaid {span=wide pos=top}
+stateDiagram-v2
+[*] --> Fences
+Fences --> Convert : strict subset
+Convert --> Wrap : template
+Wrap --> Validate : packages
+Validate --> Compile : engine
+Compile --> [*]
+state Weave {
+Convert --> Wrap
+Wrap --> Validate
+}
+```
+
+Figure 3 shows the document path as states — fences convert, the
+body wraps and validates, the engine compiles — with the weave
+stages grouped in one composite box. State diagrams take the same
+entry point (`stateDiagram-v2` header): `[*]` markers, `-->`
+transitions with optional labels, `state "Label" as Name`, and one
+level of `state Name { … }` boxes drawn around laid-out members,
+so a box can never move coordinates. Nested composites are a build
+error, like everything else outside the subset.
+
 ## 3. Floats without fear
 
 ```mermaid {span=column pos=both width=0.9}
@@ -172,9 +195,9 @@ in one command.
 
 ### 4.1 Where the code and the tests live
 
-Figure 4 counts lines per shipped Rust module — `doc` dominates
+Figure 5 counts lines per shipped Rust module — `doc` dominates
 because assembly lives there (the test-only spike module aside) —
-and Figure 5 counts test functions per commit across the build,
+and Figure 6 counts test functions per commit across the build,
 Rust and Python series separately. Both series are grep-true:
 `#[test]` attributes and `def test` functions, counted from
 history, with no smoothing and no invention. The Python steps

@@ -25,6 +25,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 | Build the spec | `spec_from_dict(raw)` — the ONE constructor (CLI `--spec` and MCP `spec_json` share it); unknown keys ignored |
 | Bar chart / line plot → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword, or `load_preset(path_or_json)` for benchmark JSON |
 | Sequence diagram → tikzpicture | `flowchart_to_tikz("sequenceDiagram\n...")` — same entry point, header dispatch; `participant`/`actor`, `->>` solid, `-->>` dashed, `alt`/`else`/`opt`/`end` (strict subset: `loop`/`par`/`Note`/self-msgs error) |
+| State diagram → tikzpicture | `flowchart_to_tikz("stateDiagram-v2\n...")` — `[*]` markers, `A --> B [: label]`, `state "Label" as Name`, one composite level (nesting errors) |
 | Standalone figure | `compile_standalone(tikz_src, workdir, engine=)` → PDF `Path`; `wrap_standalone(tikz)` → `fig.tex` source; `fence_to_tikz(lang, body)` for `mermaid`\|`chart` fences |
 | Compile | `compile_pdf(workdir, main, ensure_packages=False, engine="pdflatex"\|"tectonic")`; raises `CompileError` with the log tail |
 | TeX env | `check_tex_env(tex)` report / `ensure_tex_packages(tex)` install+re-probe |

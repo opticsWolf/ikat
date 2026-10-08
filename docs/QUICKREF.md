@@ -49,6 +49,17 @@ whisker top, log-mapped; refline) on conservatively padded ranges,
 and falls back below when all four are occupied. Inside corners
 cannot touch axis labels; the below row clears tick labels.
 
+## Diagram subsets (all through `flowchart_to_tikz`, header dispatch)
+
+| grammar | covered | errors |
+|---|---|---|
+| `graph TD/LR/...` | directions TD/TB/LR/RL/BT; nodes `[]` `{}` `([])` `[[]]`; edges `-->`, `---`, `==>` with `\|label\|`; chains, `;`, `%%`, `<br/>` | other directions/shapes, subgraphs, styling |
+| `sequenceDiagram` | `participant`/`actor` (+ `as` labels); `->>` solid, `-->>` dashed; `alt`/`else`/`opt`/`end` boxes | `loop`/`par`/`Note`/self-messages, anything else |
+| `stateDiagram-v2` | `[*]` endpoints; `A --> B [: label]`; `state "Label" as Name`; one composite level | nested composites, `direction`, notes |
+
+Layout: flowcharts layered BFS; sequences one row per message;
+states reuse the flowchart placer (layout first, boxes second).
+
 ## Float attributes (per element)
 
 Diagrams/plots take `{...}` on the fence; tables via `%% table {...}`

@@ -107,6 +107,17 @@ and node (`\node (id) at (x,y)`) vocabulary live in `emit.rs`,
 lifted verbatim from `mermaid.rs` — the golden paper proves the
 move byte-neutral.
 
+`stateDiagram-v2` (Phase C.2, `state.rs`) reuses the flowchart
+placer itself: `Graph`/`depths`/`layered_xy` are `pub(crate)` in
+`mermaid.rs`, states become nodes and transitions become edges.
+Layout first, boxes second — the composite rect is computed from
+placed member coordinates, so a box can never move them. The
+box-label rule (inside-top with half-row headroom, after an
+outside-above label struck an edge label in review) is recorded
+in the code for the D.1 subgraph boxes to reuse. `[*]` renders
+as a filled dot (start) and bullseye (end); nested composites
+are a build error.
+
 ### 3.2 `plot.rs` — data → pgfplots
 
 Two emitters, no plotting library: `barchart` (grouped bars with

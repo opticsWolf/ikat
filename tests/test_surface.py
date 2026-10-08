@@ -101,6 +101,25 @@ def test_sequence_mcp_parity():
     assert "rectangle" in mcp_server.flowchart_to_tikz(SEQ)
 
 
+STATE = ("stateDiagram-v2\n[*] --> A\nA --> B : go\n"
+         "state Box {\nA --> B\n}\nB --> [*]\n")
+
+
+def test_state_through_shared_entry(capsys, monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(STATE))
+    assert cli_main(["flowchart", "-"]) == 0
+    out = capsys.readouterr().out
+    assert "fill=black" in out and "rectangle" in out
+
+
+@needs_mcp
+def test_state_mcp_parity():
+    from ikat import mcp_server
+
+    assert "circle,draw" in mcp_server.flowchart_to_tikz(STATE)
+
+
 def test_skeleton_commands(capsys):
     assert cli_main(["skeletons"]) == 0
     assert "plain" in capsys.readouterr().out

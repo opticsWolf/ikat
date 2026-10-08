@@ -25,7 +25,7 @@ description: >
 | Need | Tool |
 |---|---|
 | Weave markdown → `.tex` | `weave_document(md_text, toml_text, spec_json)` — `spec_json` is BuildSpec JSON, same shape as CLI `--spec` |
-| Mermaid fence → tikzpicture | `flowchart_to_tikz(src)` — flowchart or `sequenceDiagram` (header dispatch), strict subset, errors name the statement |
+| Mermaid fence → tikzpicture | `flowchart_to_tikz(src)` — flowchart, `sequenceDiagram`, or `stateDiagram-v2` (header dispatch), strict subset, errors name the statement |
 | One fence → standalone source | `standalone_figure(md_text)` → `{lang, tex, needs}` — the WRAPPED `fig.tex`, not PDF bytes; the caller compiles (same workdir rule as `compile_pdf`) |
 | Bar / line data → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword (`auto` default; unknown words error naming the set), `preset_json=` (preset document string; when set, explicit data args ignored) |
 | What does this `.tex` need | `check_tex_packages(tex_source)` → `{missing, ok}` |

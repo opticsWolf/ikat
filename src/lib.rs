@@ -14,6 +14,7 @@ mod mermaid;
 mod plot;
 mod preset;
 mod sequence;
+mod state;
 mod table;
 #[cfg(feature = "tectonic")]
 mod tectonic;
