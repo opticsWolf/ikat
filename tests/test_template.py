@@ -84,6 +84,58 @@ def test_presets_cover_library():
     assert flagged == {"acm-sigconf", "elsevier", "aps"}
 
 
+def test_all_heads_weave_with_guards():
+    # D.2: every shipped head weaves a section-bearing doc with
+    # guards on (needspace auto-added, no titlesec trip).
+    from ikat import build_document
+
+    md = "# T\n\n## 1. Intro\n\nBody.\n"
+    for name in list_templates():
+        if name.startswith("skeleton-"):
+            continue
+        head = template_path(name).read_text(encoding="utf-8")
+        r = build_document(md, "", _spec(preamble_override=head))
+        assert "\\needspace{3\\baselineskip}" in r.tex, name
+        # rsplit: some heads MENTION \begin{document} in comments.
+        assert "\\usepackage{needspace}" in r.tex.rsplit("\\begin{document}", 1)[0], name
+
+
+def test_cli_check_surfaces_titlesec(tmp_path, capsys):
+    from ikat.cli import main as cli_main
+
+    bad = tmp_path / "bad.tex"
+    bad.write_text("\\documentclass[conference]{IEEEtran}\n"
+                    "\\usepackage[nobottomtitles]{titlesec}\n"
+                    "\\begin{document}\nHi.\n\\end{document}\n", encoding="utf-8")
+    assert cli_main(["check", str(bad)]) == 1
+    assert "titlesec" in capsys.readouterr().err
+    good = tmp_path / "good.tex"
+    good.write_text("\\documentclass{article}\n\\usepackage{titlesec}\n"
+                    "\\begin{document}\nHi.\n\\end{document}\n", encoding="utf-8")
+    # article+titlesec passes the titlesec gate (TeX probe may
+    # still fail without a TeX install — only the gate matters).
+    import shutil
+    if shutil.which("kpsewhich") is None:
+        pytest.skip("no TeX probe available")
+    assert cli_main(["check", str(good)]) == 0
+
+
+needs_tex = pytest.mark.skipif(
+    __import__("shutil").which("pdflatex") is None, reason="no pdflatex")
+
+
+@needs_tex
+def test_showcase_builds_unchanged(capsys):
+    # Guards on: the full showcase (weave + compile) still builds.
+    import runpy
+    from pathlib import Path
+
+    here = Path(__file__).parent.parent / "examples" / "ikat-paper"
+    runpy.run_path(str(here / "build.py"), run_name="__main__")
+    out = capsys.readouterr().out
+    assert "diagrams=4 tables=4" in out
+
+
 def test_spec_override_beats_toml(tmp_path):
     (tmp_path / "head.tex").write_text(HEAD, encoding="utf-8")
     (tmp_path / "doc.md").write_text(MD, encoding="utf-8")

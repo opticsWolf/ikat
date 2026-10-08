@@ -280,6 +280,62 @@ pub struct Template {
     pub skeleton: String,
 }
 
+/// `[typography]` table: keep-with-next guards against stranded
+/// headings. A heading at a column/page bottom with its paragraph
+/// starting on the next one is a layout bug ikat makes structurally
+/// impossible — LaTeX's `\@afterheading` only partly prevents it
+/// (floats and two-column balancing defeat it), so the guards are
+/// explicit. Default ON: this is a bugfix, not a style choice.
+///
+/// ```toml
+/// [typography]
+/// keep_with_next = true  # penalties + needspace before sections
+/// min_lines = 2         # body lines required after a heading
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Typography {
+    #[serde(default = "keep_true")]
+    pub keep_with_next: bool,
+    #[serde(default = "min_two")]
+    pub min_lines: i64,
+}
+
+fn keep_true() -> bool {
+    true
+}
+fn min_two() -> i64 {
+    2
+}
+
+impl Default for Typography {
+    fn default() -> Self {
+        Self { keep_with_next: true, min_lines: 2 }
+    }
+}
+
+impl Typography {
+    /// Guard lines for knobs that differ from LaTeX defaults.
+    /// LaTeX ships club/widow penalties at 150 and no heading
+    /// guards, so a default `[typography]` EMITS lines (unlike
+    /// `[floats]`, whose defaults match LaTeX). Turning the guards
+    /// off emits nothing — free breaks are already the default.
+    pub fn setup_lines(&self) -> Vec<String> {
+        if !self.keep_with_next {
+            return Vec::new();
+        }
+        vec![
+            "\\clubpenalty=10000".to_string(),
+            "\\widowpenalty=10000".to_string(),
+        ]
+    }
+
+    /// `\needspace` reservation before a heading: the heading plus
+    /// `min_lines` of body must fit, else the break comes first.
+    pub fn needspace_line(&self) -> String {
+        format!("\\needspace{{{}\\baselineskip}}", self.min_lines + 1)
+    }
+}
+
 /// `[floats]` table: document-wide float tuning. Fraction/counter
 /// lines are emitted into the preamble ONLY when they differ from
 /// the LaTeX defaults, so default documents weave byte-identically.
@@ -386,6 +442,8 @@ pub struct Config {
     #[serde(default)]
     pub floats: Floats,
     #[serde(default)]
+    pub typography: Typography,
+    #[serde(default)]
     pub template: Template,
 }
 
@@ -418,6 +476,27 @@ mod tests {
         assert_eq!(cfg.spans.for_kind("plot").latex_env(), "figure*");
         assert_eq!(cfg.spans.for_kind("table").latex_env(), "figure");
         assert_eq!(cfg.spans.for_kind("diagram").latex_width(), "\\columnwidth");
+    }
+
+    #[test]
+    fn typography_defaults_and_guards() {
+        let t = Config::from_toml("").unwrap().typography;
+        assert!(t.keep_with_next);
+        assert_eq!(t.min_lines, 2);
+        let lines = t.setup_lines();
+        assert!(lines.contains(&"\\clubpenalty=10000".to_string()));
+        assert!(lines.contains(&"\\widowpenalty=10000".to_string()));
+        // Off emits nothing: free breaks are already the default.
+        let off = Config::from_toml("[typography]\nkeep_with_next = false\n").unwrap().typography;
+        assert!(off.setup_lines().is_empty());
+    }
+
+    #[test]
+    fn needspace_scales_with_min_lines() {
+        let t = Config::from_toml("").unwrap().typography;
+        assert_eq!(t.needspace_line(), "\\needspace{3\\baselineskip}");
+        let t4 = Config::from_toml("[typography]\nmin_lines = 4\n").unwrap().typography;
+        assert_eq!(t4.needspace_line(), "\\needspace{5\\baselineskip}");
     }
 
     #[test]

@@ -401,10 +401,23 @@ pub fn render_skeleton(
 /// A user-supplied preamble head must carry a document class and
 /// every package the woven body provably needs; otherwise the
 /// failure would surface as a cryptic TeX log, far from its cause.
+/// `titlesec` breaks `IEEEtran` sectioning (notably
+/// `[nobottomtitles]`): reject the combination naming both, and
+/// point at the built-in `[typography]` guards as the replacement.
+/// Do NOT re-propose titlesec here — this error is the record.
+pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), String> {
+    let uses_titlesec = crate::texenv::used_packages(preamble_tex).iter().any(|p| p == "titlesec");
+    if uses_titlesec && class.map(|c| c.starts_with("IEEE")).unwrap_or(false) {
+        return Err("template loads titlesec under an IEEE class (incompatible sectioning): remove titlesec and use the built-in [typography] keep_with_next guards instead".to_string());
+    }
+    Ok(())
+}
+
 pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> Result<(), String> {
     if crate::texenv::document_class(override_tex).is_none() {
         return Err("template has no \\documentclass".to_string());
     }
+    check_titlesec(override_tex, crate::texenv::document_class(override_tex).as_deref())?;
     let mut required: Vec<&str> = Vec::new();
     if body.contains("\\includegraphics") {
         required.push("graphicx");
@@ -433,8 +446,9 @@ pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> 
 }
 
 /// Heuristic package scan for ARBITRARY `.tex` (user heads, pasted
-/// preambles): `\FloatBarrier` needs placeins, `[H]` needs float.
-/// The builder itself threads precise `FloatNeeds` instead.
+/// preambles): `\FloatBarrier` needs placeins, `[H]` needs float,
+/// `\needspace` needs needspace. The builder itself threads
+/// precise `FloatNeeds` instead.
 pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     let mut out = Vec::new();
     if tex.contains("[H]") {
@@ -442,6 +456,9 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     }
     if tex.contains("\\FloatBarrier") {
         out.push("\\usepackage{placeins}".to_string());
+    }
+    if tex.contains("\\needspace") {
+        out.push("\\usepackage{needspace}".to_string());
     }
     out
 }
@@ -632,6 +649,9 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                 out.push("\\FloatBarrier\n".to_string());
                 needs.barrier = true;
             }
+            if cfg.typography.keep_with_next {
+                out.push(cfg.typography.needspace_line() + "\n");
+            }
             out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
             i += 1;
             continue;
@@ -642,6 +662,9 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
             if cfg.floats.barrier_sections {
                 out.push("\\FloatBarrier\n".to_string());
                 needs.barrier = true;
+            }
+            if cfg.typography.keep_with_next {
+                out.push(cfg.typography.needspace_line() + "\n");
             }
             out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
             i += 1;
@@ -744,11 +767,24 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             &rest,
             &bib,
         )?;
-        if !spec.preamble_append.is_empty() {
+        // needspace auto-add (same rule as the override path): the
+        // body carries \needspace commands the builder emitted, so
+        // the package must be present whether or not the skeleton
+        // ships it. Additive only, right before \begin{document}.
+        let need_needspace = body.contains("\\needspace")
+            && !crate::texenv::used_packages(&spec.skeleton).iter().any(|p| p == "needspace");
+        if !spec.preamble_append.is_empty() || need_needspace {
             let Some(at) = rendered.find("\\begin{document}") else {
                 return Err("skeleton has no \\begin{document} for preamble_append".to_string());
             };
-            rendered.insert_str(at, &(spec.preamble_append.join("\n") + "\n"));
+            let mut extra = spec.preamble_append.join("\n");
+            if need_needspace {
+                if !extra.is_empty() {
+                    extra.push('\n');
+                }
+                extra.push_str("\\usepackage{needspace}");
+            }
+            rendered.insert_str(at, &(extra + "\n"));
         }
         return Ok(BuildResult {
             title,
@@ -770,6 +806,10 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         generated.extend(tex_requirements(has_tikz, has_plots));
         generated.extend(needs.packages());
         generated.extend(cfg.floats.setup_lines());
+        generated.extend(cfg.typography.setup_lines());
+        if body.contains("\\needspace") {
+            generated.push("\\usepackage{needspace}".to_string());
+        }
         generated.extend([
             "\\usepackage[hidelinks]{hyperref}".to_string(),
             format!("\\graphicspath{{{paths}}}"),
@@ -785,6 +825,12 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         validate_template(&spec.preamble_override, &body, &needs)?;
         let mut over = vec![render_override(&spec.preamble_override, &title, &spec.author, &spec.title_thanks)];
         over.extend(cfg.floats.setup_lines());
+        over.extend(cfg.typography.setup_lines());
+        if body.contains("\\needspace")
+            && !crate::texenv::used_packages(&spec.preamble_override).iter().any(|p| p == "needspace")
+        {
+            over.push("\\usepackage{needspace}".to_string());
+        }
         over
     };
     head.extend(spec.preamble_append.clone());
@@ -938,6 +984,31 @@ mod tests {
     fn template_without_class_is_an_error() {
         let err = validate_template("\\usepackage{tikz}\n", "plain", &FloatNeeds::none()).unwrap_err();
         assert!(err.contains("documentclass"));
+    }
+
+    #[test]
+    fn titlesec_under_ieee_is_an_error() {
+        let head = "\\documentclass[conference]{IEEEtran}\n\\usepackage[nobottomtitles]{titlesec}\n";
+        let err = check_titlesec(head, Some("IEEEtran")).unwrap_err();
+        assert!(err.contains("titlesec") && err.contains("typography"), "got: {err}");
+        // Same preamble under article: fine.
+        assert!(check_titlesec(head, Some("article")).is_ok());
+        // And the full validator surfaces it too.
+        assert!(validate_template(head, "plain", &FloatNeeds::none()).is_err());
+    }
+
+    #[test]
+    fn needspace_auto_package_on_override() {
+        // Body needs needspace (guards on), head lacks it: the
+        // builder adds the package instead of failing.
+        let mut s = spec();
+        s.diagrams = vec![];
+        s.table_captions = vec![];
+        s.preamble_override = "\\documentclass{article}\n\\begin{document}\n".to_string();
+        let r = build_document("# T\n\n## 1. Sec\n\nBody.\n", "", &s).unwrap();
+        assert!(r.tex.contains("\\usepackage{needspace}"), "auto-added");
+        assert!(r.tex.contains("\\needspace{3\\baselineskip}"), "guard emitted");
+        assert!(r.tex.contains("\\clubpenalty=10000"), "penalties emitted");
     }
 
     #[test]

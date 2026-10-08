@@ -87,9 +87,14 @@ def cmd_weave(a: argparse.Namespace) -> int:
 
 
 def cmd_check(a: argparse.Namespace) -> int:
-    from ikat import check_tex_env, ensure_tex_packages
+    from ikat import check_tex_env, document_class, ensure_tex_packages, used_packages
 
     tex = Path(a.tex).read_text(encoding="utf-8")
+    cls = document_class(tex) or ""
+    if "titlesec" in used_packages(tex) and cls.startswith("IEEE"):
+        print(f"ikat check: titlesec under {cls} breaks sectioning "
+              "(use the [typography] keep_with_next guards instead)", file=sys.stderr)
+        return 1
     rep = ensure_tex_packages(tex) if a.install else check_tex_env(tex)
     print(json.dumps({k: v for k, v in rep.items() if k != "needs"}, indent=1))
     if rep.get("needs") is not None and a.verbose:

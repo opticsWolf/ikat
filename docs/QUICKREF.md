@@ -78,6 +78,14 @@ Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 `[floats]` tuning (fractions, counters, `barrier_sections`) emits
 only when non-default.
 
+`[typography]` keep-with-next (default ON): `\clubpenalty` +
+`\widowpenalty` at 10000, `\needspace{3\baselineskip}` before
+every section (`min_lines+1`; `min_lines = 2` default). Set
+`keep_with_next = false` to restore free breaks. Never load
+`titlesec` under an IEEE class — it breaks sectioning and
+`ikat check` / `validate_template` reject it; the built-in
+guards are the replacement.
+
 ## Templates
 
 ```toml
