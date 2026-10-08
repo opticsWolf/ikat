@@ -8,7 +8,8 @@ M2.1, M2.2, M3.1–M3.4, M4.1, M4.10, M5.4, tectonic crate embedding.
 remains, which is a settings page, not code.)
 
 Version rule: **+0.0.1 per minor feature, +0.1.0 per completed
-phase.** Every bump is its own commit: `cargo test` + `pytest`
+phase.** Ladder: 0.2.1 → … → 0.9.0 (Phase G) → 0.9.1
+(Phase H) → **1.0.0**. Every bump is its own commit: `cargo test` + `pytest`
 green, `maturin develop` warning-free, demo + showcase still
 build, versions in `Cargo.toml` / `pyproject.toml` /
 `python/ikat/__init__.py` / `Cargo.lock` in sync.
@@ -377,6 +378,8 @@ to), QUICKREF error-format row, ROADMAP M4.1 DONE, merge to
 
 No new machinery — CI steps plus verification runs. Smallest
 phase; scheduled last because it verifies everything above.
+Phase H follows it: typographic keep-with-next is verified by
+human eye on the showcase, so it needs all figures final first.
 
 ### G.1 CI tectonic step → 0.8.1
 
@@ -415,6 +418,62 @@ ROADMAP M4.10 DONE, ARCHITECTURE §3.5 updated (prototype →
   hardened, what the CI step covers), merge to `main`.
 
 ---
+
+## Phase H — Heading keep-with-next → 1.0.0
+
+A heading stranded at a column/page bottom with its paragraph
+starting on the next column/page is a layout bug ikat should
+make structurally impossible. LaTeX's built-in `\@afterheading`
+only partly prevents it (floats and two-column balancing defeat
+it), so ikat emits explicit keep-with-next guards.
+
+### H.1 heading guards → 0.9.1
+
+- New `[typography]` config section in `ikat.toml` (Rust
+  `src/config.rs`, defaults-first like `[floats]`):
+  `keep_with_next = true` (default on — this is a bugfix, not a
+  style choice), `min_lines = 2` (paragraph lines required to
+  follow a heading before a break is allowed).
+- `doc.rs` `setup_lines()` emits the guards only when
+  non-default (the non-default-preamble rule holds):
+  `\\clubpenalty=10000` + `\\widowpenalty=10000` against
+  orphan/widow lines generally, plus a per-level `\\needspace`
+  requirement before `\\section`/`\\subsection`/`\\subsubsection`
+  (the `needspace` package auto-added to `tex_extra_packages()`
+  when the guards are on and the template doesn't supply it).
+  `\\needspace{4\\baselineskip}`-scale defaults: heading +
+  `min_lines` of body must fit, else the break comes first.
+- Template-compatibility validation (hard-won constraint:
+  `titlesec`'s `[nobottomtitles]` is famously incompatible with
+  `IEEEtran`'s sectioning, so it is NOT the mechanism — and
+  `validate_template` errors if a user's `preamble_file` loads
+  `titlesec` under an IEEE class, naming both and pointing at
+  the built-in guards as the replacement). `needspace` is
+  class-agnostic and safe under all nine shipped heads —
+  proven by compiling every head's proof doc with guards on.
+- The showcase paper is the torture test: its headings already
+  sit at various column depths; after H.1, a review pass over
+  the 6-page PDF confirms no stranded headings, recorded with
+  the review date in `examples/regen/ACCEPTED.md` (same ledger).
+  Automated assertion is limited to preamble-content unit tests
+  (layout is eye-verified — the plan is honest about that).
+- Tests: Rust +5 (guard lines emitted, non-default-only rule,
+  needspace auto-package, titlesec+IEEE validation error,
+  `min_lines` scaling math); pytest +3 (all nine heads compile
+  with guards on, CLI `--check` surfaces the titlesec error,
+  showcase builds unchanged).
+
+### Phase H gate → 1.0.0
+
+- Full suite green, all three surfaces + QUICKREF document
+  `[typography]`, ARCHITECTURE gains the heading-guard
+  paragraph (and the titlesec/IEEE incompatibility note —
+  future agents must not re-propose it), ROADMAP records
+  Phase H DONE.
+- **1.0.0 release:** tag `v1.0.0`, release workflow runs the
+  proven path (wheels + crates.io + PyPI trusted publishing).
+  `main` takes the phase; `dev` re-baselines to post-1.0
+  planning.
 
 ## Standing rules (all phases)
 
