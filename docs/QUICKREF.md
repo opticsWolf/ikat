@@ -75,6 +75,8 @@ on the line above.
 Hard errors: `figure*` + `here`/`force`; unknown attrs/keys.
 Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 `float`/`placeins` (or the template must carry them).
+Fraction `width` scales TikZ coordinates, not text (no `transform
+shape`): labels stay full-size, so leave air around them.
 `[floats]` tuning (fractions, counters, `barrier_sections`) emits
 only when non-default.
 

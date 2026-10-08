@@ -174,17 +174,22 @@ pub fn to_tikz(src: &str, base: usize) -> Result<String, crate::error::Error> {
                     ));
                 }
                 let (x0, x1) = (col_x(0) - 1.4, col_x(names.len() - 1) + 1.4);
-                let (yt, yb) = (msg_y(b.top_row) + 0.5, msg_y(row.saturating_sub(1)) - 0.5);
+                let last = msg_y(row.saturating_sub(1));
+                let (yt, yb) = (msg_y(b.top_row) + 0.5, last - 0.8);
                 draws.push(format!("  \\draw ({x0:.1},{yt:.1}) rectangle ({x1:.1},{yb:.1});\n"));
-                // Box label sits OUTSIDE above the top edge: inside it
-                // would collide with the first message's label (both
-                // live ~0.3 above their line). The row gap above the
-                // box (0.6) fits one footnotesize line; the previous
-                // message's own label is above ITS line, so no clash.
+                // Box label sits INSIDE below the bottom edge's air:
+                // the band above the top edge is shared with the
+                // previous message's `fill=white` label box (wider
+                // than its glyphs), and `width` fractions scale
+                // coordinates but not text, so no outside slot is
+                // safe at every scale. Below the last message lives
+                // nothing but lifelines: `fill=white` covers those
+                // behind the text, as message labels already do.
+                // `inner sep=0pt` makes the anchor the true text top.
                 draws.push(format!(
-                    "  \\node[anchor=south west,font=\\footnotesize\\itshape] at ({:.1},{:.1}) {{{}}};\n",
+                    "  \\node[anchor=north west,font=\\footnotesize\\itshape,fill=white,inner sep=0pt] at ({:.1},{:.1}) {{{}}};\n",
                     x0 + 0.1,
-                    yt + 0.05,
+                    last - 0.1,
                     esc_label(&b.labels.join(" / "))
                 ));
             }
