@@ -125,12 +125,15 @@ needs_tex = pytest.mark.skipif(
 
 
 @needs_tex
-def test_showcase_builds_unchanged(capsys):
+def test_showcase_builds_unchanged(capsys, monkeypatch):
     # Guards on: the full showcase (weave + compile) still builds.
+    # argv isolated: build.py has its own `--engine` flag and
+    # would otherwise try to parse pytest's arguments.
     import runpy
     from pathlib import Path
 
     here = Path(__file__).parent.parent / "examples" / "ikat-paper"
+    monkeypatch.setattr("sys.argv", ["build.py"])
     runpy.run_path(str(here / "build.py"), run_name="__main__")
     out = capsys.readouterr().out
     assert "diagrams=4 tables=4" in out
