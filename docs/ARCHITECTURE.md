@@ -351,6 +351,6 @@ acceptance gates). Done: pipeline parity + golden master (M1,
 M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
 workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
-Phase A, 0.3.0). The open frontier: figure subsets + layout (M3),
-the pulldown-cmark switch (M5.4), line-numbered errors (M4.1),
-heading keep-with-next (Phase D.2), tectonic hardening (M4.10).
+Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
+0.6.0). The open frontier: line-numbered errors (M4.1), the
+pulldown-cmark switch (M5.4), tectonic hardening (M4.10).

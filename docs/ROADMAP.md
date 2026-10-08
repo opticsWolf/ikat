@@ -1,12 +1,12 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase C gate, 0.5.0): Phases 1, 2 (plots),
-3 (standalone, sequence, state),
-4 (core), 5, 6 done — 81 cargo + 62 pytest green, showcase
-(9 pages, 4 diagrams) + regen + standalone proofs build, 0
-undefined citations.
-Open: M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
-tectonic crate embedding, Phase D.2 heading guards.
+Status 2026-10-08 (Phase D gate, 0.6.0): Phases 1, 2 (plots),
+3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
+heading guards) done — 96 cargo + 69 pytest green, showcase
+(10 pages, 4 diagrams) + regen + standalone + heads proofs
+build, 0 undefined citations.
+Open: M4.1, M4.10, M5.4 (the pulldown-cmark switch), tectonic
+crate embedding.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -96,8 +96,21 @@ anywhere in the loop.
   `src/state.rs` (shared placer, composite boxes) behind the same
   `flowchart_to_tikz` entry; `emit.rs` holds the shared TikZ
   vocabulary; showcase Figures 2+3 are the proofs.
-- **M3.4 layout.** Edge routing that avoids node interiors, subgraph
-  cluster boxes, wider DAG support (today: layered trees/DAGs only).
+- **M3.4 layout.** ✅ DONE 2026-10-08 (Phase D.1, 0.5.1) —
+  `src/layout.rs` (legend geometry reused: `segs_cross`,
+  `seg_hits_rect`, `cluster_box`), longest-path layering
+  (multi-parent = max+1), `subgraph ID [title]`…`end` clusters
+  (nesting errors), edge router (clear segments byte-identical,
+  crossings reroute via pushed midpoint, exhaustion names the
+  edge); showcase Figure 1 re-laid and reviewed.
+- **D.2 heading guards.** ✅ DONE 2026-10-08 (0.5.2) —
+  `[typography]` (`keep_with_next = true` default, `min_lines =
+  2`): `\clubpenalty`/`\widowpenalty` 10000 +
+  `\needspace{min_lines+1\baselineskip}` before sections;
+  needspace auto-added (generated/override/skeleton paths);
+  `titlesec` under IEEE rejected by `check_titlesec` +
+  `ikat check`; main paper `.tex` regenerated (61 added guard
+  lines, 0 removed) and recompiled clean.
 
 *Acceptance:* the paper's TikZ diagrams (corpus: the four
 `paper/figs/tikz/fig-*.tex` sources — branch-tree, ledger-flow,
