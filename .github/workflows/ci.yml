@@ -70,9 +70,11 @@ jobs:
         run: '"$VENV_BIN"/python examples/demo.py'
       - name: Build showcase paper
         run: '"$VENV_BIN"/python examples/ikat-paper/build.py'
+      - name: Regen main-paper plots (preset -> TikZ snapshots + PDFs)
+        run: '"$VENV_BIN"/python examples/regen/regen.py'
       - name: No undefined citations
         run: |
           if grep -rE "There were undefined references|Citation .* undefined|Undefined control sequence" \
-              examples/demo-out examples/ikat-paper/out --include="*.log"; then
+              examples/demo-out examples/ikat-paper/out examples/regen/out --include="*.log"; then
             echo "::error::TeX errors in build logs"; exit 1;
           fi

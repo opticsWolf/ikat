@@ -1,0 +1,45 @@
+{
+  "kind": "line",
+  "title": "Branched reads hold flat across chain depth",
+  "xlabel": "fork-chain depth",
+  "ylabel": "branched traversal (ms)",
+  "xs": [
+    1,
+    2,
+    5,
+    10
+  ],
+  "series_names": [
+    "scale 1",
+    "scale 3"
+  ],
+  "yss": [
+    [
+      4.272,
+      4.312,
+      6.96,
+      4.998
+    ],
+    [
+      12.621,
+      12.624,
+      12.853,
+      15.023
+    ]
+  ],
+  "errs": [
+    [
+      3.2699999999999996,
+      0.19099999999999984,
+      0.7750000000000004,
+      0.33699999999999974
+    ],
+    [
+      2.5299999999999994,
+      9.115,
+      2.3279999999999994,
+      6.943999999999999
+    ]
+  ],
+  "footnote": "PRELIMINARY \u2014 non-reference hardware; medians of 5, bars show min/max. First readings, not reference figures (paper \u00a75)."
+}

@@ -1,0 +1,65 @@
+{
+  "kind": "bar",
+  "title": "Branch cost is ancestry, not divergence",
+  "ylabel": "latency (ms, log, scale 3)",
+  "log_y": true,
+  "group_labels": [
+    "R1",
+    "R3",
+    "Q2",
+    "Q3"
+  ],
+  "series_names": [
+    "trunk",
+    "branch (audit)"
+  ],
+  "values": [
+    [
+      7.688,
+      26.468,
+      49.019,
+      0.47
+    ],
+    [
+      29.555,
+      79.782,
+      51.73,
+      66.205
+    ]
+  ],
+  "mins": [
+    [
+      7.631,
+      20.701,
+      38.674,
+      0.46
+    ],
+    [
+      24.109,
+      77.248,
+      43.79,
+      56.974
+    ]
+  ],
+  "maxs": [
+    [
+      9.892,
+      32.295,
+      60.88,
+      0.616
+    ],
+    [
+      35.527,
+      87.222,
+      54.334,
+      74.437
+    ]
+  ],
+  "refline": [
+    3.8,
+    4.2,
+    59.627,
+    "zero-write fork"
+  ],
+  "footnote": "PRELIMINARY \u2014 non-reference hardware; medians of 5, bars show min/max. First readings, not reference figures (paper \u00a75)."
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "bar",
+  "title": "T6: transaction-dimension work costs an order more",
+  "ylabel": "latency (ms, log)",
+  "log_y": true,
+  "group_labels": [
+    "T6a valid-slice at txn point",
+    "T6b txn-versions at valid point"
+  ],
+  "series_names": [
+    "scale 1",
+    "scale 3"
+  ],
+  "values": [
+    [
+      12.244,
+      64.307
+    ],
+    [
+      41.999,
+      628.674
+    ]
+  ],
+  "mins": [
+    [
+      12.023,
+      62.925
+    ],
+    [
+      37.785,
+      625.288
+    ]
+  ],
+  "maxs": [
+    [
+      12.684,
+      65.481
+    ],
+    [
+      54.171,
+      649.941
+    ]
+  ],
+  "footnote": "PRELIMINARY \u2014 non-reference hardware; medians of 5, bars show min/max. First readings, not reference figures (paper \u00a75)."
+}

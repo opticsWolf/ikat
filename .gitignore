@@ -11,6 +11,7 @@ dist/
 .pytest_cache/
 examples/demo-out/
 examples/ikat-paper/out/
+examples/regen/out/
 *.aux
 *.log
 *.out

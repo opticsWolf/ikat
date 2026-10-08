@@ -46,6 +46,17 @@ def test_loc_parity_with_hand_assembled():
     assert load_preset(LOC) == hand
 
 
+def test_regen_fixtures_parse_and_match_snaps():
+    import pathlib
+
+    for name in ("fig-fork-flat", "fig-t6-asymmetry", "fig-trunk-branch", "fig-chain-depth"):
+        tikz = load_preset(f"examples/regen/{name}.json")
+        assert "\\begin{tikzpicture}" in tikz
+        snap = pathlib.Path(f"examples/regen/snap/{name}.tex")
+        assert snap.exists(), f"missing snapshot for {name}"
+        assert snap.read_text(encoding="utf-8") == tikz, f"snapshot drift: {name}"
+
+
 def test_growth_parity_with_hand_assembled():
     data = json.loads(open(TESTS, encoding="utf-8").read())
     hand = lineplot_to_tikz(
