@@ -42,6 +42,10 @@ no font mismatch between text and figures.
 - **Compile** (`ikat.compile`): `pdflatex`/`bibtex` driver that turns
   the woven tree into PDF.
 
+## Showcase paper
+
+[Read the ikat showcase paper (PDF)](site/assets/ikat-paper.pdf), or browse its [Markdown source and build instructions](examples/ikat-paper/).
+
 ## Layout
 
 ```text

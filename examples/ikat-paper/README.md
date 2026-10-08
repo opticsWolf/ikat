@@ -11,6 +11,8 @@ needs `pdflatex` + `bibtex` on PATH. Outputs land in `out/`
 (git-ignored): two plot PDFs, the woven `.tex`, the staged `.bib`
 (+ local `IEEEtran.bst`, never bundled for arXiv), and the final PDF.
 
+[Read the committed ikat showcase PDF](../../site/assets/ikat-paper.pdf).
+
 ## Features exercised
 
 Blocks: `#` title, `## N.` numbered sections (numbers stripped),

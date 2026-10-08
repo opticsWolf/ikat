@@ -2,6 +2,10 @@
 
 **v0.2.0 · md → tex/pdf pipeline, Rust core + thin Python**
 
+## Showcase paper
+
+[Read the exported ikat paper (PDF)](../site/assets/ikat-paper.pdf). Its [Markdown source and build instructions](../examples/ikat-paper/) are also in the repository.
+
 ## Install & build
 
 ```bash
