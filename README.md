@@ -1,6 +1,7 @@
 # ikat
 
 [![CI](https://github.com/opticsWolf/ikat/actions/workflows/ci.yml/badge.svg)](https://github.com/opticsWolf/ikat/actions)
+[![Website](https://img.shields.io/website?url=https%3A%2F%2FopticsWolf.github.io%2Fikat%2F)](https://opticsWolf.github.io/ikat/)
 [![GitHub Pages](https://github.com/opticsWolf/ikat/actions/workflows/pages.yml/badge.svg)](https://opticswolf.github.io/ikat/)
 [![PyPI](https://img.shields.io/pypi/v/ikat?logo=pypi)](https://pypi.org/project/ikat/)
 [![crates.io](https://img.shields.io/crates/v/ikat?logo=rust)](https://crates.io/crates/ikat)

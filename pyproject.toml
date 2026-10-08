@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "opticsWolf" }]
 license = { text = "MIT OR Apache-2.0" }
-urls = { Homepage = "https://github.com/opticsWolf/ikat", Repository = "https://github.com/opticsWolf/ikat" }
+urls = { Homepage = "https://opticsWolf.github.io/ikat/", Repository = "https://github.com/opticsWolf/ikat" }
 dependencies = []
 
 [project.optional-dependencies]
