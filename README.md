@@ -27,8 +27,12 @@ no font mismatch between text and figures.
 - **Markdown → LaTeX** (`ikat.pipeline`): headings, tables, citations,
   code, footnotes, and fenced elements → a complete `.tex` document.
 - **Mermaid → TikZ** (`ikat._core.flowchart_to_tikz`, Rust): the
-  `graph TD/LR` flowchart subset → a `tikzpicture` with deterministic
-  layered layout. No Node.js, no browser, no SVG round-trip.
+  `graph TD/LR` flowchart subset plus `sequenceDiagram` messages
+  (`->>`/`-->>`) with `alt`/`else`/`opt` boxes → a `tikzpicture`
+  with deterministic layout.
+  Dispatch is on the header line; every grammar is strict
+  (unknown statements are string errors). No Node.js, no browser,
+  no SVG round-trip.
 - **Data → pgfplots** (`ikat._core`, Rust): bar charts with
   min/max whiskers, log axes, line plots → `tikzpicture` code compiled
   by your LaTeX installation, so figure fonts always match the paper.

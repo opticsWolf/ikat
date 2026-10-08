@@ -82,6 +82,25 @@ def test_flowchart_stdin(capsys, monkeypatch):
     assert "\\begin{tikzpicture}" in capsys.readouterr().out
 
 
+SEQ = ("sequenceDiagram\nparticipant A\nparticipant B\n"
+       "A->>B: hi\nB-->>A: yo\nalt x\nA->>B: r\nend\n")
+
+
+def test_sequence_through_shared_entry(capsys, monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(SEQ))
+    assert cli_main(["flowchart", "-"]) == 0
+    out = capsys.readouterr().out
+    assert "\\draw[dashed]" in out and "rectangle" in out
+
+
+@needs_mcp
+def test_sequence_mcp_parity():
+    from ikat import mcp_server
+
+    assert "rectangle" in mcp_server.flowchart_to_tikz(SEQ)
+
+
 def test_skeleton_commands(capsys):
     assert cli_main(["skeletons"]) == 0
     assert "plain" in capsys.readouterr().out

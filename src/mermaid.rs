@@ -57,46 +57,7 @@ struct Edge {
     style: EdgeStyle,
 }
 
-/// Escape a mermaid label for LaTeX text mode.
-/// Order matters: entities, then stash line breaks, then escape
-/// specials, then restore breaks (else `\` gets escaped too).
-fn esc_label(s: &str) -> String {
-    const BR: char = '\u{E000}';
-    let mut s = s
-        .replace("<br/>", &BR.to_string())
-        .replace("<br>", &BR.to_string())
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&");
-    for (ch, rep) in [
-        ('\\', "\\textbackslash{}"),
-        ('&', "\\&"),
-        ('%', "\\%"),
-        ('$', "\\$"),
-        ('#', "\\#"),
-        ('_', "\\_"),
-        ('{', "\\{"),
-        ('}', "\\}"),
-        ('~', "\\textasciitilde{}"),
-        ('^', "\\textasciicircum{}"),
-    ] {
-        s = s.replace(ch, rep);
-    }
-    s = s.replace(BR, "\\\\");
-    // Common prose glyphs mermaid authors actually type.
-    for (ch, rep) in [
-        ('×', "$\\times$"),
-        ('→', "$\\to$"),
-        ('–', "--"),
-        ('—', "---"),
-        ('≤', "$\\leq$"),
-        ('≥', "$\\geq$"),
-        ('✓', "\\checkmark{}"),
-    ] {
-        s = s.replace(ch, rep);
-    }
-    s
-}
+use crate::emit::{edge_label_node, tikz_node, unquote};
 
 fn is_id_char(c: char) -> bool {
     // NOTE: `-` is deliberately excluded: `a-->b` must lex the edge,
@@ -104,15 +65,7 @@ fn is_id_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// Mermaid lets label text wear one layer of double quotes; take it off.
-fn unquote(s: &str) -> String {
-    let t = s.trim();
-    if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
-        t[1..t.len() - 1].to_string()
-    } else {
-        t.to_string()
-    }
-}
+
 
 /// Parse `id[shape...]` at the head of `s`.
 /// Returns (id, shape, label, rest).
@@ -334,8 +287,24 @@ fn depths(g: &Graph) -> Vec<usize> {
     depth
 }
 
-/// Full `tikzpicture` for a mermaid flowchart block.
+/// First content line (comments stripped): the grammar dispatch.
+fn first_stmt(src: &str) -> &str {
+    src.lines()
+        .map(|l| {
+            let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
+            cut.trim()
+        })
+        .find(|l| !l.is_empty())
+        .unwrap_or("")
+}
+
+/// Full `tikzpicture` for a mermaid block: flowchart here,
+/// `sequenceDiagram` / `stateDiagram-v2` dispatch to their
+/// grammars on the header line (same entry point, same errors).
 pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
+    if first_stmt(src) == "sequenceDiagram" {
+        return crate::sequence::to_tikz(src);
+    }
     let g = parse(src)?;
     let depth = depths(&g);
 
@@ -355,9 +324,7 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
 
     const DX: f64 = 4.2;
     const DY: f64 = 2.4;
-    let mut out = String::from(
-        "\\begin{tikzpicture}[>=Stealth,\n  every node/.style={align=center,font=\\small},\n  box/.style={draw,rounded corners=2pt,fill=gray!8},\n  dia/.style={draw,diamond,aspect=2,fill=blue!8},\n  stad/.style={draw,rounded corners=10pt,fill=gray!8},\n  sub/.style={draw,double,fill=gray!8}]\n",
-    );
+    let mut out = String::from(crate::emit::PICTURE_HEAD);
     for (i, n) in g.nodes.iter().enumerate() {
         let (x, y) = match g.direction {
             Direction::Td => {
@@ -377,13 +344,7 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
             Shape::Stadium => "stad",
             Shape::Subroutine => "sub",
         };
-        out.push_str(&format!(
-            "  \\node ({}) at ({:.1},{:.1}) [{style}] {{{}}};\n",
-            n.id,
-            x,
-            y,
-            esc_label(&n.label)
-        ));
+        out.push_str(&tikz_node(&n.id, x, y, style, &n.label));
     }
     for e in &g.edges {
         let style = match e.style {
@@ -393,10 +354,10 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
         };
         if let Some(lbl) = &e.label {
             out.push_str(&format!(
-                "  \\draw[{style}] ({}) -- ({}) node[midway,above,fill=white,inner sep=1pt,font=\\footnotesize] {{{}}};\n",
+                "  \\draw[{style}] ({}) -- ({}) {};\n",
                 e.from,
                 e.to,
-                esc_label(lbl)
+                edge_label_node(lbl)
             ));
         } else {
             out.push_str(&format!("  \\draw[{style}] ({}) -- ({});\n", e.from, e.to));

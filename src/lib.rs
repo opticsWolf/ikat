@@ -6,12 +6,14 @@ use pyo3::prelude::*;
 
 mod config;
 mod doc;
+mod emit;
 mod esc;
 #[cfg(test)]
 mod md_spike;
 mod mermaid;
 mod plot;
 mod preset;
+mod sequence;
 mod table;
 #[cfg(feature = "tectonic")]
 mod tectonic;

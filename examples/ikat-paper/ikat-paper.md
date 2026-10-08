@@ -82,6 +82,34 @@ subset too: flowcharts with `-->`, `---`, edge `|labels|`, and
 because a diagram that almost renders is worse than one that
 refuses.
 
+```mermaid {span=wide pos=top}
+sequenceDiagram
+participant U as Caller
+participant P as Python
+participant R as Rust core
+participant T as TeX engine
+U->>P: weave(md, spec)
+P->>R: convert()
+R-->>P: body tex
+P->>T: compile_pdf
+T-->>U: PDF
+alt engine tectonic
+U->>P: tectonic
+else default engine
+U->>P: pdflatex
+end
+```
+
+Figure 2 replays the same build as a sequence: the calls §2 names
+— `convert()` across the PyO3 boundary, `compile_pdf` driving the
+engine — with the engine choice as an `alt` box instead of prose.
+Sequence diagrams dispatch on their header line through the same
+`flowchart_to_tikz` entry point: participants declare columns in
+order, `->>` and `-->>` messages take one row each, and
+`alt`/`else`/`opt`/`end` boxes span all columns. The subset is
+strict like the flowchart one — `loop`, `par`, `Note`, and
+self-messages are string errors naming the statement.
+
 ## 3. Floats without fear
 
 ```mermaid {span=column pos=both width=0.9}
@@ -144,9 +172,9 @@ in one command.
 
 ### 4.1 Where the code and the tests live
 
-Figure 3 counts lines per shipped Rust module — `doc` dominates
+Figure 4 counts lines per shipped Rust module — `doc` dominates
 because assembly lives there (the test-only spike module aside) —
-and Figure 4 counts test functions per commit across the build,
+and Figure 5 counts test functions per commit across the build,
 Rust and Python series separately. Both series are grep-true:
 `#[test]` attributes and `def test` functions, counted from
 history, with no smoothing and no invention. The Python steps

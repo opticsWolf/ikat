@@ -132,6 +132,7 @@ def make_paper() -> None:
     spec = BuildSpec(
         diagrams=[
             DiagramEntry(key="fig-pipeline", caption="The ikat build: three inputs, a template, one decision.", mode="inline"),
+            DiagramEntry(key="fig-sequence", caption="The same build as a sequence: calls across the PyO3 boundary, engine choice as an alt box.", mode="inline"),
             DiagramEntry(key="fig-floats", caption="Float resolution: attrs against policy.", mode="inline"),
         ],
         plots=[

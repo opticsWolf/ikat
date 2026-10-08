@@ -97,6 +97,16 @@ are parsed in Rust; the `[scale=]` splice exists in both the Rust
 and the Python mirror (a past double-bracket bug is pinned by a
 test on each side).
 
+`sequenceDiagram` dispatches on its header line through the same
+`flowchart_to_tikz` entry (Phase C.1): participant columns in
+declaration order, one row per message, `alt`/`else`/`opt` boxes
+spanning all columns with the label outside above the top edge
+(inside it would strike the first message's label — proven by
+probe, fixed before the showcase). The knockout (`fill=white`)
+and node (`\node (id) at (x,y)`) vocabulary live in `emit.rs`,
+lifted verbatim from `mermaid.rs` — the golden paper proves the
+move byte-neutral.
+
 ### 3.2 `plot.rs` — data → pgfplots
 
 Two emitters, no plotting library: `barchart` (grouped bars with
