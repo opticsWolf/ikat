@@ -18,6 +18,43 @@ from ._core import bib_safe as _bib_safe
 from ._core import build_document as _build_document
 from ._core import parse_config as _parse_config
 
+import re as _re
+
+_LINE_RE = _re.compile(r"^([^\n]+)\n --> line (\d+)\n", _re.MULTILINE)
+
+# Error kinds whose lines are head-file-relative (the template or
+# skeleton text), not manuscript-relative. For these the head path
+# is the honest attribution; everything else gets the md path.
+_HEAD_MSGS = ("template ", "[template]", "skeleton ", "titlesec", "documentclass")
+
+
+def with_file(path: str | Path | None, head_path: str | Path | None, fn, *args):
+    """Call `fn(*args)`, upgrading a Rust `Error` Display into
+    `file:line: message` (+ echo lines).
+
+    Rust renders `{msg}\\n --> line {N}\\n{echo}` (no line part when
+    no manuscript line applies). Python — the only layer that sees
+    paths (Rust never touches the filesystem) — prepends the file:
+    `md_path:N: msg` + echo. Template/skeleton errors resolve
+    against the head file, so they get `head_path:N:` instead.
+    Line-less errors become `path: msg` (+ echo). `path=None`
+    (pure-string API) leaves the Rust rendering untouched.
+    """
+    try:
+        return fn(*args)
+    except ValueError as e:
+        if path is None:
+            raise
+        text = str(e)
+        m = _LINE_RE.match(text)
+        if not m:
+            raise ValueError(f"{path}: {text}") from e
+        msg, n = m.group(1), m.group(2)
+        echo = text[m.end():]
+        owner = head_path if head_path and msg.startswith(_HEAD_MSGS) else path
+        tail = f"\n{echo}" if echo else ""
+        raise ValueError(f"{owner}:{n}: {msg}{tail}") from e
+
 
 @dataclass
 class DiagramEntry:
@@ -110,6 +147,10 @@ def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec
     skel = read_skeleton(toml_path.parent, toml_src)
     if skel and (override or spec.preamble_override):
         raise ValueError("[template] skeleton is mutually exclusive with preamble_file")
+    # Head attribution for template/skeleton errors: the actual
+    # file the head text was read from. Inline spec strings stay
+    # md-attributed (no file to point at).
+    inline_head = bool(spec.preamble_override or spec.skeleton)
     spec = replace(
         spec,
         preamble_override=spec.preamble_override or override,
@@ -117,7 +158,12 @@ def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec
         skeleton=spec.skeleton or skel,
     )
     md_text = Path(md_path).read_text(encoding="utf-8")
-    return build_document(md_text, toml_src, spec)
+    head_path = None
+    if not inline_head:
+        cfg = _parse_config(toml_src)
+        head_rel = cfg.get("template_preamble_file", "") or cfg.get("template_skeleton", "")
+        head_path = toml_path.parent / head_rel if head_rel else None
+    return with_file(md_path, head_path, build_document, md_text, toml_src, spec)
 
 
 def _templates_dir() -> Path:

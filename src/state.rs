@@ -37,6 +37,10 @@ const END: &str = "__end";
 struct Composite {
     name: String,
     members: Vec<String>,
+    /// Absolute 1-based line of the opening `state X {`.
+    line: usize,
+    /// Opening statement text (echo for missing-`}`).
+    stmt: String,
 }
 
 fn is_id(s: &str) -> bool {
@@ -65,18 +69,27 @@ fn parse_trans(stmt: &str) -> Option<(String, String, Option<String>)> {
     Some((a.to_string(), b, label))
 }
 
-pub fn to_tikz(src: &str) -> Result<String, String> {
-    let mut lines = src
-        .lines()
-        .map(|l| {
-            let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
-            cut.trim()
-        })
-        .filter(|l| !l.is_empty())
-        .peekable();
-    let first = lines.next().ok_or("empty mermaid block")?;
+pub fn to_tikz(src: &str, base: usize) -> Result<String, crate::error::Error> {
+    use crate::error::Error;
+    // (parse text, raw echo, body-relative 0-based line).
+    let mut raw_lines: Vec<(String, String, usize)> = Vec::new();
+    for (idx, l) in src.lines().enumerate() {
+        let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
+        let t = cut.trim();
+        if !t.is_empty() {
+            raw_lines.push((t.to_string(), l.trim().to_string(), idx));
+        }
+    }
+    let mut lines = raw_lines.iter();
+    let (first, first_raw, first_idx) = lines.next().ok_or_else(|| {
+        Error::new("empty mermaid block", base, String::new())
+    })?.clone();
     if first != "stateDiagram-v2" {
-        return Err(format!("not a stateDiagram-v2 (got `{first}`)"));
+        return Err(Error::new(
+            format!("not a stateDiagram-v2 (got `{first}`)"),
+            base + first_idx,
+            first_raw.clone(),
+        ));
     }
 
     let mut g = mermaid::Graph {
@@ -91,25 +104,43 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
     // points — membership is the only thing the block adds).
     let mut open: Option<Composite> = None;
 
-    for stmt in lines {
+    for (stmt, raw, idx) in lines {
+        let line: usize = base + *idx;
         if let Some(rest) = stmt.strip_prefix("state ") {
             let rest = rest.trim();
             if let Some(name) = rest.strip_suffix('{') {
                 let name = name.trim().to_string();
                 if open.is_some() {
-                    return Err("nested composites are not supported".to_string());
+                    return Err(Error::new(
+                        "nested composites are not supported",
+                        line,
+                        raw.clone(),
+                    ));
                 }
                 if !is_id(&name) {
-                    return Err(format!("bad composite name in `{stmt}`"));
+                    return Err(Error::new(
+                        format!("bad composite name in `{stmt}`"),
+                        line,
+                        raw.clone(),
+                    ));
                 }
-                open = Some(Composite { name, members: Vec::new() });
+                open = Some(Composite {
+                    name,
+                    members: Vec::new(),
+                    line,
+                    stmt: raw.clone(),
+                });
                 continue;
             }
             // Long form: `state "Label" as Name`.
             if let Some(i) = rest.find(" as ") {
                 let (label, name) = (rest[..i].trim(), rest[i + 4..].trim());
                 if !is_id(name) {
-                    return Err(format!("bad state name in `{stmt}`"));
+                    return Err(Error::new(
+                        format!("bad state name in `{stmt}`"),
+                        line,
+                        raw.clone(),
+                    ));
                 }
                 g.set_node(name.to_string(), Shape::Rect, unquote(label));
                 if let Some(c) = open.as_mut() {
@@ -117,15 +148,22 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
                 }
                 continue;
             }
-            return Err(format!("unsupported statement `{stmt}`"));
+            return Err(Error::new(
+                format!("unsupported statement `{stmt}`"),
+                line,
+                raw.clone(),
+            ));
         }
         if stmt == "}" {
-            let c = open.take().ok_or_else(|| format!("`}}` without `state` in `{stmt}`"))?;
+            let c = open.take().ok_or_else(|| {
+                Error::new(format!("`}}` without `state` in `{stmt}`"), line, raw.clone())
+            })?;
             composites.push(c);
             continue;
         }
-        let (a, b, label) =
-            parse_trans(stmt).ok_or_else(|| format!("unsupported statement `{stmt}`"))?;
+        let (a, b, label) = parse_trans(stmt).ok_or_else(|| {
+            Error::new(format!("unsupported statement `{stmt}`"), line, raw.clone())
+        })?;
         let (a, b) = (
             if a == "[*]" { START.to_string() } else { a },
             if b == "[*]" { END.to_string() } else { b },
@@ -145,10 +183,12 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
             to: b,
             label,
             style: EdgeStyle::Arrow,
+            line,
+            stmt: raw.clone(),
         });
     }
-    if open.is_some() {
-        return Err("missing `}` for composite".to_string());
+    if let Some(c) = open {
+        return Err(Error::new("missing `}` for composite".to_string(), c.line, c.stmt));
     }
     // Long-form members that never appear in a transition still
     // exist: declare them so the box has something to wrap. (The
@@ -162,7 +202,7 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
         }
     }
     if g.nodes.is_empty() {
-        return Err("no states".to_string());
+        return Err(Error::new("no states", base, String::new()));
     }
 
     let depth = mermaid::depths(&g);
@@ -194,7 +234,11 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
             .filter_map(|m| g.node_idx.get(m).map(|&i| xy[i]))
             .collect();
         let Some((r, at)) = crate::layout::cluster_box(&pts) else {
-            return Err(format!("composite `{}` has no placed members", c.name));
+            return Err(Error::new(
+                format!("composite `{}` has no placed members", c.name),
+                c.line,
+                c.stmt.clone(),
+            ));
         };
         out.push_str(&crate::emit::cluster_rect(&c.name, r, at));
     }
@@ -221,8 +265,17 @@ mod tests {
     const DOC: &str = "stateDiagram-v2\n[*] --> Fences\nFences --> Convert : strict subset\nConvert --> Wrap\nWrap --> Validate\nValidate --> Compile\nCompile --> [*]";
 
     #[test]
+    fn error_bad_transition_carries_line() {
+        // `A ==> B` is body line 2 (0-based 1), base 4 → line 5.
+        let e = to_tikz("stateDiagram-v2\nA ==> B\n", 4).unwrap_err();
+        assert!(e.msg.contains("unsupported statement"), "got: {e}");
+        assert_eq!(e.line, 5, "got: {e}");
+        assert!(e.echo.contains("==>"), "got: {e}");
+    }
+
+    #[test]
     fn start_end_rendering() {
-        let tikz = to_tikz(DOC).unwrap();
+        let tikz = to_tikz(DOC, 1).unwrap();
         assert!(tikz.contains("fill=black"), "start dot, got:\n{tikz}");
         assert!(tikz.contains("circle,draw"), "end bullseye, got:\n{tikz}");
         assert!(tikz.contains("\\draw[->] (__start) -- (Fences)"), "start edge, got:\n{tikz}");
@@ -231,7 +284,7 @@ mod tests {
 
     #[test]
     fn composite_bounding_math() {
-        let tikz = to_tikz("stateDiagram-v2\n[*] --> A\nstate Box {\nA --> B\n}\nB --> [*]").unwrap();
+        let tikz = to_tikz("stateDiagram-v2\n[*] --> A\nstate Box {\nA --> B\n}\nB --> [*]", 1).unwrap();
         assert!(tikz.contains("rectangle"), "box, got:\n{tikz}");
         assert!(tikz.contains("{Box}"), "box label, got:\n{tikz}");
         // Members keep their laid-out coordinates: the box wraps
@@ -242,30 +295,30 @@ mod tests {
 
     #[test]
     fn nesting_is_an_error() {
-        assert!(to_tikz("stateDiagram-v2\nstate A {\nstate B {\nX --> Y\n}\n}").is_err());
+        assert!(to_tikz("stateDiagram-v2\nstate A {\nstate B {\nX --> Y\n}\n}", 1).is_err());
     }
 
     #[test]
     fn long_form_labels() {
-        let tikz = to_tikz("stateDiagram-v2\nstate \"Convert body\" as Convert\n[*] --> Convert").unwrap();
+        let tikz = to_tikz("stateDiagram-v2\nstate \"Convert body\" as Convert\n[*] --> Convert", 1).unwrap();
         assert!(tikz.contains("{Convert body}"), "label kept, got:\n{tikz}");
     }
 
     #[test]
     fn transition_labels() {
-        let tikz = to_tikz(DOC).unwrap();
+        let tikz = to_tikz(DOC, 1).unwrap();
         assert!(tikz.contains("node[midway,above,fill=white"), "knockout, got:\n{tikz}");
         assert!(tikz.contains("{strict subset}"), "label text, got:\n{tikz}");
     }
 
     #[test]
     fn layout_determinism() {
-        assert_eq!(to_tikz(DOC).unwrap(), to_tikz(DOC).unwrap());
+        assert_eq!(to_tikz(DOC, 1).unwrap(), to_tikz(DOC, 1).unwrap());
     }
 
     #[test]
     fn unknown_statement_is_an_error() {
-        assert!(to_tikz("stateDiagram-v2\nA --> B\nnote right of A: hi").is_err());
-        assert!(to_tikz("stateDiagram-v2\nA --> B\ndirection LR").is_err());
+        assert!(to_tikz("stateDiagram-v2\nA --> B\nnote right of A: hi", 1).is_err());
+        assert!(to_tikz("stateDiagram-v2\nA --> B\ndirection LR", 1).is_err());
     }
 }

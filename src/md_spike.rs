@@ -144,21 +144,21 @@ fn hand_parse(md: &str) -> Vec<Block> {
 /// the harness `Block` stream. Post-switch this is the cross-check —
 /// the frozen `hand_parse` oracle vs the shipped mapping. Any drift
 /// between the two reddens here (and in the golden test).
-fn pdc_parse(md: &str) -> Result<Vec<Block>, String> {
+fn pdc_parse(md: &str) -> Result<Vec<Block>, crate::error::Error> {
     let mut out = Vec::new();
     for b in crate::md::blocks(md)? {
-        match b {
-            crate::md::MdBlock::Title(t) => {
+        match b.kind {
+            crate::md::MdKind::Title(t) => {
                 if let Some(Block::Title(_)) = out.last() {
                     out.pop();
                 }
                 out.push(Block::Title(t));
             }
-            crate::md::MdBlock::H2(h) => out.push(Block::H2(h)),
-            crate::md::MdBlock::H3(h) => out.push(Block::H3(h)),
-            crate::md::MdBlock::Appendix => out.push(Block::Appendix),
-            crate::md::MdBlock::Abstract => out.push(Block::Abstract),
-            crate::md::MdBlock::Fence { info, body } => {
+            crate::md::MdKind::H2(h) => out.push(Block::H2(h)),
+            crate::md::MdKind::H3(h) => out.push(Block::H3(h)),
+            crate::md::MdKind::Appendix => out.push(Block::Appendix),
+            crate::md::MdKind::Abstract => out.push(Block::Abstract),
+            crate::md::MdKind::Fence { info, body } => {
                 // Same backtick-strip the hand scanner applied.
                 let mut sp = info.trim_start_matches('`').splitn(2, char::is_whitespace);
                 out.push(Block::Fence {
@@ -167,9 +167,9 @@ fn pdc_parse(md: &str) -> Result<Vec<Block>, String> {
                     body,
                 });
             }
-            crate::md::MdBlock::Table(rows) => out.push(Block::Table(rows)),
-            crate::md::MdBlock::Directive(a) => out.push(Block::Directive(a)),
-            crate::md::MdBlock::Para(ls) => out.push(Block::Para(ls.join(" "))),
+            crate::md::MdKind::Table(rows) => out.push(Block::Table(rows)),
+            crate::md::MdKind::Directive(a) => out.push(Block::Directive(a)),
+            crate::md::MdKind::Para(ls) => out.push(Block::Para(ls.join(" "))),
         }
     }
     Ok(out)

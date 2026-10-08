@@ -34,6 +34,8 @@ pub fn is_sep(line: &str) -> bool {
 
 /// Full `table` float. First row is bolded; `spec` overrides the
 /// default all-`X` column string (e.g. the appendix `Xcl`).
+/// `line` is the 1-based original line of the first row; rows are
+/// consecutive original lines, so cell errors resolve per row.
 pub fn table_block(
     rows: &[String],
     cap: &str,
@@ -43,11 +45,17 @@ pub fn table_block(
     pos: Pos,
     caption_top: bool,
     width: Option<&str>,
-) -> Result<(String, FloatNeeds), String> {
+    line: usize,
+) -> Result<(String, FloatNeeds), crate::error::Error> {
+    use crate::error::Error;
     let mut needs = FloatNeeds::none();
     let wide = matches!(span, Span::Wide);
     if wide && matches!(pos, Pos::Here | Pos::Force) {
-        return Err("table*: pos here/force is illegal on full-width floats (use span=column)".to_string());
+        return Err(Error::new(
+            "table*: pos here/force is illegal on full-width floats (use span=column)",
+            line,
+            rows.first().cloned().unwrap_or_default(),
+        ));
     }
     if wide && matches!(pos, Pos::Bottom | Pos::Both) {
         needs.dblfloat = true;
@@ -82,7 +90,7 @@ pub fn table_block(
         "\\hline".to_string(),
     ]);
     let mut first = true;
-    for r in rows {
+    for (ri, r) in rows.iter().enumerate() {
         if is_sep(r) {
             continue;
         }
@@ -90,7 +98,7 @@ pub fn table_block(
         cells.resize(n, String::new());
         let mut rendered = Vec::new();
         for c in &cells {
-            let mut cell = inline(c, keys)?;
+            let mut cell = inline(c, keys, line + ri)?;
             if first {
                 cell = format!("\\textbf{{{cell}}}");
             }
@@ -169,7 +177,7 @@ mod tests {
     #[test]
     fn block_shape() {
         let rows = ["| A | B |".to_string(), "|--|--|".to_string(), "| `x_y` | 3 |".to_string()];
-        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None).unwrap();
+        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None, 4).unwrap();
         assert!(got.contains("\\begin{table}[t]"));
         assert!(got.contains("\\begin{tabularx}{\\columnwidth}{XX}"));
         assert!(got.contains("\\textbf{A} & \\textbf{B} \\\\"));
@@ -181,7 +189,7 @@ mod tests {
     fn wide_barrier_table() {
         let rows = ["| A |".to_string()];
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8")).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8"), 4).unwrap();
         assert!(got.contains("\\FloatBarrier\n\\begin{table*}[t]"));
         assert!(got.contains("\\begin{tabularx}{0.8\\textwidth}{X}"));
         assert!(needs.barrier);
@@ -190,13 +198,13 @@ mod tests {
     #[test]
     fn wide_force_table_is_an_error() {
         let rows = ["| A |".to_string()];
-        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None).is_err());
+        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None, 4).is_err());
     }
 
     #[test]
     fn appendix_spec() {
         let rows = ["| A | B | C |".to_string(), "| 1 | 2 | 3 |".to_string()];
-        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None).unwrap();
+        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None, 4).unwrap();
         assert!(got.contains("{Xcl}"));
     }
 

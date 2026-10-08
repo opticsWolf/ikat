@@ -66,7 +66,9 @@ pub(crate) fn route_edge(
     a: (f64, f64),
     b: (f64, f64),
     boxes: &[(String, (f64, f64, f64, f64))],
-) -> Result<Option<(f64, f64)>, String> {
+    line: usize,
+    stmt: &str,
+) -> Result<Option<(f64, f64)>, crate::error::Error> {
     let blocked: Vec<(f64, f64, f64, f64)> = boxes
         .iter()
         .filter(|(id, _)| id != from && id != to)
@@ -97,7 +99,11 @@ pub(crate) fn route_edge(
             return Ok(Some(m));
         }
     }
-    Err(format!("edge {from}->{to} crosses a node box; reroute exhausted"))
+    Err(crate::error::Error::new(
+        format!("edge {from}->{to} crosses a node box; reroute exhausted"),
+        line,
+        stmt.to_string(),
+    ))
 }
 
 /// Composite/subgraph box around placed member points: pads and the
@@ -138,7 +144,7 @@ mod tests {
     #[test]
     fn clean_edge_is_none() {
         let b = vec![("c".to_string(), node_box(9.0, 9.0))];
-        assert_eq!(route_edge("a", "b", (0.0, 0.0), (2.0, 0.0), &b).unwrap(), None);
+        assert_eq!(route_edge("a", "b", (0.0, 0.0), (2.0, 0.0), &b, 1, "a-->b").unwrap(), None);
     }
 
     #[test]
@@ -146,7 +152,7 @@ mod tests {
         // Vertical edge through a centered box: the midpoint must
         // leave to one side (|x| > 0) and both halves must clear.
         let b = vec![("c".to_string(), node_box(0.0, -2.4))];
-        let m = route_edge("a", "d", (0.0, 0.0), (0.0, -4.8), &b).unwrap().unwrap();
+        let m = route_edge("a", "d", (0.0, 0.0), (0.0, -4.8), &b, 2, "a-->d").unwrap().unwrap();
         assert!(m.0.abs() > 0.5, "pushed aside, got {m:?}");
         assert!(!seg_hits_rect(0.0, 0.0, m.0, m.1, b[0].1));
         assert!(!seg_hits_rect(m.0, m.1, 0.0, -4.8, b[0].1));
@@ -160,7 +166,8 @@ mod tests {
         let wall: Vec<(String, (f64, f64, f64, f64))> = (-24..=24)
             .map(|k| (format!("w{k}"), (k as f64 * 0.5 - 0.4, -3.0, k as f64 * 0.5 + 0.4, -1.0)))
             .collect();
-        let e = route_edge("a", "b", (0.0, 0.0), (0.0, -4.8), &wall).unwrap_err();
-        assert!(e.contains("a->b"), "names the edge, got: {e}");
+        let e = route_edge("a", "b", (0.0, 0.0), (0.0, -4.8), &wall, 3, "a-->b").unwrap_err();
+        assert!(e.to_string().contains("a->b"), "names the edge, got: {e}");
+        assert!(e.to_string().contains(" --> line 3"), "line carried, got: {e}");
     }
 }

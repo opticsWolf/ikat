@@ -67,27 +67,41 @@ fn with_footnote(mut tikz: String, footnote: &Option<String>) -> String {
 
 /// Parse preset JSON and emit the `tikzpicture`. Errors name the
 /// offending key/value, never a bare serde dump.
-pub fn preset_to_tikz(src: &str) -> Result<String, String> {
-    let p: Preset = serde_json::from_str(src).map_err(|e| format!("preset: {e}"))?;
+pub fn preset_to_tikz(src: &str) -> Result<String, crate::error::Error> {
+    use crate::error::Error;
+    let p: Preset =
+        serde_json::from_str(src).map_err(|e| Error::data(format!("preset: {e}"), String::new()))?;
     let legend_src = if p.legend.is_empty() { "auto" } else { &p.legend };
-    let legend = LegendPos::parse(legend_src).map_err(|e| format!("preset legend: {e}"))?;
+    let legend = LegendPos::parse(legend_src).map_err(|e| Error {
+            msg: format!("preset legend: {}", e.msg),
+            ..e
+        })?;
     match p.kind.as_str() {
         "bar" => {
             if p.group_labels.is_empty() || p.series_names.is_empty() {
-                return Err("preset bar: no group_labels or no series_names".to_string());
+                return Err(Error::data("preset bar: no group_labels or no series_names", String::new()));
             }
             let (ng, ns) = (p.group_labels.len(), p.series_names.len());
             for (tag, t) in [("values", &p.values), ("mins", &p.mins), ("maxs", &p.maxs)] {
                 if t.len() != ns || t.iter().any(|col| col.len() != ng) {
-                    return Err(format!("preset bar: ragged {tag}"));
+                    return Err(Error::data(
+                    format!("preset bar: ragged {tag}"),
+                    format!("{tag} shapes {:?}", t.iter().map(|c| c.len()).collect::<Vec<_>>()),
+                ));
                 }
             }
             for s in 0..ns {
                 for i in 0..ng {
                     if !(p.mins[s][i] <= p.values[s][i] && p.values[s][i] <= p.maxs[s][i]) {
-                        return Err(format!(
-                            "preset bar: series {} group {i}: min > value or value > max",
-                            p.series_names[s]
+                        return Err(Error::data(
+                            format!(
+                                "preset bar: series {} group {i}: min > value or value > max",
+                                p.series_names[s]
+                            ),
+                            format!(
+                                "min={} value={} max={}",
+                                p.mins[s][i], p.values[s][i], p.maxs[s][i]
+                            ),
                         ));
                     }
                 }
@@ -108,14 +122,25 @@ pub fn preset_to_tikz(src: &str) -> Result<String, String> {
         }
         "line" => {
             if p.xs.is_empty() || p.series_names.is_empty() {
-                return Err("preset line: no xs or no series_names".to_string());
+                return Err(Error::data("preset line: no xs or no series_names", String::new()));
             }
             if p.series_names.len() != p.yss.len() || p.series_names.len() != p.errs.len() {
-                return Err("preset line: series_names/yss/errs length mismatch".to_string());
+                return Err(Error::data(
+                "preset line: series_names/yss/errs length mismatch",
+                format!(
+                    "names={} yss={} errs={}",
+                    p.series_names.len(),
+                    p.yss.len(),
+                    p.errs.len()
+                ),
+            ));
             }
             for w in 1..p.xs.len() {
                 if !(p.xs[w] > p.xs[w - 1]) {
-                    return Err("preset line: xs not strictly increasing".to_string());
+                    return Err(Error::data(
+                "preset line: xs not strictly increasing",
+                format!("xs[{w}]={} <= xs[{}]={}", p.xs[w], w - 1, p.xs[w - 1]),
+            ));
                 }
             }
             let series: Vec<(&str, Vec<f64>, Vec<f64>)> = p
@@ -127,13 +152,19 @@ pub fn preset_to_tikz(src: &str) -> Result<String, String> {
                 .collect();
             for (name, ys, es) in &series {
                 if ys.len() != p.xs.len() || es.len() != p.xs.len() {
-                    return Err(format!("preset line: ragged series {name}"));
+                    return Err(Error::data(
+                        format!("preset line: ragged series {name}"),
+                        format!("ys={} es={} xs={}", ys.len(), es.len(), p.xs.len()),
+                    ));
                 }
             }
             let tikz = plot::lineplot(&p.title, &p.xlabel, &p.ylabel, &p.xs, &series, legend)?;
             Ok(with_footnote(tikz, &p.footnote))
         }
-        other => Err(format!("preset: kind must be bar|line, got {other:?}")),
+        other => Err(Error::data(
+            format!("preset: kind must be bar|line, got {other:?}"),
+            other.to_string(),
+        )),
     }
 }
 
@@ -175,7 +206,7 @@ mod tests {
         let mut v: serde_json::Value = serde_json::from_str(&bar_src()).unwrap();
         v["values"] = serde_json::json!([[1.0]]);
         let err = preset_to_tikz(&v.to_string()).unwrap_err();
-        assert!(err.contains("ragged values"), "{err}");
+        assert!(err.msg.contains("ragged values"), "{err}");
     }
 
     #[test]
@@ -183,7 +214,7 @@ mod tests {
         let mut v: serde_json::Value = serde_json::from_str(&bar_src()).unwrap();
         v["mins"] = serde_json::json!([[5.0, 1.5]]);
         let err = preset_to_tikz(&v.to_string()).unwrap_err();
-        assert!(err.contains("min > value"), "{err}");
+        assert!(err.msg.contains("min > value"), "{err}");
     }
 
     #[test]
@@ -191,7 +222,7 @@ mod tests {
         let mut v: serde_json::Value = serde_json::from_str(&bar_src()).unwrap();
         v.as_object_mut().unwrap().remove("title");
         let err = preset_to_tikz(&v.to_string()).unwrap_err();
-        assert!(err.contains("title"), "{err}");
+        assert!(err.msg.contains("title"), "{err}");
     }
 
     #[test]
@@ -199,7 +230,7 @@ mod tests {
         let mut v: serde_json::Value = serde_json::from_str(&bar_src()).unwrap();
         v["kind"] = serde_json::json!("pie");
         let err = preset_to_tikz(&v.to_string()).unwrap_err();
-        assert!(err.contains("bar|line"), "{err}");
+        assert!(err.msg.contains("bar|line"), "{err}");
     }
 
     #[test]
@@ -207,7 +238,7 @@ mod tests {
         let mut v: serde_json::Value = serde_json::from_str(&bar_src()).unwrap();
         v["series_names"] = serde_json::json!([]);
         let err = preset_to_tikz(&v.to_string()).unwrap_err();
-        assert!(err.contains("no group_labels or no series_names"), "{err}");
+        assert!(err.msg.contains("no group_labels or no series_names"), "{err}");
     }
 
     #[test]

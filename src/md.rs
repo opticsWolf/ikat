@@ -1,44 +1,50 @@
-//! Markdown block splitter (E.1 / M5.4): the hand line-scanner's
-//! successor. pulldown-cmark owns block BOUNDARIES; every content
-//! rule is applied to raw source slices (byte offsets), so inline
-//! escaping, fence attrs, tables, and directives behave exactly as
-//! before. Inline events are IGNORED — the slice is the truth.
+//! Markdown block splitter (E.1 / M5.4; line numbers added F.1):
+//! pulldown-cmark owns block BOUNDARIES; every content rule is
+//! applied to raw source slices (byte offsets). Inline events are
+//! IGNORED — the slice is the truth.
 //!
-//! Mapping (each justified by the `md_spike` parity harness, which
-//! diffs this module against the frozen hand rules on the full
-//! corpus plus latent-divergence synthetics):
+//! Every block carries its 1-based ORIGINAL manuscript line
+//! (`prepass` deletions shift stripped lines, so a line map rides
+//! along). Fence/table inner lines resolve as `block.line + row`
+//! (fence and table bodies are consecutive original lines).
+//! Paragraph lines may be non-consecutive (a deleted quote between
+//! them); para errors report the first line with the joined text
+//! as echo.
+//!
+//! Mapping (each justified by the `md_spike` parity harness):
 //! - `>` quote lines: pre-deleted (the hand scanner dropped them
 //!   without even breaking paragraphs — deletion replicates that).
-//! - `%% table`-before-table: pre-extracted to `(table_seq, attrs)`
-//!   (fence-aware, same "next non-blank is `|`" rule); `Directive`
-//!   blocks splice positionally before their table. A dangling
-//!   `%% table` stays paragraph text, as before.
-//! - Link reference definitions `[label]: ...` are a hard error:
-//!   the event stream consumes them with no event at all, so the
-//!   text would vanish silently. Loud beats silent; they were never
-//!   in the subset.
+//! - `%% table`-before-table: pre-extracted to
+//!   `(table_seq, attrs, orig_line)`; `Directive` blocks splice
+//!   positionally before their table. A dangling `%% table` stays
+//!   paragraph text, as before.
+//! - Link reference definitions `[label]: ...` are a hard error
+//!   naming the line (the stream would swallow them silently).
 //! - ATX `#`/`##`/`###` (+ `## Appendix`/`## Abstract` prefixes):
-//!   headings as before. Setext, H4+, closed-ATX quirks: raw lines
-//!   as paragraph text (the hand scanner never knew them; closed
-//!   `## X ##` keeps its closers — same as hand's `s[3..]`).
+//!   headings as before. Setext, H4+, `#NoSpace`: raw lines as
+//!   paragraph text (closed `## X ##` keeps its closers).
 //! - Backtick fences: raw info line + raw body lines (pulldown
 //!   preserves both verbatim — probed). `~~~` and indented code:
-//!   raw lines as paragraph text (hand's obliviousness, replicated).
-//! - Tables: raw slice rows (delimiter included), same as the hand
-//!   `|`-runs. `|`-runs pulldown rejects (lone `|`, no delimiter)
-//!   are re-scanned out of paragraph slices and tabled — the hand
-//!   scanner tabled ANY such run.
-//! - Paragraphs break ONLY on blank lines (gap rule by line
-//!   arithmetic — spans may swallow newlines, so counting `\n`s in
-//!   the gap miscounts). Titles never flush; last `# ` wins.
-//! - Anything else (lists, HTML blocks, thematic breaks): raw slice
-//!   lines as paragraph text.
+//!   raw lines as paragraph text.
+//! - Tables: raw slice rows (delimiter included). `|`-runs
+//!   pulldown rejects are re-scanned out of paragraph slices.
+//! - Paragraphs break ONLY on blank lines (stripped-index
+//!   arithmetic). Titles never flush; last wins.
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
+use crate::error::Error;
+
+/// A block with its 1-based original manuscript line.
+#[derive(Debug, PartialEq)]
+pub struct MdBlock {
+    pub line: usize,
+    pub kind: MdKind,
+}
+
 /// Block stream `convert()` consumes.
 #[derive(Debug, PartialEq)]
-pub enum MdBlock {
+pub enum MdKind {
     Title(String),
     H2(String),
     H3(String),
@@ -53,11 +59,12 @@ pub enum MdBlock {
 /// Fence-aware pre-pass: drop `>` quote lines, extract
 /// `%% table`-before-table directives keyed by the table sequence
 /// they precede, reject link reference definitions. Returns the
-/// stripped lines plus `(table_seq, attr_string)`.
-pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<(usize, String)>), String> {
+/// stripped lines, their 1-based original line numbers, and
+/// `(table_seq, attrs, orig_line)` directives.
+pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String, usize)>), Error> {
     let lines: Vec<&str> = md.lines().collect();
     let mut kept: Vec<bool> = vec![true; lines.len()];
-    let mut directives: Vec<(usize, String)> = Vec::new();
+    let mut directives: Vec<(usize, String, usize)> = Vec::new();
     let mut infence = false;
     for (n, l) in lines.iter().enumerate() {
         let s = l.trim();
@@ -79,8 +86,6 @@ pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<(usize, String)>), String> 
             }
             if j < lines.len() && lines[j].trim().starts_with('|') {
                 kept[n] = false;
-                // Sequence number = count of `|`-runs in the kept
-                // lines strictly before the target table's line.
                 let mut runs = 0;
                 let mut k = 0;
                 while k < j {
@@ -93,37 +98,41 @@ pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<(usize, String)>), String> 
                         k += 1;
                     }
                 }
-                directives.push((runs, crate::doc::fence_attr_str(s).to_string()));
+                directives.push((runs, crate::doc::fence_attr_str(s).to_string(), n + 1));
             }
             continue;
         }
         // Link reference definition (`[label]: dest`, not `[^..]:`):
         // the event stream swallows these with no event — the text
-        // would vanish. Error loudly instead.
+        // would vanish. Error loudly instead, naming the line.
         if !s.starts_with("[^") && s.starts_with('[') {
             if let Some(col) = s.find("]:") {
                 if !s[1..col].contains([' ', '\n', '[']) {
-                    return Err(format!(
-                        "line {}: reference definitions `[label]: ...` are not in the subset (write the text inline)",
-                        n + 1
+                    return Err(Error::new(
+                        "reference definitions `[label]: ...` are not in the subset (write the text inline)",
+                        n + 1,
+                        s.to_string(),
                     ));
                 }
             }
         }
     }
-    let stripped: Vec<String> = lines
-        .iter()
-        .enumerate()
-        .filter(|(n, _)| kept[*n])
-        .map(|(_, l)| l.to_string())
-        .collect();
-    Ok((stripped, directives))
+    let mut stripped = Vec::new();
+    let mut orig = Vec::new();
+    for (n, l) in lines.iter().enumerate() {
+        if kept[n] {
+            stripped.push(l.to_string());
+            orig.push(n + 1);
+        }
+    }
+    Ok((stripped, orig, directives))
 }
 
 /// Split `md` into blocks per the mapping above.
-pub fn blocks(md: &str) -> Result<Vec<MdBlock>, String> {
-    let (stripped, directives) = prepass(md)?;
+pub fn blocks(md: &str) -> Result<Vec<MdBlock>, Error> {
+    let (stripped, orig, directives) = prepass(md)?;
     let text = stripped.join("\n");
+    // Byte offset of each stripped line's start.
     let mut line_off: Vec<usize> = Vec::with_capacity(stripped.len());
     let mut o = 0;
     for l in &stripped {
@@ -136,42 +145,46 @@ pub fn blocks(md: &str) -> Result<Vec<MdBlock>, String> {
             Err(n) => n.saturating_sub(1),
         }
     };
+    let is_blank = |k: usize| -> bool {
+        stripped.get(k).map(|l| l.trim().is_empty()).unwrap_or(false)
+    };
 
     let mut out: Vec<MdBlock> = Vec::new();
     let mut para: Vec<String> = Vec::new();
-    let mut para_tail: Option<usize> = None;
+    // Stripped index of the last line that fed the pending para.
+    let mut para_tail: usize = 0;
+    // Original line of the pending para's first fed line.
+    let mut para_line: usize = 0;
 
-    let flush = |out: &mut Vec<MdBlock>, para: &mut Vec<String>, tail: &mut Option<usize>| {
+    let flush = |out: &mut Vec<MdBlock>, para: &mut Vec<String>, pline: &mut usize| {
         if !para.is_empty() {
-            out.push(MdBlock::Para(std::mem::take(para)));
-            *tail = None;
+            out.push(MdBlock { line: *pline, kind: MdKind::Para(std::mem::take(para)) });
         }
     };
-    // Feed raw text lines into the pending para, flushing first when
-    // a truly blank stripped line lies between (titles and other
-    // non-flushing blocks between text lines do NOT split them).
+    // Feed `(stripped index, text)` lines into the pending para,
+    // flushing first when a truly blank stripped line lies between
+    // the last fed line and this run's first line.
     let feed = |out: &mut Vec<MdBlock>,
                 para: &mut Vec<String>,
-                tail: &mut Option<usize>,
-                slice_start: usize,
-                slice_end: usize,
-                raw_lines: &[String]| {
-        if !para.is_empty() {
-            let prev = line_of(tail.unwrap_or(0).saturating_sub(1));
-            let first = line_of(slice_start);
-            let blank = (prev + 1..first)
-                .any(|k| stripped.get(k).map(|l| l.trim().is_empty()).unwrap_or(false));
-            if blank {
-                out.push(MdBlock::Para(std::mem::take(para)));
-            }
+                tail: &mut usize,
+                pline: &mut usize,
+                run: &[(usize, String)]| {
+        if run.is_empty() {
+            return;
         }
-        for l in raw_lines {
+        if !para.is_empty() && (tail.saturating_add(1)..run[0].0).any(|k| is_blank(k)) {
+            out.push(MdBlock { line: *pline, kind: MdKind::Para(std::mem::take(para)) });
+        }
+        for (k, l) in run {
             let t = l.trim();
             if !t.is_empty() {
+                if para.is_empty() {
+                    *pline = orig.get(*k).copied().unwrap_or(1);
+                }
                 para.push(t.to_string());
+                *tail = *k;
             }
         }
-        *tail = Some(slice_end);
     };
 
     enum Kind {
@@ -207,31 +220,37 @@ pub fn blocks(md: &str) -> Result<Vec<MdBlock>, String> {
     }
 
     for (kind, s, e) in spans {
-        let slice_lines: Vec<String> = text[s..e].split('\n').map(|l| l.to_string()).collect();
+        // The span covers contiguous stripped lines.
+        let base = line_of(s);
+        let cover: Vec<(usize, String)> = text[s..e]
+            .split('\n')
+            .enumerate()
+            .map(|(k, l)| (base + k, l.to_string()))
+            .collect();
+        // 1-based original line of the span's first line.
+        let ln = orig.get(base).copied().unwrap_or(1);
         match kind {
             Kind::Other => {
-                // BlockQuote is pre-deleted; the rest (lists, HTML
-                // blocks, thematic breaks) feeds raw lines as para
-                // text — the hand scanner's obliviousness, kept.
-                feed(&mut out, &mut para, &mut para_tail, s, e, &slice_lines);
+                feed(&mut out, &mut para, &mut para_tail, &mut para_line, &cover);
             }
             Kind::Para => {
-                // Re-scan for `|`-runs the hand scanner would table
-                // (including shapes pulldown rejects).
-                let mut seg: Vec<String> = Vec::new();
-                let mut run: Vec<String> = Vec::new();
-                let mut runs: Vec<(Vec<String>, Vec<String>)> = Vec::new();
-                for l in slice_lines {
+                // Re-scan for `|`-runs the hand scanner would table.
+                // Segments carry their stripped indices so para
+                // lines keep exact originals.
+                let mut seg: Vec<(usize, String)> = Vec::new();
+                let mut run: Vec<(usize, String)> = Vec::new();
+                let mut runs: Vec<(Vec<(usize, String)>, Vec<(usize, String)>)> = Vec::new();
+                for (k, l) in cover {
                     if l.trim().starts_with('|') {
                         if !seg.is_empty() {
                             runs.push((std::mem::take(&mut seg), Vec::new()));
                         }
-                        run.push(l.trim().to_string());
+                        run.push((k, l.trim().to_string()));
                     } else {
                         if !run.is_empty() {
                             runs.push((Vec::new(), std::mem::take(&mut run)));
                         }
-                        seg.push(l);
+                        seg.push((k, l));
                     }
                 }
                 if !run.is_empty() {
@@ -242,79 +261,84 @@ pub fn blocks(md: &str) -> Result<Vec<MdBlock>, String> {
                 }
                 for (textseg, tablerun) in runs {
                     if !tablerun.is_empty() {
-                        flush(&mut out, &mut para, &mut para_tail);
-                        out.push(MdBlock::Table(tablerun));
+                        flush(&mut out, &mut para, &mut para_line);
+                        // Table line: original of its first row.
+                        let tline = orig.get(tablerun[0].0).copied().unwrap_or(ln);
+                        let rows = tablerun.into_iter().map(|(_, r)| r).collect();
+                        out.push(MdBlock { line: tline, kind: MdKind::Table(rows) });
                     } else {
-                        feed(&mut out, &mut para, &mut para_tail, s, e, &textseg);
+                        feed(&mut out, &mut para, &mut para_tail, &mut para_line, &textseg);
                     }
                 }
             }
             Kind::Heading => {
-                let first = slice_lines[0].trim().to_string();
+                let first = cover[0].1.trim().to_string();
                 if let Some(rest) = first.strip_prefix("### ") {
-                    flush(&mut out, &mut para, &mut para_tail);
-                    out.push(MdBlock::H3(rest.to_string()));
+                    flush(&mut out, &mut para, &mut para_line);
+                    out.push(MdBlock { line: ln, kind: MdKind::H3(rest.to_string()) });
                 } else if let Some(rest) = first.strip_prefix("## ") {
-                    flush(&mut out, &mut para, &mut para_tail);
+                    flush(&mut out, &mut para, &mut para_line);
                     if rest.strip_prefix("Appendix").is_some() {
-                        out.push(MdBlock::Appendix);
+                        out.push(MdBlock { line: ln, kind: MdKind::Appendix });
                     } else if rest.starts_with("Abstract") {
-                        out.push(MdBlock::Abstract);
+                        out.push(MdBlock { line: ln, kind: MdKind::Abstract });
                     } else {
-                        out.push(MdBlock::H2(rest.to_string()));
+                        out.push(MdBlock { line: ln, kind: MdKind::H2(rest.to_string()) });
                     }
                 } else if let Some(rest) = first.strip_prefix("# ") {
-                    // No flush (hand never flushed); last wins.
-                    if let Some(MdBlock::Title(_)) = out.last() {
+                    if let Some(MdBlock { kind: MdKind::Title(_), .. }) = out.last() {
                         out.pop();
                     }
-                    out.push(MdBlock::Title(rest.to_string()));
+                    out.push(MdBlock { line: ln, kind: MdKind::Title(rest.to_string()) });
                 } else {
-                    // Setext, H4+, `#NoSpace`: raw lines as text.
-                    feed(&mut out, &mut para, &mut para_tail, s, e, &slice_lines);
+                    feed(&mut out, &mut para, &mut para_tail, &mut para_line, &cover);
                 }
             }
             Kind::Code => {
-                let first = slice_lines[0].trim().to_string();
+                let first = cover[0].1.trim().to_string();
                 if first.starts_with("```") {
-                    flush(&mut out, &mut para, &mut para_tail);
+                    flush(&mut out, &mut para, &mut para_line);
                     let mut body = Vec::new();
-                    for l in &slice_lines[1..] {
+                    for (_, l) in cover.iter().skip(1) {
                         let t = l.trim();
                         if !t.is_empty() && t.chars().all(|c| c == '`') {
                             break;
                         }
                         body.push(l.to_string());
                     }
-                    out.push(MdBlock::Fence { info: first, body: body.join("\n") });
+                    out.push(MdBlock {
+                        line: ln,
+                        kind: MdKind::Fence { info: first, body: body.join("\n") },
+                    });
                 } else {
-                    // `~~~` or indented code: raw lines as text.
-                    feed(&mut out, &mut para, &mut para_tail, s, e, &slice_lines);
+                    feed(&mut out, &mut para, &mut para_tail, &mut para_line, &cover);
                 }
             }
             Kind::Table => {
-                flush(&mut out, &mut para, &mut para_tail);
+                flush(&mut out, &mut para, &mut para_line);
                 let mut rows: Vec<String> =
-                    slice_lines.iter().map(|l| l.trim().to_string()).collect();
+                    cover.iter().map(|(_, l)| l.trim().to_string()).collect();
                 while rows.last().map(|l| l.is_empty()).unwrap_or(false) {
                     rows.pop();
                 }
-                out.push(MdBlock::Table(rows));
+                out.push(MdBlock { line: ln, kind: MdKind::Table(rows) });
             }
         }
     }
-    flush(&mut out, &mut para, &mut para_tail);
+    flush(&mut out, &mut para, &mut para_line);
 
-    // Splice directives before their tables by sequence number.
     let mut sorted = directives;
-    sorted.sort_by_key(|(seq, _)| *seq);
+    sorted.sort_by_key(|(seq, _, _)| *seq);
     let mut diri = 0usize;
     let mut table_idx = 0usize;
     let mut merged: Vec<MdBlock> = Vec::with_capacity(out.len() + sorted.len());
     for b in out {
-        if matches!(b, MdBlock::Table(_)) {
+        if matches!(b.kind, MdKind::Table(_)) {
             while diri < sorted.len() && sorted[diri].0 == table_idx {
-                merged.push(MdBlock::Directive(sorted[diri].1.clone()));
+                merged.push(MdBlock {
+                    line: sorted[diri].2,
+                    kind: MdKind::Directive(sorted[diri].1.clone()),
+                });
                 diri += 1;
             }
             table_idx += 1;
@@ -322,4 +346,30 @@ pub fn blocks(md: &str) -> Result<Vec<MdBlock>, String> {
         merged.push(b);
     }
     Ok(merged)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_refdef_names_line() {
+        let e = blocks("# T\n\n[lab]: /url\n").unwrap_err();
+        assert!(e.msg.contains("reference definitions"), "got: {e}");
+        assert_eq!(e.line, 3, "got: {e}");
+        assert!(e.echo.contains("[lab]: /url"), "got: {e}");
+    }
+
+    #[test]
+    fn blocks_carry_original_lines() {
+        // Quote + directive lines vanish; the survivors keep
+        // original numbers (title 1, section 5, table 7).
+        let md = "# T\n\n> dropped\n\n## S\n\n%% table {pos=bottom}\n\n| A |\n|---|\n";
+        let bs = blocks(md).unwrap();
+        let lines: Vec<usize> = bs.iter().map(|b| b.line).collect();
+        assert!(lines.contains(&1), "title: {lines:?}");
+        assert!(lines.contains(&5), "section: {lines:?}");
+        assert!(lines.contains(&7), "directive orig line: {lines:?}");
+        assert!(lines.contains(&9), "table orig line: {lines:?}");
+    }
 }

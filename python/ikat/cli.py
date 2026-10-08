@@ -45,6 +45,7 @@ def _apply_bib(spec, bib_path: str | None) -> None:
 
 def cmd_build(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths, compile_pdf
+    from ikat.document import with_file
 
     spec = _spec_from_json(a.spec)
     if a.bib_style:
@@ -53,11 +54,15 @@ def cmd_build(a: argparse.Namespace) -> int:
     outdir = Path(a.outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
     stem = Path(a.md).stem
-    if a.toml:
-        r = build_from_paths(a.md, a.toml, spec)
-    else:
-        md, toml_src, _ = _read_md_toml(a.md, None)
-        r = build_document(md, toml_src, spec)
+    try:
+        if a.toml:
+            r = build_from_paths(a.md, a.toml, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            r = with_file(a.md, None, build_document, md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     tex_path = outdir / f"{stem}.tex"
     tex_path.write_text(r.tex, encoding="utf-8")
     print(f"tex: {tex_path} (diagrams={r.n_diagrams} tables={r.n_tables})")
@@ -74,14 +79,19 @@ def cmd_build(a: argparse.Namespace) -> int:
 
 def cmd_weave(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths
+    from ikat.document import with_file
 
     spec = _spec_from_json(a.spec)
     _apply_bib(spec, a.bib)
-    if a.toml:
-        r = build_from_paths(a.md, a.toml, spec)
-    else:
-        md, toml_src, _ = _read_md_toml(a.md, None)
-        r = build_document(md, toml_src, spec)
+    try:
+        if a.toml:
+            r = build_from_paths(a.md, a.toml, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            r = with_file(a.md, None, build_document, md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     sys.stdout.write(r.tex + ("\n" if not r.tex.endswith("\n") else ""))
     return 0
 

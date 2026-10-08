@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config::{CaptionPos, Config, FloatNeeds, Pos, Span};
 use crate::esc::inline;
-use crate::md::MdBlock;
+use crate::md::MdKind;
 use crate::mermaid::flowchart_to_tikz;
 use crate::table::table_block;
 
@@ -139,7 +139,11 @@ fn parse_width(s: &str) -> Result<String, String> {
     Err(format!("width must be a fraction or TeX length, got {s:?}"))
 }
 
-pub fn parse_attrs(attr: &str, what: &str) -> Result<(ElemAttrs, bool), String> {
+/// Attribute parser. `line` is the 1-based source line of the attr
+/// string (fence info or directive line); the echo is the attr
+/// string itself — short, and it always contains the bad token.
+pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bool), crate::error::Error> {
+    use crate::error::Error;
     let mut out = ElemAttrs::default();
     let mut inline = false;
     for tok in attr.split_whitespace() {
@@ -148,23 +152,40 @@ pub fn parse_attrs(attr: &str, what: &str) -> Result<(ElemAttrs, bool), String> 
             continue;
         }
         let Some((k, v)) = tok.split_once('=') else {
-            return Err(format!("{what}: bad attribute {tok:?} (want k=v)"));
+            return Err(Error::new(format!("{what}: bad attribute {tok:?} (want k=v)"), line, attr.to_string()));
         };
         match k {
             "span" => {
                 out.span = Some(match v {
                     "column" => Span::Column,
                     "wide" => Span::Wide,
-                    _ => return Err(format!("{what}: span must be column|wide, got {v:?}")),
+                    _ => {
+                        return Err(Error::new(
+                            format!("{what}: span must be column|wide, got {v:?}"),
+                            line,
+                            attr.to_string(),
+                        ))
+                    }
                 })
             }
-            "pos" => out.pos = Some(Pos::parse(v).map_err(|e| format!("{what}: {e}"))?),
-            "width" => out.width = Some(parse_width(v).map_err(|e| format!("{what}: {e}"))?),
-            "captionpos" => {
-                out.captionpos =
-                    Some(CaptionPos::parse(v).map_err(|e| format!("{what}: {e}"))?)
+            "pos" => {
+                out.pos = Some(Pos::parse(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?)
             }
-            _ => return Err(format!("{what}: unknown attribute {k:?} (span|pos|width|captionpos)")),
+            "width" => {
+                out.width = Some(parse_width(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?)
+            }
+            "captionpos" => {
+                out.captionpos = Some(
+                    CaptionPos::parse(v).map_err(|e| Error::new(format!("{what}: {e}"), line, attr.to_string()))?,
+                )
+            }
+            _ => {
+                return Err(Error::new(
+                    format!("{what}: unknown attribute {k:?} (span|pos|width|captionpos)"),
+                    line,
+                    attr.to_string(),
+                ))
+            }
         }
     }
     Ok((out, inline))
@@ -326,6 +347,26 @@ fn strip_tex_comments(skel: &str) -> String {
 
 /// Fill a LEVEL-3 skeleton: complete `.tex` with `{{tokens}}`.
 /// `{{title}}/{{author}}/{{thanks}}` fill as level 1;
+/// 1-based line number of the byte index inside a head/skeleton
+/// file (template errors are head-relative; Python attributes the
+/// head file — see `document._with_file`).
+fn head_line(tex: &str, byte_idx: usize) -> usize {
+    tex[..byte_idx.min(tex.len())].matches('\n').count() + 1
+}
+
+/// Line + echo for a `{{token}}` inside a skeleton: the token's
+/// own line when present, else line 1 with an empty echo.
+fn tok_line(skel: &str, tok: &str) -> (usize, String) {
+    let pat = format!("{{{{{tok}}}}}");
+    match skel.find(&pat) {
+        Some(at) => {
+            let ln = head_line(skel, at);
+            (ln, skel.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string())
+        }
+        None => (1, String::new()),
+    }
+}
+
 /// `{{body}}` is required exactly once; `{{bibliography}}` is
 /// required exactly once unless `bib` is empty (biblatex-style
 /// skeletons print refs themselves); `{{abstract}}` is required
@@ -340,7 +381,7 @@ pub fn render_skeleton(
     abstract_tex: &str,
     body: &str,
     bib: &str,
-) -> Result<String, String> {
+) -> Result<String, crate::error::Error> {
     let tok_re = regex::Regex::new(r"\{\{([A-Za-z_]+)\}\}").unwrap();
     let countable = strip_tex_comments(skel);
     let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
@@ -350,7 +391,15 @@ pub fn render_skeleton(
     for tok in counts.keys() {
         match *tok {
             "title" | "author" | "thanks" | "body" | "abstract" | "bibliography" => {}
-            _ => return Err(format!("skeleton has unknown token {{{{{tok}}}}}")),
+            _ => {
+                let at = skel.find(&format!("{{{{{tok}}}}}")).unwrap_or(0);
+                let ln = head_line(skel, at);
+                return Err(crate::error::Error::new(
+                    format!("skeleton has unknown token {{{{{tok}}}}}"),
+                    ln,
+                    skel.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string(),
+                ));
+            }
         }
     }
     let count = |tok: &str| counts.get(tok).copied().unwrap_or(0);
@@ -360,15 +409,26 @@ pub fn render_skeleton(
     // at most once and render as nothing (forward-compatible
     // skeletons for manuscripts gaining refs/abstracts later).
     if count("body") != 1 {
-        return Err("skeleton needs {{body}} exactly once".to_string());
+        let (ln, echo) = tok_line(skel, "body");
+        return Err(crate::error::Error::new("skeleton needs {{body}} exactly once", ln, echo));
     }
     for (tok, content) in [("bibliography", bib), ("abstract", abstract_tex)] {
         let n = count(tok);
         if !content.is_empty() && n != 1 {
-            return Err(format!("skeleton needs {{{{{tok}}}}} exactly once"));
+            let (ln, echo) = tok_line(skel, tok);
+            return Err(crate::error::Error::new(
+                format!("skeleton needs {{{{{tok}}}}} exactly once"),
+                ln,
+                echo,
+            ));
         }
         if content.is_empty() && n > 1 {
-            return Err(format!("skeleton has {{{{{tok}}}}} {n} times (max once)"));
+            let (ln, echo) = tok_line(skel, tok);
+            return Err(crate::error::Error::new(
+                format!("skeleton has {{{{{tok}}}}} {n} times (max once)"),
+                ln,
+                echo,
+            ));
         }
     }
     // Absent-but-empty tokens render as nothing, so skeletons
@@ -406,17 +466,31 @@ pub fn render_skeleton(
 /// `[nobottomtitles]`): reject the combination naming both, and
 /// point at the built-in `[typography]` guards as the replacement.
 /// Do NOT re-propose titlesec here — this error is the record.
-pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), String> {
+pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), crate::error::Error> {
     let uses_titlesec = crate::texenv::used_packages(preamble_tex).iter().any(|p| p == "titlesec");
     if uses_titlesec && class.map(|c| c.starts_with("IEEE")).unwrap_or(false) {
-        return Err("template loads titlesec under an IEEE class (incompatible sectioning): remove titlesec and use the built-in [typography] keep_with_next guards instead".to_string());
+        let at = preamble_tex.find("titlesec").unwrap_or(0);
+        let ln = head_line(preamble_tex, at);
+        return Err(crate::error::Error::new(
+            "template loads titlesec under an IEEE class (incompatible sectioning): remove titlesec and use the built-in [typography] keep_with_next guards instead",
+            ln,
+            preamble_tex.lines().nth(ln.saturating_sub(1)).unwrap_or("").trim().to_string(),
+        ));
     }
     Ok(())
 }
 
-pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> Result<(), String> {
+pub fn validate_template(
+    override_tex: &str,
+    body: &str,
+    needs: &FloatNeeds,
+) -> Result<(), crate::error::Error> {
     if crate::texenv::document_class(override_tex).is_none() {
-        return Err("template has no \\documentclass".to_string());
+        return Err(crate::error::Error::new(
+            "template has no \\documentclass",
+            1,
+            override_tex.lines().next().unwrap_or("").trim().to_string(),
+        ));
     }
     check_titlesec(override_tex, crate::texenv::document_class(override_tex).as_deref())?;
     let mut required: Vec<&str> = Vec::new();
@@ -439,9 +513,13 @@ pub fn validate_template(override_tex: &str, body: &str, needs: &FloatNeeds) -> 
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(format!(
-            "template drops packages the body needs: {}",
-            missing.into_iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
+        Err(crate::error::Error::new(
+            format!(
+                "template drops packages the body needs: {}",
+                missing.into_iter().map(|s| s.to_string()).collect::<Vec<_>>().join(", ")
+            ),
+            1,
+            override_tex.lines().next().unwrap_or("").trim().to_string(),
         ))
     }
 }
@@ -492,7 +570,12 @@ pub fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
     req
 }
 
-pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(String, String, usize, usize, FloatNeeds), String> {
+pub fn convert(
+    lines: &[String],
+    spec: &BuildSpec,
+    cfg: &Config,
+) -> Result<(String, String, usize, usize, FloatNeeds), crate::error::Error> {
+    use crate::error::Error;
     let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
     let mut out: Vec<String> = Vec::new();
     let mut needs = FloatNeeds::none();
@@ -502,10 +585,12 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
     let mut in_abstract = false;
     let mut diagram_idx = 0usize;
     let mut table_idx = 0usize;
+    // Original line of the pending para's first line (for flush errors).
+    let mut para_line = 0usize;
 
-    let flush = |out: &mut Vec<String>, para: &mut Vec<String>| -> Result<(), String> {
+    let flush = |out: &mut Vec<String>, para: &mut Vec<String>, pline: usize| -> Result<(), Error> {
         if !para.is_empty() {
-            let mut text = inline(&para.join(" "), keys)?;
+            let mut text = inline(&para.join(" "), keys, pline)?;
             if text.starts_with("\\dag{}") {
                 text = format!("\\textit{{Note: }}{}", &text["\\dag{}".len()..]);
             }
@@ -521,17 +606,19 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
     // inputs. `lines` is rejoined because offsets need one source.
     let md_text = lines.join("\n");
     for b in crate::md::blocks(&md_text)? {
-        match b {
-            MdBlock::Fence { info: s, body: fence_body } => {
-                flush(&mut out, &mut para)?;
+        let line = b.line;
+        match b.kind {
+            MdKind::Fence { info: s, body: fence_body } => {
+                flush(&mut out, &mut para, para_line)?;
                 if s.contains("mermaid") {
                     if diagram_idx >= spec.diagrams.len() {
-                        return Err(format!("mermaid fence #{diagram_idx} has no registry entry"));
+                        return Err(Error::new(format!("mermaid fence #{diagram_idx} has no registry entry"), line, s.clone()));
                     }
                     let entry = &spec.diagrams[diagram_idx];
                     let (attrs, inline_flag) = parse_attrs(
                         fence_attr_str(&s),
                         &format!("mermaid fence #{diagram_idx}"),
+                        line,
                     )?;
                     let mode = if inline_flag || s.contains("{inline}") {
                         "inline"
@@ -542,7 +629,10 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                     let span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
                     let pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
                     let body = if mode == "inline" {
-                        flowchart_to_tikz(&fence_body)?
+                        flowchart_to_tikz(&fence_body, line + 1).map_err(|e| Error {
+                            msg: format!("mermaid fence #{diagram_idx}: {}", e.msg),
+                            ..e
+                        })?
                     } else {
                         format!("{}{}", entry.path_prefix, entry.key)
                     };
@@ -550,14 +640,14 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                         attrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
                     let (fig, n) = figure_block(
                         &body,
-                        &inline(&entry.caption, keys)?,
+                        &inline(&entry.caption, keys, line)?,
                         &format!("fig:{}", entry.key),
                         span,
                         pos,
                         attrs.width.as_deref(),
                         caption_bottom,
                     )
-                    .map_err(|e| format!("mermaid fence #{diagram_idx}: {e}"))?;
+                    .map_err(|e| Error::new(format!("mermaid fence #{diagram_idx}: {e}"), line, s.clone()))?;
                     needs.add(n);
                     out.push(fig + "\n");
                     diagram_idx += 1;
@@ -565,12 +655,12 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                 // Non-mermaid fences: skipped silently, exactly as
                 // the hand scanner skipped them.
             }
-            MdBlock::Directive(a) => {
+            MdKind::Directive(a) => {
                 // Same stash rule, parsed with the same `table #N`
                 // context; the Table arm below takes it. (A
                 // dangling `%% table` never becomes a Directive —
                 // the pre-pass leaves it as paragraph text.)
-                let (attrs, _) = parse_attrs(&a, &format!("table #{table_idx}"))?;
+                let (attrs, _) = parse_attrs(&a, &format!("table #{table_idx}"), line)?;
                 if attrs.span.is_some()
                     || attrs.pos.is_some()
                     || attrs.width.is_some()
@@ -579,10 +669,10 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                     pending_table = Some(attrs);
                 }
             }
-            MdBlock::Table(rows) => {
-                flush(&mut out, &mut para)?;
+            MdKind::Table(rows) => {
+                flush(&mut out, &mut para, para_line)?;
                 if table_idx >= spec.table_captions.len() {
-                    return Err(format!("table #{table_idx} has no caption"));
+                    return Err(Error::new(format!("table #{table_idx} has no caption"), line, rows.first().cloned().unwrap_or_default()));
                 }
                 let tattrs = pending_table.take().unwrap_or_default();
                 let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
@@ -597,23 +687,27 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                     tpos,
                     caption_top,
                     tattrs.width.as_deref(),
+                    line,
                 )
-                .map_err(|e| format!("table #{table_idx}: {e}"))?;
+                .map_err(|e| Error {
+                    msg: format!("table #{table_idx}: {}", e.msg),
+                    ..e
+                })?;
                 needs.add(n);
                 out.push(tab + "\n");
                 table_idx += 1;
             }
-            MdBlock::Appendix => {
-                flush(&mut out, &mut para)?;
+            MdKind::Appendix => {
+                flush(&mut out, &mut para, para_line)?;
                 out.push("\\appendix\n\\section{Claim-to-decision map}\n".to_string());
             }
-            MdBlock::Abstract => {
-                flush(&mut out, &mut para)?;
+            MdKind::Abstract => {
+                flush(&mut out, &mut para, para_line)?;
                 out.push("\\begin{abstract}\n".to_string());
                 in_abstract = true;
             }
-            MdBlock::H2(h) => {
-                flush(&mut out, &mut para)?;
+            MdKind::H2(h) => {
+                flush(&mut out, &mut para, para_line)?;
                 if in_abstract {
                     out.push("\\end{abstract}\n".to_string());
                     in_abstract = false;
@@ -626,10 +720,10 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                 if cfg.typography.keep_with_next {
                     out.push(cfg.typography.needspace_line() + "\n");
                 }
-                out.push(format!("\\section{{{}}}\n", inline(&head, keys)?));
+                out.push(format!("\\section{{{}}}\n", inline(&head, keys, line)?));
             }
-            MdBlock::H3(h) => {
-                flush(&mut out, &mut para)?;
+            MdKind::H3(h) => {
+                flush(&mut out, &mut para, para_line)?;
                 let head = strip_section_number(&h);
                 if cfg.floats.barrier_sections {
                     out.push("\\FloatBarrier\n".to_string());
@@ -638,51 +732,55 @@ pub fn convert(lines: &[String], spec: &BuildSpec, cfg: &Config) -> Result<(Stri
                 if cfg.typography.keep_with_next {
                     out.push(cfg.typography.needspace_line() + "\n");
                 }
-                out.push(format!("\\subsection{{{}}}\n", inline(&head, keys)?));
+                out.push(format!("\\subsection{{{}}}\n", inline(&head, keys, line)?));
             }
-            MdBlock::Title(t) => {
-                title = inline(&t, keys)?;
+            MdKind::Title(t) => {
+                title = inline(&t, keys, line)?;
             }
-            MdBlock::Para(ls) => {
+            MdKind::Para(ls) => {
                 // Consecutive Para blocks are always blank-separated
                 // (`blocks()` splits there), so a pending para must
                 // flush first — the old scanner flushed on the blank
                 // line itself. Lines WITHIN one block join safely.
                 if !para.is_empty() {
-                    flush(&mut out, &mut para)?;
+                    flush(&mut out, &mut para, para_line)?;
                 }
+                // The block's line is its first fed line's original.
+                para_line = line;
                 para.extend(ls);
             }
         }
     }
-    flush(&mut out, &mut para)?;
+    flush(&mut out, &mut para, para_line)?;
     if in_abstract {
         out.push("\\end{abstract}\n".to_string());
     }
     Ok((title, out.join("\n"), diagram_idx, table_idx, needs))
 }
 
-pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<BuildResult, String> {
-    let cfg = Config::from_toml(toml_src)?;
+pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<BuildResult, crate::error::Error> {
+    let cfg = Config::from_toml(toml_src).map_err(|e| crate::error::Error::data(e, String::new()))?;
     let lines: Vec<String> = md_text.lines().map(|l| l.to_string()).collect();
     let (title, mut body, n_diagrams, n_tables, mut needs) = convert(&lines, spec, &cfg)?;
     if n_diagrams != spec.diagrams.len() {
-        return Err(format!(
-            "{n_diagrams} fences vs {} registry entries",
-            spec.diagrams.len()
+        return Err(crate::error::Error::data(
+            format!("{n_diagrams} fences vs {} registry entries", spec.diagrams.len()),
+            String::new(),
         ));
     }
     if n_tables != spec.table_captions.len() {
-        return Err(format!(
-            "{n_tables} tables vs {} captions",
-            spec.table_captions.len()
+        return Err(crate::error::Error::data(
+            format!("{n_tables} tables vs {} captions", spec.table_captions.len()),
+            String::new(),
         ));
     }
     if !spec.plots.is_empty() {
         let mut figs = Vec::new();
         for (key, cap) in &spec.plots {
+            // Plot attrs ride the spec dict (JSON/Python), not the
+            // manuscript: line 0 (data class — no manuscript line).
             let pattrs = match spec.plot_attrs.get(key) {
-                Some(a) => parse_attrs(a, &format!("plot {key}"))?.0,
+                Some(a) => parse_attrs(a, &format!("plot {key}"), 0)?.0,
                 None => ElemAttrs::default(),
             };
             let pspan = pattrs.span.unwrap_or_else(|| cfg.spans.for_kind("plot"));
@@ -698,7 +796,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
                 pattrs.width.as_deref(),
                 caption_bottom,
             )
-            .map_err(|e| format!("plot {key}: {e}"))?;
+            .map_err(|e| crate::error::Error::new(format!("plot {key}: {e}"), 0, key.clone()))?;
             needs.add(n);
             figs.push(fig);
         }
@@ -717,9 +815,10 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         // Level 3: the skeleton IS the document. No generated
         // head/tail at all — render tokens, splice appends, done.
         if !spec.preamble_override.is_empty() || !cfg.template.preamble_file.is_empty() {
-            return Err(
-                "[template] skeleton is mutually exclusive with preamble_file".to_string(),
-            );
+            return Err(crate::error::Error::data(
+                "[template] skeleton is mutually exclusive with preamble_file",
+                String::new(),
+            ));
         }
         validate_template(&spec.skeleton, &body, &needs)?;
         let (abs, rest) = if cfg.template.abstract_before_maketitle {
@@ -752,7 +851,10 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             && !crate::texenv::used_packages(&spec.skeleton).iter().any(|p| p == "needspace");
         if !spec.preamble_append.is_empty() || need_needspace {
             let Some(at) = rendered.find("\\begin{document}") else {
-                return Err("skeleton has no \\begin{document} for preamble_append".to_string());
+                return Err(crate::error::Error::data(
+                    "skeleton has no \\begin{document} for preamble_append",
+                    String::new(),
+                ));
             };
             let mut extra = spec.preamble_append.join("\n");
             if need_needspace {
@@ -926,7 +1028,8 @@ mod tests {
         s.table_captions.clear();
         s.preamble_override = "\\documentclass{article}\n\\title{T}".to_string();
         let err = build_document(md, "", &s).unwrap_err();
-        assert!(err.contains("tikz"), "unexpected: {err}");
+        assert!(err.msg.contains("tikz"), "unexpected: {err}");
+        assert_eq!(err.line, 1, "head-relative line, got: {err}");
     }
 
     #[test]
@@ -960,14 +1063,17 @@ mod tests {
     #[test]
     fn template_without_class_is_an_error() {
         let err = validate_template("\\usepackage{tikz}\n", "plain", &FloatNeeds::none()).unwrap_err();
-        assert!(err.contains("documentclass"));
+        assert!(err.msg.contains("documentclass"), "got: {err}");
+        assert_eq!(err.line, 1, "got: {err}");
     }
 
     #[test]
     fn titlesec_under_ieee_is_an_error() {
         let head = "\\documentclass[conference]{IEEEtran}\n\\usepackage[nobottomtitles]{titlesec}\n";
         let err = check_titlesec(head, Some("IEEEtran")).unwrap_err();
-        assert!(err.contains("titlesec") && err.contains("typography"), "got: {err}");
+        assert!(err.msg.contains("titlesec") && err.msg.contains("typography"), "got: {err}");
+        assert_eq!(err.line, 2, "titlesec is on head line 2, got: {err}");
+        assert!(err.echo.contains("titlesec"), "got: {err}");
         // Same preamble under article: fine.
         assert!(check_titlesec(head, Some("article")).is_ok());
         // And the full validator surfaces it too.
@@ -989,20 +1095,65 @@ mod tests {
     }
 
     #[test]
+    fn error_dangling_key_carries_line() {
+        use std::collections::HashSet;
+        let mut s = spec();
+        s.diagrams = vec![];
+        s.table_captions = vec![];
+        s.bib_keys = HashSet::from(["a".to_string()]);
+        let err = build_document("# T\n\nSee [`nope`] here.\n", "", &s).unwrap_err();
+        assert!(err.msg.contains("dangling citation key"), "got: {err}");
+        assert_eq!(err.line, 3, "got: {err}");
+        assert!(err.echo.contains("nope"), "got: {err}");
+    }
+
+    #[test]
+    fn error_skeleton_token_carries_line() {
+        let skel = "\\documentclass{article}\n\\begin{document}\n{{bogus}}\n\\end{document}\n";
+        let err = render_skeleton(skel, "T", "A", "", "", "B.", "").unwrap_err();
+        assert!(err.msg.contains("unknown token"), "got: {err}");
+        assert_eq!(err.line, 3, "got: {err}");
+        assert!(err.echo.contains("bogus"), "got: {err}");
+    }
+
+    #[test]
+    fn error_wide_here_table_carries_line() {
+        let mut s = spec();
+        s.diagrams = vec![];
+        s.table_captions = vec!["C.".to_string()];
+        let md = "# T\n\n%% table {span=wide pos=here}\n\n| A |\n|---|\n| 1 |\n";
+        let err = build_document(md, "", &s).unwrap_err();
+        assert!(err.msg.contains("here/force"), "got: {err}");
+        assert_eq!(err.line, 5, "table starts line 5, got: {err}");
+    }
+
+    #[test]
+    fn error_unknown_attr_carries_line() {
+        let mut s = spec();
+        s.diagrams = vec![DiagramEntry { key: "x".into(), caption: "C.".into(), mode: "precompiled".into(), path_prefix: "p/".into() }];
+        s.table_captions = vec![];
+        let md = "# T\n\n```mermaid {pos=middle}\ngraph TD\na[x]\n```\n";
+        let err = build_document(md, "", &s).unwrap_err();
+        assert!(err.msg.contains("pos must be"), "got: {err}");
+        assert_eq!(err.line, 3, "fence info line, got: {err}");
+        assert!(err.echo.contains("pos=middle"), "got: {err}");
+    }
+
+    #[test]
     fn attrs_parse_strictly() {
-        let (a, inl) = parse_attrs("span=column pos=both width=0.8 captionpos=top", "t").unwrap();
+        let (a, inl) = parse_attrs("span=column pos=both width=0.8 captionpos=top", "t", 5).unwrap();
         assert!(!inl);
         assert_eq!(a.span, Some(Span::Column));
         assert_eq!(a.pos, Some(Pos::Both));
         assert_eq!(a.width.as_deref(), Some("0.8"));
         assert_eq!(a.captionpos, Some(CaptionPos::Top));
-        let (_, inl) = parse_attrs("{inline}", "t").unwrap();
+        let (_, inl) = parse_attrs("{inline}", "t", 5).unwrap();
         assert!(inl);
-        assert!(parse_attrs("pos=center", "t").is_err());
-        assert!(parse_attrs("bogus=1", "t").is_err());
-        assert!(parse_attrs("width=huge", "t").is_err());
-        assert!(parse_attrs("width=0", "t").is_err());
-        assert!(parse_attrs("width=5cm", "t").unwrap().0.width.is_some());
+        assert!(parse_attrs("pos=center", "t", 5).is_err());
+        assert!(parse_attrs("bogus=1", "t", 5).is_err());
+        assert!(parse_attrs("width=huge", "t", 5).is_err());
+        assert!(parse_attrs("width=0", "t", 5).is_err());
+        assert!(parse_attrs("width=5cm", "t", 5).unwrap().0.width.is_some());
     }
 
     #[test]

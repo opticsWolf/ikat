@@ -55,6 +55,11 @@ pub(crate) struct Edge {
     pub to: String,
     pub label: Option<String>,
     pub style: EdgeStyle,
+    /// Absolute (base-resolved) 1-based source line of the edge's
+    /// statement, for emission-time errors (router exhaustion).
+    pub line: usize,
+    /// The statement text (echo for emission-time errors).
+    pub stmt: String,
 }
 
 use crate::emit::{edge_label_node, tikz_node, unquote};
@@ -137,6 +142,11 @@ pub(crate) struct Subgraph {
     pub id: String,
     pub title: String,
     pub members: Vec<String>,
+    /// Absolute 1-based line of the opening `subgraph` statement
+    /// (missing-`end` and empty-box errors point here).
+    pub line: usize,
+    /// Opening statement text (echo for those errors).
+    pub stmt: String,
 }
 
 /// Shared with the state emitter: states are nodes, transitions
@@ -191,28 +201,43 @@ fn parse_subgraph(stmt: &str) -> Option<(String, String)> {
     Some((id, unquote(title)))
 }
 
-fn parse(src: &str) -> Result<(Graph, Vec<Subgraph>), String> {
-    let mut lines = src
-        .lines()
-        .map(|l| {
-            // Strip %% comments.
-            let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
-            cut.trim()
-        })
-        .filter(|l| !l.is_empty())
-        .peekable();
-
-    let first = lines.next().ok_or("empty mermaid block")?;
+fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error::Error> {
+    use crate::error::Error;
+    // (parse text, raw echo, body-relative 0-based line). `%%`
+    // comments strip for parsing but the echo keeps the raw line.
+    let mut lines: Vec<(String, String, usize)> = Vec::new();
+    for (idx, l) in src.lines().enumerate() {
+        let cut = l.find("%%").map(|i| &l[..i]).unwrap_or(l);
+        let t = cut.trim();
+        if !t.is_empty() {
+            lines.push((t.to_string(), l.trim().to_string(), idx));
+        }
+    }
+    let (first, first_raw, first_idx) = lines.first().ok_or_else(|| {
+        Error::new("empty mermaid block", base, String::new())
+    })?.clone();
     let dir_word = first
         .strip_prefix("graph")
         .or_else(|| first.strip_prefix("flowchart"))
-        .ok_or("first line must be `graph TD/LR/...`")?
+        .ok_or_else(|| {
+            Error::new(
+                "first line must be `graph TD/LR/...`",
+                base + first_idx,
+                first_raw.clone(),
+            )
+        })?
         .trim();
     let direction = match dir_word {
         "TD" | "TB" => Direction::Td,
         "LR" | "RL" => Direction::Lr,
         "BT" => Direction::Td, // laid top-down; BT flip is cosmetic
-        _ => return Err(format!("unsupported direction `{dir_word}`")),
+        _ => {
+            return Err(Error::new(
+                format!("unsupported direction `{dir_word}`"),
+                base + first_idx,
+                first_raw.clone(),
+            ))
+        }
     };
 
     let mut g = Graph {
@@ -222,25 +247,52 @@ fn parse(src: &str) -> Result<(Graph, Vec<Subgraph>), String> {
         edges: Vec::new(),
     };
 
-    // Statements split on ';' (newlines already separate chains).
-    let stmts: Vec<String> = lines.flat_map(|l| l.split(';').map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)).collect();
+    // Statements split on ';' (newlines already separate chains);
+    // each keeps its body-relative line and raw echo.
+    let mut stmts: Vec<(String, String, usize)> = Vec::new();
+    for (t, raw, idx) in lines.iter().skip(1) {
+        for part in t.split(';') {
+            let s = part.trim();
+            if !s.is_empty() {
+                stmts.push((s.to_string(), raw.clone(), *idx));
+            }
+        }
+    }
     if stmts.is_empty() {
-        return Err("no statements".to_string());
+        return Err(Error::new("no statements", base + first_idx, first_raw.clone()));
     }
 
     let mut boxes: Vec<Subgraph> = Vec::new();
     let mut open: Option<Subgraph> = None;
+    // Raw open-statement text for the missing-`end` echo (at most
+    // one box is ever open — nesting is an error).
+    let mut open_raw: Option<String> = None;
 
-    for stmt in &stmts {
+    for (stmt, raw, idx) in &stmts {
+        let line = base + idx;
         if let Some((id, title)) = parse_subgraph(stmt) {
             if open.is_some() {
-                return Err("nested subgraphs are not supported".to_string());
+                return Err(Error::new(
+                    "nested subgraphs are not supported",
+                    line,
+                    raw.clone(),
+                ));
             }
-            open = Some(Subgraph { id, title, members: Vec::new() });
+            open = Some(Subgraph {
+                id,
+                title,
+                members: Vec::new(),
+                line: line,
+                stmt: raw.clone(),
+            });
+            open_raw = Some(raw.clone());
             continue;
         }
         if *stmt == "end" {
-            let b = open.take().ok_or("end without subgraph".to_string())?;
+            let b = open.take().ok_or_else(|| {
+                Error::new("end without subgraph", line, raw.clone())
+            })?;
+            open_raw = None;
             boxes.push(b);
             continue;
         }
@@ -270,7 +322,11 @@ fn parse(src: &str) -> Result<(Graph, Vec<Subgraph>), String> {
         while !rest.trim_start().is_empty() {
             rest = rest.trim_start();
             let (style, label, r) = parse_edge(rest).ok_or_else(|| {
-                format!("cannot parse edge in statement `{stmt}` near `{rest}`")
+                Error::new(
+                    format!("cannot parse edge in statement `{stmt}` near `{rest}`"),
+                    line,
+                    raw.clone(),
+                )
             })?;
             rest = r;
             let target = if let Some((id, shape, label, r2)) = parse_node(rest) {
@@ -280,15 +336,28 @@ fn parse(src: &str) -> Result<(Graph, Vec<Subgraph>), String> {
             } else {
                 let end = rest.find(|c: char| !is_id_char(c)).unwrap_or(rest.len());
                 if end == 0 {
-                    return Err(format!("missing edge target in `{stmt}`"));
+                    return Err(Error::new(
+                        format!("missing edge target in `{stmt}`"),
+                        line,
+                        raw.clone(),
+                    ));
                 }
                 let id = rest[..end].to_string();
                 g.ensure_node(&id);
                 rest = rest[end..].trim_start();
                 id
             };
-            let from = current.clone().ok_or_else(|| format!("edge without source in `{stmt}`"))?;
-            g.edges.push(Edge { from: from.clone(), to: target.clone(), label, style });
+            let from = current.clone().ok_or_else(|| {
+                Error::new(format!("edge without source in `{stmt}`"), line, raw.clone())
+            })?;
+            g.edges.push(Edge {
+                from: from.clone(),
+                to: target.clone(),
+                label,
+                style,
+                line: line,
+                stmt: raw.clone(),
+            });
             touched.push(from);
             touched.push(target.clone());
             current = Some(target);
@@ -302,14 +371,19 @@ fn parse(src: &str) -> Result<(Graph, Vec<Subgraph>), String> {
             }
         }
     }
-    if open.is_some() {
-        return Err("missing `end` for subgraph".to_string());
+    if let Some(b) = open {
+        return Err(Error::new(
+            "missing `end` for subgraph".to_string(),
+            b.line,
+            open_raw.unwrap_or_default(),
+        ));
     }
     if g.nodes.is_empty() {
-        return Err("no nodes".to_string());
+        return Err(Error::new("no nodes", base + first_idx, first_raw.clone()));
     }
     Ok((g, boxes))
 }
+
 
 /// Longest-path layering from the roots: a multi-parent node takes
 /// max(parent depth)+1, so diamond joins sit below ALL their
@@ -387,14 +461,18 @@ pub(crate) fn layered_xy(g: &Graph, depth: &[usize]) -> Vec<(f64, f64)> {
 /// Full `tikzpicture` for a mermaid block: flowchart here,
 /// `sequenceDiagram` / `stateDiagram-v2` dispatch to their
 /// grammars on the header line (same entry point, same errors).
-pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
+/// Rendered `tikzpicture`. `base_line` is the 1-based original line
+/// of the body's first line (fence line + 1 from `convert()`, 1
+/// for bare snippets) — every error below resolves against it.
+pub fn flowchart_to_tikz(src: &str, base_line: usize) -> Result<String, crate::error::Error> {
+    use crate::error::Error;
     if first_stmt(src) == "sequenceDiagram" {
-        return crate::sequence::to_tikz(src);
+        return crate::sequence::to_tikz(src, base_line);
     }
     if first_stmt(src) == "stateDiagram-v2" {
-        return crate::state::to_tikz(src);
+        return crate::state::to_tikz(src, base_line);
     }
-    let (g, boxes) = parse(src)?;
+    let (g, boxes) = parse(src, base_line)?;
     let depth = depths(&g);
     let xy = layered_xy(&g, &depth);
 
@@ -418,7 +496,11 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
             .filter_map(|m| g.node_idx.get(m).map(|&i| xy[i]))
             .collect();
         let Some((r, at)) = crate::layout::cluster_box(&pts) else {
-            return Err(format!("subgraph `{}` has no placed members", sg.id));
+            return Err(Error::new(
+                format!("subgraph `{}` has no placed members", sg.id),
+                sg.line,
+                sg.stmt.clone(),
+            ));
         };
         out.push_str(&crate::emit::cluster_rect(&sg.title, r, at));
     }
@@ -437,12 +519,16 @@ pub fn flowchart_to_tikz(src: &str) -> Result<String, String> {
         let (ai, bi) = match (g.node_idx.get(&e.from), g.node_idx.get(&e.to)) {
             (Some(&a), Some(&b)) => (a, b),
             _ => {
-                return Err(format!("edge endpoints missing for `{}->{}`", e.from, e.to))
+                return Err(Error::new(
+                    format!("edge endpoints missing for `{}->{}`", e.from, e.to),
+                    e.line,
+                    e.stmt.clone(),
+                ))
             }
         };
         // The router returns None for clear segments: the emitted
         // line is then the exact historical one (golden parity).
-        match crate::layout::route_edge(&e.from, &e.to, xy[ai], xy[bi], &node_boxes)? {
+        match crate::layout::route_edge(&e.from, &e.to, xy[ai], xy[bi], &node_boxes, e.line, &e.stmt)? {
             None => {
                 if let Some(lbl) = &e.label {
                     out.push_str(&format!(
@@ -484,7 +570,7 @@ mod tests {
 
     #[test]
     fn read_questions_shape() {
-        let tikz = flowchart_to_tikz(READ_Q).unwrap();
+        let tikz = flowchart_to_tikz(READ_Q, 1).unwrap();
         assert!(tikz.contains("\\begin{tikzpicture}"));
         assert!(tikz.contains("\\node (q)"));
         assert!(tikz.contains("[dia]"), "diamond, got:\n{tikz}");
@@ -504,8 +590,7 @@ mod tests {
     #[test]
     fn lr_and_shapes() {
         let tikz = flowchart_to_tikz(
-            "flowchart LR\n  a([start]) --> b{decide} --> c[[run]]\n  b --- c",
-        )
+            "flowchart LR\n  a([start]) --> b{decide} --> c[[run]]\n  b --- c", 1)
         .unwrap();
         assert!(tikz.contains("[stad]"));
         assert!(tikz.contains("[sub]"));
@@ -514,22 +599,43 @@ mod tests {
 
     #[test]
     fn errors_are_strings() {
-        assert!(flowchart_to_tikz("").is_err());
-        assert!(flowchart_to_tikz("digraph G { a -> b }").is_err());
-        assert!(flowchart_to_tikz("graph TD\nq -->").is_err());
+        assert!(flowchart_to_tikz("", 1).is_err());
+        assert!(flowchart_to_tikz("digraph G { a -> b }", 1).is_err());
+        assert!(flowchart_to_tikz("graph TD\nq -->", 1).is_err());
+    }
+
+    #[test]
+    fn error_unknown_statement_carries_line() {
+        // Body lines 0-2, base 10: the bad statement is line 12.
+        let e = flowchart_to_tikz("graph TD\na[x]\nbogus !!\n", 10).unwrap_err();
+        assert_eq!(e.line, 12, "got: {e}");
+        assert!(e.echo.contains("bogus"), "got: {e}");
+        assert!(e.to_string().contains(" --> line 12"), "got: {e}");
+    }
+
+    #[test]
+    fn error_missing_target_carries_line() {
+        let e = flowchart_to_tikz("graph TD\na[x]-->\n", 5).unwrap_err();
+        assert!(e.msg.contains("missing edge target"), "got: {e}");
+        assert_eq!(e.line, 6, "got: {e}");
+    }
+
+    #[test]
+    fn error_empty_block_carries_base() {
+        let e = flowchart_to_tikz("", 3).unwrap_err();
+        assert_eq!(e.line, 3, "got: {e}");
     }
 
     #[test]
     fn comments_and_semicolons() {
-        let tikz = flowchart_to_tikz("graph TD\n%% hi\na[x]; b[y]; a-->b").unwrap();
+        let tikz = flowchart_to_tikz("graph TD\n%% hi\na[x]; b[y]; a-->b", 1).unwrap();
         assert_eq!(tikz.matches("\\node").count(), 2);
     }
 
     #[test]
     fn subgraph_box_math() {
         let tikz = flowchart_to_tikz(
-            "graph TD\nsubgraph ours[Our box]\na[x]-->b[y]\nend\nb-->c[z]",
-        )
+            "graph TD\nsubgraph ours[Our box]\na[x]-->b[y]\nend\nb-->c[z]", 1)
         .unwrap();
         assert!(tikz.contains("rectangle"), "box, got:\n{tikz}");
         assert!(tikz.contains("{Our box}"), "title, got:\n{tikz}");
@@ -539,16 +645,15 @@ mod tests {
 
     #[test]
     fn subgraph_nesting_is_an_error() {
-        assert!(flowchart_to_tikz("graph TD\nsubgraph a\nsubgraph b\nx[y]\nend\nend").is_err());
-        assert!(flowchart_to_tikz("graph TD\na[x]\nend").is_err());
-        assert!(flowchart_to_tikz("graph TD\nsubgraph a\na[x]").is_err());
+        assert!(flowchart_to_tikz("graph TD\nsubgraph a\nsubgraph b\nx[y]\nend\nend", 1).is_err());
+        assert!(flowchart_to_tikz("graph TD\na[x]\nend", 1).is_err());
+        assert!(flowchart_to_tikz("graph TD\nsubgraph a\na[x]", 1).is_err());
     }
 
     #[test]
     fn diamond_layering_max_plus_one() {
         let tikz = flowchart_to_tikz(
-            "graph TD\na[x]-->b[y]\na-->c[z]\nb-->d[w]\nc-->d",
-        )
+            "graph TD\na[x]-->b[y]\na-->c[z]\nb-->d[w]\nc-->d", 1)
         .unwrap();
         // d sits below BOTH parents (depth 2), not at first-visit 1.
         assert!(tikz.contains("\\node (d) at (0.0,-4.8)"), "join at max+1, got:\n{tikz}");
@@ -556,7 +661,7 @@ mod tests {
 
     #[test]
     fn router_triggers_on_crossing() {
-        let tikz = flowchart_to_tikz("graph TD\na[x]-->b[y]\na-->c[z]\nb-->c").unwrap();
+        let tikz = flowchart_to_tikz("graph TD\na[x]-->b[y]\na-->c[z]\nb-->c", 1).unwrap();
         assert!(
             tikz.lines().filter(|l| l.contains("\\draw")).any(|l| l.matches("--").count() == 2),
             "a→c reroutes around b, got:\n{tikz}"
@@ -566,7 +671,7 @@ mod tests {
     #[test]
     fn clean_graphs_have_no_polylines() {
         // No dashes in labels (an em-dash would read as `--`).
-        let tikz = flowchart_to_tikz("graph TD\na[alpha]-->b[beta]\nb-->c[gamma]").unwrap();
+        let tikz = flowchart_to_tikz("graph TD\na[alpha]-->b[beta]\nb-->c[gamma]", 1).unwrap();
         for l in tikz.lines().filter(|l| l.contains("\\draw")) {
             assert_eq!(l.matches("--").count(), 1, "straight edge untouched: {l}");
         }
@@ -575,7 +680,7 @@ mod tests {
     #[test]
     fn layout_determinism_across_runs() {
         let src = "graph TD\na[x]-->b[y]\nb-->c[z]\na-->c\nsubgraph s\na\nend";
-        assert_eq!(flowchart_to_tikz(src).unwrap(), flowchart_to_tikz(src).unwrap());
+        assert_eq!(flowchart_to_tikz(src, 1).unwrap(), flowchart_to_tikz(src, 1).unwrap());
     }
 
     #[test]
@@ -588,7 +693,7 @@ mod tests {
         for i in 0..11 {
             src.push_str(&format!("n{i}-->n{}\n", i + 1));
         }
-        let tikz = flowchart_to_tikz(&src).unwrap();
+        let tikz = flowchart_to_tikz(&src, 1).unwrap();
         assert!(tikz.contains("\\node (n11) at (0.0,-26.4)"), "depth 11 placed, got tail:\n{}", &tikz[tikz.len().saturating_sub(300)..]);
     }
 }
