@@ -310,7 +310,7 @@ The plan of record is `docs/ROADMAP.md` (milestones M1–M6 with
 acceptance gates). Done: pipeline parity + golden master (M1,
 M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
-workflows (M4.2b). The open frontier: benchmark-JSON presets and
-plot regeneration (M2.1, M2.2), figure subsets + layout (M3), the
-pulldown-cmark switch (M5.4), line-numbered errors (M4.1), and
-shipping itself (M4.3 — names claimed, tokens pending).
+workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
+Phase A, 0.3.0). The open frontier: figure subsets + layout (M3),
+the pulldown-cmark switch (M5.4), line-numbered errors (M4.1),
+heading keep-with-next (Phase D.2), tectonic hardening (M4.10).

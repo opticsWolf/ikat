@@ -1,10 +1,10 @@
 # ikat roadmap
 
-Status 2026-10-07 (`4c6c9f8`): Phases 1, 4 (minus M4.1/M4.2b/ship),
-5, and 6 done — 54 cargo + 43 pytest green, showcase paper builds
-(6 pages, 2 diagrams, 2 plots, 4 tables, 0 undefined citations).
-Open: M2.1, M2.2, M3.1–M3.4, M4.1, M4.3 (tokens only), M4.10,
-M5.4 (the pulldown-cmark switch), tectonic crate embedding.
+Status 2026-10-08 (Phase A gate, 0.3.0): Phases 1, 2 (plots),
+4 (core), 5, 6 done — 67 cargo + 52 pytest green, showcase +
+regen build (6-page paper, 4 regen plots, 0 undefined citations).
+Open: M3.1–M3.4, M4.1, M4.10, M5.4 (the pulldown-cmark switch),
+tectonic crate embedding, Phase D.2 heading guards.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -39,15 +39,19 @@ shows only intended improvements; resulting PDF compiles with
 
 ## Phase 2 — Data plots live (matplotlib out)
 
-- **M2.1 presets.** OPEN — benchmark JSON (`results/*.json` shape)
-  → `barchart_to_tikz` / `lineplot_to_tikz` directly: series names,
-  whiskers from min/max, refline, footnote text. No helper exists
-  yet; callers hand-assemble the argument lists (see
-  `examples/ikat-paper/build.py` for the current pattern to wrap).
-- **M2.2 regeneration.** OPEN — the 4 main-paper plots
-  (`paper/figs/fig-*.pdf`, today matplotlib) rebuilt through ikat;
-  side-by-side visual diff against the matplotlib PDFs. Blocked
-  only on M2.1 (needs the preset loader to feed the emitters).
+- **M2.1 presets.** ✅ DONE 2026-10-08 (Phase A.1+A.2, 0.2.2+0.2.3)
+  — `src/preset.rs` + `load_preset`: benchmark JSON → emitters
+  (series names, min/max-validated whiskers, refline, footnote,
+  legend key); CLI `--preset` + MCP `preset_json` wired with the
+  surfaces synchronized in the same commits; skills updated.
+- **M2.2 regeneration.** ✅ DONE 2026-10-08 (Phase A.3, 0.2.4)
+  — `examples/regen/`: 4 fixtures transcribed from
+  `benchmarks/results`, TikZ snapshots (CI byte-gate), standalone
+  PDFs, pixel scores pinned in `ACCEPTED.md` with reviewed deltas
+  (degenerate Fig-A whiskers, symmetric max-errors, linear Fig-D
+  x, below-legend/45° touch, refline edge clip). Outputs stay in
+  `regen/out/` — staging into `paper/figs/` is the paper track's
+  call.
 - **M2.3 local pgfplots.** ✅ DONE 2026-10-06 — tlnet `pgfplots.tar.xz`
   extracted into the TinyTeX texmf tree (`tlmgr` GPG is broken on
   this mirror chain); `tex_requirements()` auto-detects TikZ/pgfplots
