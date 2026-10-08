@@ -3,7 +3,7 @@
 Status 2026-10-07 (`4c6c9f8`): Phases 1, 4 (minus M4.1/M4.2b/ship),
 5, and 6 done — 54 cargo + 43 pytest green, showcase paper builds
 (6 pages, 2 diagrams, 2 plots, 4 tables, 0 undefined citations).
-Open: M2.1, M2.2, M3.1–M3.4, M4.1, M4.2b, M4.3 (tokens only),
+Open: M2.1, M2.2, M3.1–M3.4, M4.1, M4.3 (tokens only), M4.10,
 M5.4 (the pulldown-cmark switch), tectonic crate embedding.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
@@ -152,6 +152,14 @@ no hand-tuning.
   link here, so embedding is a Linux-CI exercise verified under
   M4.2b); empty `bib_name` now emits no bibliography lines (tectonic auto-runs
   BibTeX and dies on empty `\bibliography{}`).
+  What M4.9 did NOT cover is itemized in M4.10.
+- **M4.10 tectonic hardening.** OPEN — three items: (1) a
+  tectonic step in the CI `tex` job (install the 0.17.0 binary,
+  build demo + showcase with `--engine tectonic`, same
+  undefined-citation gate); (2) showcase paper and main paper
+  verified under tectonic (only a probe doc is proven; XeTeX
+  font handling differs from pdfTeX); (3) the Windows-embedding
+  limitation documented in README's LaTeX section.
 
 ## Non-goals
 
@@ -166,7 +174,8 @@ preset loader feeds regeneration) → M3 (layout work needs real
 diagrams to test against) → M5.4 (the parser switch needs the full
 test corpus green) → M4.1 whenever (error paths are additive).
 M4.3 can jump the queue any time — it costs nothing but tokens.
-M4.2b unblocks tectonic-embedding verification.
+M4.10 rides along with any CI work (it is a `tex`-job step plus
+verification runs, no new machinery).
 
 ## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md)
 
