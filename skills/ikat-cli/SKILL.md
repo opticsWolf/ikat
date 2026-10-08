@@ -26,6 +26,8 @@ ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{...}' | ikat barchart - [--legend WORD]            # JSON payload → tikzpicture
 echo '{...}' | ikat lineplot - [--legend WORD]
+ikat barchart --preset fig.json [--legend WORD]         # preset file (or - for stdin)
+ikat lineplot --preset fig.json [--legend WORD]
 ikat version
 ```
 
@@ -36,6 +38,10 @@ ikat version
   values mins maxs` (+ optional `log_y refline:[x0,x1,y,label] legend`);
   lineplot needs `title xlabel ylabel xs names yss errs` (+ optional
   `legend`). `--legend` overrides the payload.
+- `--preset FILE|-`: benchmark-JSON preset instead of a payload
+  (`kind bar|line`, same schema as `load_preset` in ikat-api).
+  `FILE` + `--preset` together is an error naming both;
+  `--legend` overrides the preset's `legend` key.
 - `check` covers float packages too (`placeins/float/dblfloatfix`).
 
 ## Errors

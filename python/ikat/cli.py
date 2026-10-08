@@ -136,6 +136,8 @@ def cmd_flowchart(a: argparse.Namespace) -> int:
 
 def _read_payload(a: argparse.Namespace) -> dict:
     """JSON plot payload from a file or stdin (`-`)."""
+    if a.file is None:
+        raise ValueError("need FILE payload or --preset")
     raw = sys.stdin.read() if a.file == "-" else Path(a.file).read_text(encoding="utf-8")
     try:
         data = json.loads(raw)
@@ -146,9 +148,33 @@ def _read_payload(a: argparse.Namespace) -> dict:
     return data
 
 
+def _preset_tikz(a: argparse.Namespace) -> str:
+    """Render `--preset` JSON (file or stdin); `--legend` overrides its key."""
+    from ikat import preset_to_tikz
+
+    raw = sys.stdin.read() if a.preset == "-" else Path(a.preset).read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"bad preset JSON: {e}")
+    if not isinstance(data, dict):
+        raise ValueError("preset must be a JSON object")
+    if a.legend:
+        data["legend"] = a.legend
+    try:
+        return preset_to_tikz(json.dumps(data))
+    except ValueError as e:
+        raise ValueError(f"preset {a.preset}: {e}") from e
+
+
 def cmd_barchart(a: argparse.Namespace) -> int:
     from ikat import barchart_to_tikz
 
+    if a.preset is not None:
+        if a.file is not None:
+            raise ValueError("cannot use both FILE payload and --preset")
+        sys.stdout.write(_preset_tikz(a) + "\n")
+        return 0
     p = _read_payload(a)
     refline = p.get("refline")
     tikz = barchart_to_tikz(
@@ -170,6 +196,11 @@ def cmd_barchart(a: argparse.Namespace) -> int:
 def cmd_lineplot(a: argparse.Namespace) -> int:
     from ikat import lineplot_to_tikz
 
+    if a.preset is not None:
+        if a.file is not None:
+            raise ValueError("cannot use both FILE payload and --preset")
+        sys.stdout.write(_preset_tikz(a) + "\n")
+        return 0
     p = _read_payload(a)
     tikz = lineplot_to_tikz(
         p["title"],
@@ -255,7 +286,8 @@ def build_parser() -> argparse.ArgumentParser:
         "title, ylabel, group_labels, series_names, values, mins, maxs; "
         "optional log_y, refline [x0,x1,y,label], legend)",
     )
-    bc.add_argument("file", help="JSON file or - for stdin")
+    bc.add_argument("file", nargs="?", default=None, help="JSON file or - for stdin")
+    bc.add_argument("--preset", default=None, help="preset JSON file or - for stdin (conflicts with FILE)")
     bc.add_argument("--legend", default=None, help="position keyword (overrides payload)")
     bc.set_defaults(func=cmd_barchart)
 
@@ -264,7 +296,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="line plot -> tikzpicture on stdout (JSON payload: "
         "title, xlabel, ylabel, xs, names, yss, errs; optional legend)",
     )
-    lp.add_argument("file", help="JSON file or - for stdin")
+    lp.add_argument("file", nargs="?", default=None, help="JSON file or - for stdin")
+    lp.add_argument("--preset", default=None, help="preset JSON file or - for stdin (conflicts with FILE)")
     lp.add_argument("--legend", default=None, help="position keyword (overrides payload)")
     lp.set_defaults(func=cmd_lineplot)
 

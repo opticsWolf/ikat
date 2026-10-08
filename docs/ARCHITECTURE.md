@@ -123,6 +123,20 @@ row, which clears tick labels by construction. Inside corners
 cannot touch axis labels — labels live outside the axis box.
 Unknown words fail naming the full set.
 
+**Presets** (`preset.rs`, Phase A.1): benchmark JSON in,
+`tikzpicture` out. The schema wraps what the showcase `build.py`
+assembled by hand — `kind` (`bar`|`line`), `title`, `ylabel`
+(+ `xlabel`), shared `series_names`, bar fields `group_labels`
+`values`/`mins`/`maxs` (+ `log_y`, `refline`), line fields `xs`
+`yss`/`errs`, optional `legend` and `footnote` (rendered
+`{\footnotesize …\par}` after the picture). Validation is
+strict: rectangular series, `min ≤ value ≤ max` elementwise, `xs`
+strictly increasing — violations name the key, never a bare serde
+dump. Filesystem rule holds: Rust parses strings, Python
+(`preset.py::load_preset`) reads files and names them in errors.
+The emitters are untouched; the loader converts into their
+argument structs.
+
 ### 3.3 `table.rs`, `esc.rs`, `doc.rs` — the paper path
 
 - `table.rs`: pipe tables → `tabularx` with per-table column

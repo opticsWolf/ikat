@@ -475,6 +475,16 @@ ROADMAP M4.10 DONE, ARCHITECTURE §3.5 updated (prototype →
    to measurement or is marked `[NOT YET MEASURED]`.
 4. Surface parity: Rust feature → Python API → CLI → MCP →
    QUICKREF, each step tested (surface test pins the tool list).
+   The three surfaces stay synchronized in the SAME feature
+   commit — never "API now, CLI later". New flags/params on one
+   surface get their counterparts on the other two (or a recorded
+   reason why not, e.g. `compile_pdf` excluded from MCP by the
+   workdir rule). Skill files move with the code:
+   `skills/ikat-api/SKILL.md`, `skills/ikat-cli/SKILL.md`, and
+   `skills/ikat-mcp/SKILL.md` document every new
+   function/flag/tool — including error formats and payload
+   shapes — in the same commit that adds it. Stale skills are a
+   release-blocking bug, same as a failing test.
 5. `dev` is integration; `main` only takes finished phases
    (squash or fast-forward at phase gates — maintainer's call
    at 0.3.0).

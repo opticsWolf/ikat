@@ -5,6 +5,7 @@ MCP tests call the tool functions directly + assert registration;
 skipped when the mcp extra is absent.
 """
 
+import io
 import json
 
 import pytest
@@ -101,6 +102,32 @@ def test_plot_commands(tmp_path, capsys):
                       ' "names": ["s"], "yss": [[2.0]], "errs": [[0.0]]}', encoding="utf-8")
     assert cli_main(["lineplot", str(line)]) == 0
     assert "\\begin{tikzpicture}" in capsys.readouterr().out
+
+
+def test_preset_flags(tmp_path, capsys, monkeypatch):
+    loc = "examples/ikat-paper/fig-loc.json"
+    assert cli_main(["barchart", "--preset", loc]) == 0
+    assert "\\addlegendentry{shipped code}" in capsys.readouterr().out
+    # stdin preset
+    src = open(loc, encoding="utf-8").read()
+    monkeypatch.setattr("sys.stdin", io.StringIO(src))
+    assert cli_main(["lineplot", "--preset", "-", "--legend", "below"]) == 0
+    assert "anchor=north,legend columns=-1" in capsys.readouterr().out
+    # FILE + --preset conflict names both
+    assert cli_main(["barchart", str(tmp_path / "x.json"), "--preset", loc]) == 1
+    assert "--preset" in capsys.readouterr().err
+    # neither FILE nor --preset
+    assert cli_main(["barchart"]) == 1
+
+
+@needs_mcp
+def test_mcp_preset_param():
+    from ikat import mcp_server
+
+    loc = open("examples/ikat-paper/fig-tests.json", encoding="utf-8").read()
+    r = mcp_server.lineplot_to_tikz("t", "x", "y", [1.0], ["s"], [[1.0]], [[0.0]],
+                                     preset_json=loc)
+    assert "\\addlegendentry{Rust tests}" in r
 
 
 def test_version(capsys):

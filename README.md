@@ -121,8 +121,8 @@ python -m ikat.mcp_server
 |---|---|---|---|
 | weave document | `build_document` / `build_from_paths` | `ikat build` / `weave` | `weave_document` |
 | flowchart | `flowchart_to_tikz` | `ikat flowchart` | `flowchart_to_tikz` |
-| bar chart | `barchart_to_tikz` | `ikat barchart` (JSON, `--legend`) | `barchart_to_tikz` |
-| line plot | `lineplot_to_tikz` | `ikat lineplot` (JSON, `--legend`) | `lineplot_to_tikz` |
+| bar chart | `barchart_to_tikz` / `load_preset` | `ikat barchart` (JSON or `--preset`, `--legend`) | `barchart_to_tikz` (`preset_json=`) |
+| line plot | `lineplot_to_tikz` / `load_preset` | `ikat lineplot` (JSON or `--preset`, `--legend`) | `lineplot_to_tikz` (`preset_json=`) |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |

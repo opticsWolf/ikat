@@ -33,6 +33,9 @@ ikat version
 `barchart` payload: `title ylabel group_labels series_names values mins maxs`
 + optional `log_y refline:[x0,x1,y,label] legend`.
 `lineplot` payload: `title xlabel ylabel xs names yss errs` + optional `legend`.
+`--preset FILE|-`: benchmark JSON instead of a payload (`kind bar|line`,
+`series_names` shared; bar adds `group_labels values mins maxs`, line adds
+`xs yss errs`; optional `legend footnote`). Python: `load_preset(path_or_json).
 
 ## Legend keyword
 

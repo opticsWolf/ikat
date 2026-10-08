@@ -23,7 +23,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 | Full document (numbering, captions, bib) | `build_document(md_text, toml_src, spec)` or `build_from_paths(md, toml, spec)` → `BuildResult(tex, ...)` |
 | Single figure, no registries | `weave_fragment(md, toml_src)` → `[Element]` |
 | Build the spec | `spec_from_dict(raw)` — the ONE constructor (CLI `--spec` and MCP `spec_json` share it); unknown keys ignored |
-| Bar chart / line plot → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword |
+| Bar chart / line plot → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword, or `load_preset(path_or_json)` for benchmark JSON |
 | Compile | `compile_pdf(workdir, main, ensure_packages=False, engine="pdflatex"\|"tectonic")`; raises `CompileError` with the log tail |
 | TeX env | `check_tex_env(tex)` report / `ensure_tex_packages(tex)` install+re-probe |
 | Templates | `list_templates()`, `template_path(name)`, `template_preset(name)`, `list_skeletons()` |
@@ -46,6 +46,18 @@ desynchronize the document — the spec names it, not the markdown.
 TL,TR,BR,BL order, else the below-axis row) | `"below"` | four
 corners | `"outside-right"`. Anything else is `ValueError` naming
 the set.
+
+## Presets
+
+`load_preset(path_or_src)`: benchmark JSON → tikzpicture. File
+path or raw JSON string; errors name the file. Schema: `kind`
+`bar`|`line`, `title`, `ylabel` (+ `xlabel` for lines); bar
+fields `group_labels series_names values mins maxs` (+ optional
+`log_y refline:[x0,x1,y,label]`), line fields `xs series_names
+yss errs`. Optional `legend` (same keywords), optional
+`footnote` (rendered `{\footnotesize …\par}` after the picture).
+Validation: rectangular series, `min ≤ value ≤ max` elementwise,
+`xs` strictly increasing — violations name the file and key.
 
 ## Doctrine (do not work around)
 

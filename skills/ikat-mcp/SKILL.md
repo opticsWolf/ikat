@@ -26,7 +26,7 @@ description: >
 |---|---|
 | Weave markdown → `.tex` | `weave_document(md_text, toml_text, spec_json)` — `spec_json` is BuildSpec JSON, same shape as CLI `--spec` |
 | Mermaid fence → tikzpicture | `flowchart_to_tikz(src)` — strict subset, errors name the statement |
-| Bar / line data → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword (`auto` default; unknown words error naming the set) |
+| Bar / line data → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword (`auto` default; unknown words error naming the set), `preset_json=` (preset document string; when set, explicit data args ignored) |
 | What does this `.tex` need | `check_tex_packages(tex_source)` → `{missing, ok}` |
 | Install what's missing | `ensure_tex_packages(tex_source, install=true)` |
 | Float-only needs | `float_packages(tex_source)` — `placeins/float/dblfloatfix` for `force`/`barrier`/wide+bottom |
