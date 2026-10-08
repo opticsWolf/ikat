@@ -22,6 +22,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 |---|---|
 | Full document (numbering, captions, bib) | `build_document(md_text, toml_src, spec)` or `build_from_paths(md, toml, spec)` → `BuildResult(tex, ...)` |
 | Single figure, no registries | `weave_fragment(md, toml_src)` → `[Element]` |
+| Flowchart → tikzpicture | `flowchart_to_tikz(src)` — `graph TD/LR` subset + `subgraph` clusters; longest-path layers; crossing edges auto-reroute |
 | Build the spec | `spec_from_dict(raw)` — the ONE constructor (CLI `--spec` and MCP `spec_json` share it); unknown keys ignored |
 | Bar chart / line plot → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword, or `load_preset(path_or_json)` for benchmark JSON |
 | Sequence diagram → tikzpicture | `flowchart_to_tikz("sequenceDiagram\n...")` — same entry point, header dispatch; `participant`/`actor`, `->>` solid, `-->>` dashed, `alt`/`else`/`opt`/`end` (strict subset: `loop`/`par`/`Note`/self-msgs error) |

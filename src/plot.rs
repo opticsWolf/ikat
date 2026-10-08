@@ -69,44 +69,8 @@ enum Obstacle {
     Bar((f64, f64, f64, f64)),
 }
 
-fn pt_in_rect(x: f64, y: f64, r: (f64, f64, f64, f64)) -> bool {
-    x >= r.0 && x <= r.2 && y >= r.1 && y <= r.3
-}
-
-fn orient(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> f64 {
-    (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-}
-
-fn on_seg(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> bool {
-    cx >= ax.min(bx) && cx <= ax.max(bx) && cy >= ay.min(by) && cy <= ay.max(by)
-}
-
-fn segs_cross(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
-    let (o1, o2, o3, o4) = (
-        orient(a.0, a.1, b.0, b.1, c.0, c.1),
-        orient(a.0, a.1, b.0, b.1, d.0, d.1),
-        orient(c.0, c.1, d.0, d.1, a.0, a.1),
-        orient(c.0, c.1, d.0, d.1, b.0, b.1),
-    );
-    ((o1 > 0.0) != (o2 > 0.0) && (o3 > 0.0) != (o4 > 0.0))
-        || (o1 == 0.0 && on_seg(a.0, a.1, b.0, b.1, c.0, c.1))
-        || (o2 == 0.0 && on_seg(a.0, a.1, b.0, b.1, d.0, d.1))
-        || (o3 == 0.0 && on_seg(c.0, c.1, d.0, d.1, a.0, a.1))
-        || (o4 == 0.0 && on_seg(c.0, c.1, d.0, d.1, b.0, b.1))
-}
-
-fn seg_hits_rect(x1: f64, y1: f64, x2: f64, y2: f64, r: (f64, f64, f64, f64)) -> bool {
-    pt_in_rect(x1, y1, r)
-        || pt_in_rect(x2, y2, r)
-        || segs_cross((x1, y1), (x2, y2), (r.0, r.1), (r.2, r.1))
-        || segs_cross((x1, y1), (x2, y2), (r.2, r.1), (r.2, r.3))
-        || segs_cross((x1, y1), (x2, y2), (r.2, r.3), (r.0, r.3))
-        || segs_cross((x1, y1), (x2, y2), (r.0, r.3), (r.0, r.1))
-}
-
-fn rects_overlap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
-    a.0 < b.2 && a.2 > b.0 && a.1 < b.3 && a.3 > b.1
-}
+// Segment geometry lives in `layout.rs` now (moved, not rewritten).
+use crate::layout::{rects_overlap, seg_hits_rect};
 
 /// Candidate legend box for a corner, on the *visual* axis ranges
 /// (see callers). Deliberately oversized — 30% of the x-range by

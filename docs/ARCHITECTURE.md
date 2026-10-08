@@ -118,6 +118,21 @@ in the code for the D.1 subgraph boxes to reuse. `[*]` renders
 as a filled dot (start) and bullseye (end); nested composites
 are a build error.
 
+Phase D.1 (`layout.rs`, `mermaid.rs`): the legend resolver's
+segment geometry (`segs_cross`, `seg_hits_rect`) moved here and
+is reused, not rewritten. `depths()` is longest-path layering
+(multi-parent = max+1; cyclic depths cap at n, still
+terminating). `subgraph ID [title]`…`end` clusters draw
+post-layout via the shared `cluster_box`/`cluster_rect`
+(same numbers as state composites). Edges crossing a
+non-endpoint node box (conservative 3.4×0.9cm estimate)
+reroute via a pushed perpendicular midpoint (8 pushes;
+exhaustion names the edge); clear segments emit the exact
+historical line, so clean graphs are provably untouched. The
+showcase Figure 1 re-laid under max-depth (reviewed, clean);
+the golden main paper never calls the emitter (precompiled
+mode), so it stays byte-identical by construction.
+
 ### 3.2 `plot.rs` — data → pgfplots
 
 Two emitters, no plotting library: `barchart` (grouped bars with

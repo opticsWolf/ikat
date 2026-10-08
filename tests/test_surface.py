@@ -120,6 +120,24 @@ def test_state_mcp_parity():
     assert "circle,draw" in mcp_server.flowchart_to_tikz(STATE)
 
 
+SUB = ("graph TD\nsubgraph ours[Our box]\na[x]-->b[y]\nend\nb-->c[z]\n")
+
+
+def test_subgraph_cli(capsys, monkeypatch):
+    import sys
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(SUB))
+    assert cli_main(["flowchart", "-"]) == 0
+    out = capsys.readouterr().out
+    assert "rectangle" in out and "{Our box}" in out
+
+
+@needs_mcp
+def test_subgraph_mcp_parity():
+    from ikat import mcp_server
+
+    assert "{Our box}" in mcp_server.flowchart_to_tikz(SUB)
+
+
 def test_skeleton_commands(capsys):
     assert cli_main(["skeletons"]) == 0
     assert "plain" in capsys.readouterr().out

@@ -12,6 +12,7 @@ mod esc;
 mod md_spike;
 mod mermaid;
 mod plot;
+mod layout;
 mod preset;
 mod sequence;
 mod state;

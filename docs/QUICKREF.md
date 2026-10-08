@@ -53,7 +53,7 @@ cannot touch axis labels; the below row clears tick labels.
 
 | grammar | covered | errors |
 |---|---|---|
-| `graph TD/LR/...` | directions TD/TB/LR/RL/BT; nodes `[]` `{}` `([])` `[[]]`; edges `-->`, `---`, `==>` with `\|label\|`; chains, `;`, `%%`, `<br/>` | other directions/shapes, subgraphs, styling |
+| `graph TD/LR/...` | directions TD/TB/LR/RL/BT; nodes `[]` `{}` `([])` `[[]]`; edges `-->`, `---`, `==>` with `\|label\|`; chains, `;`, `%%`, `<br/>`; `subgraph ID [title]`…`end` (nesting errors); multi-parent takes max(parent)+1; crossing edges reroute (exhaustion errors) | other directions/shapes, styling, `{{}}`, dotted edges |
 | `sequenceDiagram` | `participant`/`actor` (+ `as` labels); `->>` solid, `-->>` dashed; `alt`/`else`/`opt`/`end` boxes | `loop`/`par`/`Note`/self-messages, anything else |
 | `stateDiagram-v2` | `[*]` endpoints; `A --> B [: label]`; `state "Label" as Name`; one composite level | nested composites, `direction`, notes |
 

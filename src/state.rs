@@ -28,7 +28,7 @@
 
 use std::collections::HashMap;
 
-use crate::emit::{edge_label_node, esc_label, tikz_node, unquote, PICTURE_HEAD};
+use crate::emit::{edge_label_node, tikz_node, unquote, PICTURE_HEAD};
 use crate::mermaid::{self, EdgeStyle, Shape};
 
 const START: &str = "__start";
@@ -184,39 +184,19 @@ pub fn to_tikz(src: &str) -> Result<String, String> {
         }
     }
     // Boxes second: layout is already frozen, members' coordinates
-    // are facts. Label outside above (same lesson as sequence).
+    // are facts. Shared `cluster_box` geometry + `cluster_rect`
+    // rendering — the same numbers the flowchart subgraph boxes
+    // use (the box-label rule lives on `cluster_box`).
     for c in &composites {
         let pts: Vec<(f64, f64)> = c
             .members
             .iter()
             .filter_map(|m| g.node_idx.get(m).map(|&i| xy[i]))
             .collect();
-        if pts.is_empty() {
+        let Some((r, at)) = crate::layout::cluster_box(&pts) else {
             return Err(format!("composite `{}` has no placed members", c.name));
-        }
-        let (x0, x1) = (
-            pts.iter().map(|p| p.0).fold(f64::INFINITY, f64::min) - 1.2,
-            pts.iter().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max) + 1.2,
-        );
-        // Box-label rule (shared with future subgraph boxes): label
-        // INSIDE at the top with a half-row of headroom (yt = top +
-        // 1.1 on a 2.4 row grid). Outside-above collides with edge
-        // labels crossing the top edge; inside-top only needs the
-        // first member's box to start 0.8 below the label — proven
-        // by the showcase Weave box, which struck `packages` before.
-        // Screen coords: y decreases downward, so the TOP edge is
-        // the max y plus headroom, the BOTTOM the min y minus room.
-        let (yt, yb) = (
-            pts.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max) + 1.1,
-            pts.iter().map(|p| p.1).fold(f64::INFINITY, f64::min) - 0.7,
-        );
-        out.push_str(&format!("  \\draw ({x0:.1},{yt:.1}) rectangle ({x1:.1},{yb:.1});\n"));
-        out.push_str(&format!(
-            "  \\node[anchor=north west,font=\\footnotesize\\itshape] at ({:.1},{:.1}) {{{}}};\n",
-            x0 + 0.1,
-            yt - 0.1,
-            esc_label(&c.name)
-        ));
+        };
+        out.push_str(&crate::emit::cluster_rect(&c.name, r, at));
     }
     for e in &g.edges {
         if let Some(lbl) = &e.label {

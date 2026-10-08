@@ -57,6 +57,16 @@ pub fn tikz_node(id: &str, x: f64, y: f64, style: &str, label: &str) -> String {
     )
 }
 
+/// Cluster/composite box: rect + inside-top label (the box-label
+/// rule: half-row headroom above the top member, label tucked just
+/// inside — outside-above struck edge labels in review).
+pub fn cluster_rect(text: &str, r: (f64, f64, f64, f64), at: (f64, f64)) -> String {
+    format!(
+        "  \\draw ({:.1},{:.1}) rectangle ({:.1},{:.1});\n  \\node[anchor=north west,font=\\footnotesize\\itshape] at ({:.1},{:.1}) {{{}}};\n",
+        r.0, r.1, r.2, r.3, at.0, at.1, esc_label(text)
+    )
+}
+
 /// Mid-edge label with the white knockout (text never struck).
 pub fn edge_label_node(lbl: &str) -> String {
     format!(
@@ -70,6 +80,15 @@ pub fn edge_label_node(lbl: &str) -> String {
 /// grammars — a style drift would break golden parity loudly.
 pub const PICTURE_HEAD: &str =
     "\\begin{tikzpicture}[>=Stealth,\n  every node/.style={align=center,font=\\small},\n  box/.style={draw,rounded corners=2pt,fill=gray!8},\n  dia/.style={draw,diamond,aspect=2,fill=blue!8},\n  stad/.style={draw,rounded corners=10pt,fill=gray!8},\n  sub/.style={draw,double,fill=gray!8}]\n";
+
+/// Knockout label pinned at an absolute point (rerouted edges:
+/// the midpoint carries the label instead of `midway`).
+pub fn placed_label_node(lbl: &str, x: f64, y: f64) -> String {
+    format!(
+        "\\node[fill=white,inner sep=1pt,font=\\footnotesize] at ({x:.1},{y:.1}) {{{}}}",
+        esc_label(lbl)
+    )
+}
 
 /// Mermaid lets label text wear one layer of double quotes; take it off.
 pub fn unquote(s: &str) -> String {
