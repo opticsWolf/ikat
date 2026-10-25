@@ -125,6 +125,23 @@ def standalone_figure(md_text: str) -> dict:
 
 
 @mcp.tool()
+def suggest_layout(md_text: str, toml_text: str = "", spec_json: str = "{}") -> dict:
+    """Measure floats, suggest span/pos/width per fence (auto-layout).
+
+    Advisory only: returns {suggestions, report}; nothing is
+    rewritten. Plots are report-only (the caller owns `plot_attrs`).
+    Errors name manuscript lines, like the weaver."""
+    import json as _json
+
+    from ikat import spec_from_dict as _spec_from_dict
+    from ikat.layout import report as _report
+    from ikat.layout import suggest as _suggest
+
+    suggs = _suggest(md_text, toml_text, _spec_from_dict(_json.loads(spec_json or "{}")))
+    return {"suggestions": suggs, "report": _report(suggs)}
+
+
+@mcp.tool()
 def check_tex_packages(tex_source: str) -> dict:
     """Which TeX packages a .tex source needs / misses (kpsewhich probe)."""
     return _check(tex_source)

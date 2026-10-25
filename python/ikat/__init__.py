@@ -26,6 +26,9 @@ from .document import BuildResult, BuildSpec, DiagramEntry, build_document
 from .document import build_from_paths, list_skeletons, list_templates, read_skeleton, read_template, template_path
 from .document import spec_from_dict, template_preset
 from .document import template_preset
+from .layout import apply as apply_layout
+from .layout import report as layout_report
+from .layout import suggest as suggest_layout
 from .preset import load_preset
 from .standalone import compile_standalone, fence_to_tikz, wrap_standalone
 from .pipeline import (
@@ -63,8 +66,11 @@ __all__ = [
     "ensure_tex_packages",
     "extract_fences",
     "figure_env",
+    "apply_layout",
     "flowchart_to_tikz",
+    "layout_report",
     "lineplot_to_tikz",
+    "suggest_layout",
     "load_preset",
     "package_needs",
     "preset_to_tikz",

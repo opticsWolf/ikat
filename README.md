@@ -66,12 +66,14 @@ ikat/
   src/            Rust core (pyo3): mermaid.rs (flowcharts), plot.rs
                   (pgfplots + legend auto-placement), table.rs, doc.rs,
                   esc.rs (unicode/citations), config.rs (ikat.toml),
+                  autolayout.rs (float measuring + policy),
                   texenv.rs (package scan), tectonic.rs (engine),
                   md_spike.rs (parser-spike harness, tests only)
   python/ikat/    thin wrappers: pipeline.py (fences/spans/floats),
                   document.py (BuildSpec assembly), compile.py (pdflatex
                   driver), texenv.py (kpsewhich/tlmgr), cli.py (`ikat`
-                  script), mcp_server.py (FastMCP stdio),
+                  script), mcp_server.py (FastMCP stdio), layout.py
+                  (suggest/apply/report for auto-layout),
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
   docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
@@ -113,6 +115,7 @@ ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{"title":"t",...}' | ikat barchart - [--legend top-left]
 ikat standalone fig.md --out fig.pdf   # one mermaid|chart fence → PDF
+ikat layout doc.md --toml ikat.toml [--apply]  # suggest span/pos/width, no TeX
 ikat version
 ```
 
@@ -138,6 +141,7 @@ python -m ikat.mcp_server
 | bar chart | `barchart_to_tikz` / `load_preset` | `ikat barchart` (JSON or `--preset`, `--legend`) | `barchart_to_tikz` (`preset_json=`) |
 | line plot | `lineplot_to_tikz` / `load_preset` | `ikat lineplot` (JSON or `--preset`, `--legend`) | `lineplot_to_tikz` (`preset_json=`) |
 | standalone | `compile_standalone` / `wrap_standalone` / `fence_to_tikz` | `ikat standalone` | `standalone_figure` (.tex only) |
+| auto-layout | `suggest_layout` / `apply_layout` / `layout_report` | `ikat layout [--apply]` | `suggest_layout` (advisory; plots report-only) |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |

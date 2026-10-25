@@ -269,6 +269,31 @@ locally with an HTML guard).
 *Acceptance:* `build.py` runs green, PDF is 6 pages with 2
 diagrams + 2 plots + 4 tables and 0 undefined citations.
 
+## Phase H — Auto-layout (M7.1) → 0.10.0
+
+Advisory auto-layouter: `ikat layout` measures every float and
+suggests `span`/`pos`/`width` with reasons; `--apply` rewrites
+fence attrs. No pagination simulation (only LaTeX knows text
+flow) — classification by measured size, LaTeX still places.
+Estimators: TikZ coord scan + `node_box` margins (diagrams),
+pgfplots defaults (plots), row-pitch + cell widths (tables);
+pictures/external PDFs keep hand attrs. Policy: `page_frac`
+pre-empt, section-lead bonus, wide ratio, crowding floor from
+placed node labels. Surfaces in the same commits: Rust core +
+`layout.py` (`suggest`/`apply`/`report`) + `ikat layout` CLI +
+` suggest_layout` MCP tool + QUICKREF/skills/ARCHITECTURE.
+Co-agent B1 bench (`examples/bench-layout/`, untracked scratch)
+drives `suggest_layout` over 10 PLOS papers: v2 distributions
+reproduce exactly under the final engine; showcase engine-vs-hand
+diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
+`barrier`). E1 closed as expected (PLOS is single-column; the
+1-col run puts everything in-flow).
+
+*Acceptance (M7 gate):* `cargo test` + `pytest` green
+(135 + 86), demo + showcase + regen + standalone + heads proofs
+build, golden byte-identical, auto-applied showcase copy builds
+8pp with 0 overfull and the hand float distribution.
+
 ## Tracked elsewhere (not ikat work)
 
 - **Paper track** (`paper/`): pending `[NOT YET MEASURED]`

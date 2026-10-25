@@ -96,6 +96,36 @@ def cmd_weave(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_layout(a: argparse.Namespace) -> int:
+    from ikat.layout import apply, report, suggest
+
+    spec = _spec_from_json(a.spec)
+    try:
+        if a.toml:
+            md = Path(a.md).read_text(encoding="utf-8")
+            toml_src = Path(a.toml).read_text(encoding="utf-8")
+            suggs = suggest(md, toml_src, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            suggs = suggest(md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if a.json:
+        import json as _json
+
+        print(_json.dumps(suggs, indent=1))
+        return 0
+    if a.apply:
+        new_md, n = apply(md, suggs)
+        if n:
+            Path(a.md).write_text(new_md, encoding="utf-8")
+        print(f"applied {n} placement(s) to {a.md}")
+        return 0
+    print(report(suggs))
+    return 0
+
+
 def cmd_check(a: argparse.Namespace) -> int:
     from ikat import check_tex_env, document_class, ensure_tex_packages, used_packages
 
@@ -307,6 +337,14 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--spec", default=None)
     w.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
     w.set_defaults(func=cmd_weave)
+
+    ly = sub.add_parser("layout", help="measure floats, suggest span/pos/width (no TeX needed)")
+    ly.add_argument("md")
+    ly.add_argument("--toml", default=None)
+    ly.add_argument("--spec", default=None)
+    ly.add_argument("--json", action="store_true", help="raw suggestion JSON")
+    ly.add_argument("--apply", action="store_true", help="rewrite fence attrs in place")
+    ly.set_defaults(func=cmd_layout)
 
     c = sub.add_parser("check", help="report missing TeX packages for a .tex file")
     c.add_argument("tex")

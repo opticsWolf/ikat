@@ -32,6 +32,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 | TeX env | `check_tex_env(tex)` report / `ensure_tex_packages(tex)` install+re-probe |
 | Templates | `list_templates()`, `template_path(name)`, `template_preset(name)`, `list_skeletons()` |
 | Bib keys | `bib_keys(bib_src)` — derive the cited-key set, never freeze it |
+| Auto-layout (M7.1) | `suggest_layout(md_text, toml_src="", spec=None)` → list of `{index kind key line est_w_cm est_h_cm span pos width action reason}`; `apply_layout(md, suggs)` → `(new_md, n_changed)` rewrites diagram/table attrs; `layout_report(suggs)` → human lines. Advisory: plots are report-only (caller owns `plot_attrs`); pictures/external PDFs keep hand attrs |
 
 ## BuildSpec registries (hand-owned, not inferred)
 

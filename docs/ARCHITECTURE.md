@@ -246,6 +246,37 @@ at parse time, not at TeX time.
   If the mapping ever drifts from the hand rules, this reddens
   before the golden does.
 
+### 3.6 `autolayout.rs` — measure floats, suggest `span`/`pos` (M7.1, Phase H — 0.9.2)
+
+Advisory only: nothing here rewrites anything. `suggest_layout`
+walks the manuscript exactly the way `convert()` pairs fences
+with registry entries (same strict-subset and registry errors,
+with lines), measures each float, and returns per-fence
+`(span, pos, width)` with a one-line reason carrying numbers.
+`--apply` (Python side) rewrites fence attrs; the weaver is
+untouched, so the golden paper is byte-identical with the feature
+present but uncalled.
+
+Measurement sources: diagrams scan their own emitted TikZ
+(`tikz_bbox` over `(x,y)` numerics — node ids and `axis cs:`
+skipped), padded by the `layout::node_box` halves (1.7/0.45) plus
+edge-label air; plots use pgfplots default geometry constants
+(the emitters set no dims); tables use row count × `\small`
+pitch and widest-cell-per-column × per-char width; precompiled
+pictures and external plot PDFs are unmeasurable and keep hand
+attrs. Policy (`[layout]`, new `LayoutPolicy` in `config.rs`):
+pre-empt non-lead content over `page_frac` of the text height to
+`page`; the section lead is exempt with `lead_bonus_cm` extra
+budget; short tables/plots pin `force`, short diagrams sit `here`;
+tables over `wide_ratio` × column go `wide`+`top`; `width=`
+shrinks for column overflow only (coordinates scale, text does
+not), floored by the crowding floor from placed `\node (ID) at`
+labels (same-rank pairs, `NODE_CHAR_CM` 0.21 calibrated on the
+showcase sequence) and capped at 15% over the fit. Acceptance:
+applied to a showcase copy, the engine reproduces the hand layout
+(8pp, identical distribution, 0 overfull — Fig 2 `0.57` vs hand
+`0.58`, Table 3 `force` vs hand `barrier`).
+
 ## 4. Python layer (`python/ikat/`)
 
 ### 4.1 `pipeline.py` — fences, spans, floats
@@ -410,5 +441,6 @@ workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
 Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
 0.6.0), parser switch (M5.4, Phase E — 0.7.0), line-numbered
 errors (M4.1, Phase F — 0.8.0), tectonic hardening (M4.10,
-Phase G — 0.9.0). No open milestones; tectonic crate embedding
-remains a Linux-CI exercise by design.
+Phase G — 0.9.0), auto-layout (M7.1, Phase H — 0.9.2/0.10.0).
+No open milestones; tectonic crate embedding remains a Linux-CI
+exercise by design.

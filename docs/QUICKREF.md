@@ -28,6 +28,7 @@ printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{...}' | ikat barchart - [--legend WORD]    # JSON payload, stdout tikzpicture
 echo '{...}' | ikat lineplot - [--legend WORD]
 ikat standalone FIG.md --out fig.pdf             # one mermaid|chart fence → PDF
+ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # no TeX needed
 ikat version
 ```
 
@@ -79,6 +80,34 @@ Fraction `width` scales TikZ coordinates, not text (no `transform
 shape`): labels stay full-size, so leave air around them.
 `[floats]` tuning (fractions, counters, `barrier_sections`) emits
 only when non-default.
+
+## Auto-layout (`ikat layout`, M7.1)
+
+Advisory, not automatic: measures every float and suggests
+`span`/`pos`/`width` with one-line reasons carrying numbers.
+`--apply` rewrites mermaid-fence and `%% table` attrs in place;
+plots are report-only (they ride `plot_attrs`, owned by the caller).
+Strict-subset and registry errors propagate with manuscript lines —
+a file that cannot weave cannot be measured.
+
+Policy (`[layout]` knobs, IEEE-ish defaults): short tables and
+plots pin with `force` ([H] prints at the paragraph); short
+diagrams sit with `here` (fail-soft `[h]`→`[ht]`); tall diagrams
+take a dedicated `page` — non-lead content taller than
+`page_frac` (0.6) of the text height is pre-empted there before
+any other test. A section's lead diagram is exempt and gets
+`lead_bonus_cm` (1.0) extra in-flow budget instead — section
+starts land near fresh columns. Tables wider than `wide_ratio`
+(1.25) × the column go `wide`+`top`. `width=` shrinks for column
+overflow only, never for height (coordinates scale, text does
+not: shrinking tall content crowds labels), floored by a crowding
+floor measured from placed node labels (`NODE_CHAR_CM` 0.21,
+same-rank pairs) and capped at 15% over the fit (flagged when
+capped). External graphics (precompiled diagrams, plot PDFs) keep
+hand attrs: size unknown. Full table: `textheight_cm` 23.0,
+`column_cm` 8.9, `textwidth_cm` 17.8, `caption_cm` 1.0,
+`here_max_cm` 7.0 (showcase-calibrated), `page_frac` 0.6,
+`min_width` 0.4.
 
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are

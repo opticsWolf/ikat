@@ -4,6 +4,7 @@
 
 use pyo3::prelude::*;
 
+mod autolayout;
 mod config;
 mod doc;
 mod error;
@@ -167,6 +168,19 @@ fn build_document(md_text: &str, toml_src: &str, spec_json: &str) -> PyResult<St
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
+/// Auto-layout (M7.1): measure every floatable fence in `md_text`
+/// and suggest `span`/`pos`/`width` per fence (`spec_json` is the
+/// same `BuildSpec` JSON `build_document` takes; `toml_src` may
+/// carry `[layout]` knobs). Returns a JSON list of suggestions —
+/// advisory only, nothing is rewritten. Raises `ValueError` on
+/// strict-subset or registry errors, with file lines.
+#[pyfunction]
+fn suggest_layout(md_text: &str, toml_src: &str, spec_json: &str) -> PyResult<String> {
+    let spec: doc::BuildSpec = serde_json::from_str(spec_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("spec: {e}")))?;
+    autolayout::suggest_layout_json(md_text, toml_src, &spec).map_err(verr)
+}
+
 /// BibTeX-safe derivative of a `.bib` source (brace bare authors,
 /// escape specials outside author/url/doi fields).
 #[pyfunction]
@@ -255,6 +269,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(used_packages, m)?)?;
     m.add_function(wrap_pyfunction!(document_class, m)?)?;
     m.add_function(wrap_pyfunction!(package_needs, m)?)?;
+    m.add_function(wrap_pyfunction!(suggest_layout, m)?)?;
     #[cfg(feature = "tectonic")]
     m.add_function(wrap_pyfunction!(compile_tectonic_pdf, m)?)?;
     Ok(())

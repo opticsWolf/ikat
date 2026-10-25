@@ -432,6 +432,104 @@ impl Floats {
     }
 }
 
+/// `[layout]` table: auto-layout policy knobs consumed by
+/// `ikat layout` (see `crate::autolayout`). Input-only — nothing
+/// here is emitted into TeX, so absent means defaults and the
+/// golden paper is untouched.
+///
+/// ```toml
+/// [layout]
+/// textheight_cm = 23.0
+/// column_cm = 8.9
+/// textwidth_cm = 17.8
+/// caption_cm = 1.0
+/// here_max_cm = 7.0
+/// page_frac = 0.6
+/// min_width = 0.4
+/// wide_ratio = 1.25
+/// lead_bonus_cm = 1.0
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutPolicy {
+    /// Usable column height (IEEE two-column page ≈ 23cm).
+    #[serde(default = "layout_textheight")]
+    pub textheight_cm: f64,
+    /// Single-column width (IEEE ≈ 3.5in = 8.9cm).
+    #[serde(default = "layout_column")]
+    pub column_cm: f64,
+    /// Full text width (IEEE ≈ 7in = 17.8cm).
+    #[serde(default = "layout_textwidth")]
+    pub textwidth_cm: f64,
+    /// Caption allowance added to content height in fit tests.
+    #[serde(default = "layout_caption")]
+    pub caption_cm: f64,
+    /// Tallest float (content + caption) that may sit in-flow (calibrated: the showcase sits a 6.8cm float in-flow).
+    #[serde(default = "layout_here_max")]
+    pub here_max_cm: f64,
+    /// Content taller than this fraction of the text height is a
+    /// dedicated-page float even before shrinking is tried.
+    #[serde(default = "layout_page_frac")]
+    pub page_frac: f64,
+    /// Narrowest `width=` the shrinker may emit (text never scales,
+    /// only coordinates, so below this labels crowd).
+    #[serde(default = "layout_min_width")]
+    pub min_width: f64,
+    /// Tables wider than this multiple of the column go `wide`.
+    /// X-columns wrap, so a table slightly over the column still
+    /// sets fine — only clearly wider ones earn full width.
+    #[serde(default = "layout_wide_ratio")]
+    pub wide_ratio: f64,
+    /// Extra in-flow budget (cm) for a section's lead diagram.
+    /// Section starts land near fresh columns, so the first float
+    /// has the best room odds; later floats face consumed columns.
+    #[serde(default = "layout_lead_bonus")]
+    pub lead_bonus_cm: f64,
+}
+
+fn layout_textheight() -> f64 {
+    23.0
+}
+fn layout_column() -> f64 {
+    8.9
+}
+fn layout_textwidth() -> f64 {
+    17.8
+}
+fn layout_caption() -> f64 {
+    1.0
+}
+fn layout_here_max() -> f64 {
+    7.0
+}
+fn layout_page_frac() -> f64 {
+    0.6
+}
+fn layout_min_width() -> f64 {
+    0.4
+}
+fn layout_wide_ratio() -> f64 {
+    1.25
+}
+fn layout_lead_bonus() -> f64 {
+    1.0
+}
+
+impl Default for LayoutPolicy {
+    fn default() -> Self {
+        Self {
+            textheight_cm: layout_textheight(),
+            column_cm: layout_column(),
+            textwidth_cm: layout_textwidth(),
+            caption_cm: layout_caption(),
+            here_max_cm: layout_here_max(),
+            page_frac: layout_page_frac(),
+            min_width: layout_min_width(),
+            wide_ratio: layout_wide_ratio(),
+            lead_bonus_cm: layout_lead_bonus(),
+        }
+    }
+}
+
 /// Whole-file configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -445,6 +543,8 @@ pub struct Config {
     pub typography: Typography,
     #[serde(default)]
     pub template: Template,
+    #[serde(default)]
+    pub layout: LayoutPolicy,
 }
 
 impl Config {

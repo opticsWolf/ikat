@@ -465,6 +465,20 @@ ROADMAP M4.10 DONE, ARCHITECTURE §3.5 updated (prototype →
 
 ---
 
+## Phase H — Auto-layout (M7.1) → 0.10.0
+
+Advisory `ikat layout`: Rust measure (`src/autolayout.rs`) +
+`layout.py` (`suggest`/`apply`/`report`) + CLI `layout`
+(`--json`/`--apply`) + MCP `suggest_layout` + `[layout]` knobs
+in `config.rs`, all in the feature commits (Rule 4: QUICKREF +
+skills in the same commits). Default-off and weave-untouched, so
+golden parity holds by construction. Acceptance proof is a
+showcase COPY in TEMP (never staged): apply + build + render —
+engine must reproduce the hand layout (8pp, 0 overfull). Bumps:
+feature → 0.9.2, gate → 0.10.0.
+
+---
+
 ## Standing rules (all phases)
 
 1. Golden paper never moves without intent; byte parity is the
