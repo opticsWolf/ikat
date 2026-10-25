@@ -1,9 +1,10 @@
 # ikat roadmap
 
-Status 2026-10-08 (Phase G gate, 0.9.0): Phases 1, 2 (plots),
+Status 2026-10-25 (Phase H gate, 0.10.0): Phases 1, 2 (plots),
 3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
 heading guards), E (parser switch), F (line-numbered errors),
-G (tectonic hardening) done — 118 cargo + 76 pytest green,
+G (tectonic hardening), H (auto-layout) done — 136 cargo + 86
+pytest green,
 showcase (10 pages, 4 diagrams) + regen + standalone + heads
 proofs build under pdflatex AND tectonic, golden paper
 byte-identical (`ebe698db`), 0 undefined citations both
