@@ -39,7 +39,10 @@
 //! for column overflow only, never for height (coordinates scale,
 //! text does not — shrinking tall content crowds labels), floored
 //! by the crowding floor measured from placed node labels and
-//! capped at 15% over the fit (flagged when capped).
+//! capped at 15% over the fit (flagged when capped). A `wide`
+//! float declared after `late_wide_lines` prose lines earns a
+//! move-the-fence note (page-top floats declared late strand
+//! trailing pages) — advisory, the engine never reorders.
 
 use crate::config::{LayoutPolicy, Pos, Span};
 use crate::doc::{fence_attr_str, parse_attrs, BuildSpec};
@@ -550,11 +553,18 @@ pub fn suggest_layout(
     // Diagrams since the last `##` section: the first one is the
     // section lead (fresh-column odds, inflow bonus in policy).
     let mut section_diagrams = 0usize;
+    // Non-empty prose lines since the last float or section start:
+    // a `wide` float declared after a wall of prose strands pages.
+    let mut prose_lines = 0usize;
     for b in blocks(md_text)? {
         let line = b.line;
         match b.kind {
             MdKind::H2(_) => {
                 section_diagrams = 0;
+                prose_lines = 0;
+            }
+            MdKind::Para(para) => {
+                prose_lines += para.iter().filter(|l| !l.trim().is_empty()).count();
             }
             MdKind::Fence { info: s, body: fence_body } => {
                 if !s.contains("mermaid") {
@@ -588,11 +598,13 @@ pub fn suggest_layout(
                 let (w1, h1, floor) = natural.unwrap_or((0.0, 0.0, 0.0));
                 let lead = section_diagrams == 0;
                 section_diagrams += 1;
-                let (span, pos, width, reason) = if kind == "picture" {
+                let (span, pos, width, mut reason) = if kind == "picture" {
                     suggest_for(p, "picture", w1, h1, &cur_span, &cur_pos, false, 0.0)
                 } else {
                     suggest_for(p, "diagram", w1, h1, &cur_span, &cur_pos, lead, floor)
                 };
+                reason.push_str(&late_note(p, &span, prose_lines));
+                prose_lines = 0;
                 let same_width = match (attrs.width.as_deref(), width) {
                     (None, None) => true,
                     (Some(a), Some(w)) => a.parse::<f64>().map(|v| (v - w).abs() < 0.005).unwrap_or(false),
@@ -632,7 +644,9 @@ pub fn suggest_layout(
                 let (w1, h1) = measure_table(&rows);
                 let cur_span = tattrs.span.map(|s| span_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let cur_pos = tattrs.pos.map(|s| pos_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
-                let (span, pos, width, reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
+                let (span, pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
+                reason.push_str(&late_note(p, &span, prose_lines));
+                prose_lines = 0;
                 let action = if cur_span == span && cur_pos == pos { "keep" } else { "change" };
                 out.push(Suggestion {
                     index: table_idx,
@@ -722,6 +736,20 @@ fn parse_loose_attrs(cur: &str) -> (String, String, Option<f64>) {
     (span, pos, width)
 }
 
+/// Move-the-fence note: a `wide` float declared after a wall of
+/// prose strands a trailing page (page-top floats need a top at or
+/// after their declaration). Advisory — the engine never reorders,
+/// it only names the fix.
+fn late_note(p: &LayoutPolicy, span: &str, prose_lines: usize) -> String {
+    if span == "wide" && prose_lines > p.late_wide_lines {
+        format!(
+            "; declared {prose_lines} prose lines into the section — likely strands a trailing page: move the fence above the prose (right after the section heading)"
+        )
+    } else {
+        String::new()
+    }
+}
+
 /// JSON envelope for the Python side.
 pub fn suggest_layout_json(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<String, Error> {
     let suggs = suggest_layout(md_text, toml_src, spec)?;
@@ -743,6 +771,7 @@ mod tests {
             min_width: 0.4,
             wide_ratio: 1.25,
             lead_bonus_cm: 1.0,
+            late_wide_lines: 15,
         }
     }
 
@@ -791,6 +820,14 @@ mod tests {
         let (span, pos, width, _) = suggest_for(&pol(), "table", 6.0, 4.0, "default", "default", false, 0.0);
         assert_eq!((span.as_str(), pos.as_str()), ("column", "force"), "short table pins");
         assert!(width.is_none());
+    }
+
+    #[test]
+    fn late_wide_table_names_the_fix() {
+        // Pure policy knows nothing of prose: the note is walk state.
+        assert_eq!(late_note(&pol(), "wide", 20), "; declared 20 prose lines into the section — likely strands a trailing page: move the fence above the prose (right after the section heading)");
+        assert!(late_note(&pol(), "wide", 3).is_empty());
+        assert!(late_note(&pol(), "column", 20).is_empty());
     }
 
     #[test]

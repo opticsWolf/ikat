@@ -86,6 +86,22 @@ def test_h2_resets_section_lead():
     assert "lead" in second["reason"], second["reason"]
 
 
+def test_late_wide_table_names_the_fix():
+    prose = "\n".join(f"Prose line {i} fills the column." for i in range(20))
+    md = f"# T\n\n## 1. A\n\n{prose}\n\n{WIDE_TABLE}\n"
+    spec = _spec(captions=["W."])
+    (s,) = suggest_layout(md, "", spec)
+    assert s["span"] == "wide" and s["pos"] == "top", s
+    assert "move the fence" in s["reason"], s["reason"]
+
+
+def test_section_head_wide_table_is_quiet():
+    md = f"# T\n\n## 1. A\n\n{WIDE_TABLE}\n"
+    (s,) = suggest_layout(md, "", _spec(captions=["W."]))
+    assert s["span"] == "wide", s
+    assert "move the fence" not in s["reason"], s["reason"]
+
+
 def test_apply_rewrites_and_converges():
     md = f"# T\n\n## 1. A\n\n{TINY_DIAGRAM}\n{SMALL_TABLE}\n"
     spec = _spec(diagrams=[("d0", "Tiny.")], captions=["S."])

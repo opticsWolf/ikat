@@ -103,11 +103,14 @@ overflow only, never for height (coordinates scale, text does
 not: shrinking tall content crowds labels), floored by a crowding
 floor measured from placed node labels (`NODE_CHAR_CM` 0.21,
 same-rank pairs) and capped at 15% over the fit (flagged when
-capped). External graphics (precompiled diagrams, plot PDFs) keep
+capped). A `wide` float declared after `late_wide_lines` (15)
+prose lines earns a move-the-fence note — page-top floats declared
+late strand trailing pages; the engine advises, never reorders.
+External graphics (precompiled diagrams, plot PDFs) keep
 hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 `column_cm` 8.9, `textwidth_cm` 17.8, `caption_cm` 1.0,
 `here_max_cm` 7.0 (showcase-calibrated), `page_frac` 0.6,
-`min_width` 0.4.
+`min_width` 0.4, `late_wide_lines` 15.
 
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are

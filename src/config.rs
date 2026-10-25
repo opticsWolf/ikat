@@ -448,6 +448,7 @@ impl Floats {
 /// min_width = 0.4
 /// wide_ratio = 1.25
 /// lead_bonus_cm = 1.0
+/// late_wide_lines = 15
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutPolicy {
@@ -479,6 +480,13 @@ pub struct LayoutPolicy {
     /// sets fine — only clearly wider ones earn full width.
     #[serde(default = "layout_wide_ratio")]
     pub wide_ratio: f64,
+    /// A `wide` float declared more prose lines than this after
+    /// the section start (or the previous float) earns a move-the-
+    /// fence note: page-top floats declared late strand trailing
+    /// pages (showcase Table 4 lived alone on p8 until its fence
+    /// moved above the prose).
+    #[serde(default = "layout_late_wide")]
+    pub late_wide_lines: usize,
     /// Extra in-flow budget (cm) for a section's lead diagram.
     /// Section starts land near fresh columns, so the first float
     /// has the best room odds; later floats face consumed columns.
@@ -513,6 +521,9 @@ fn layout_wide_ratio() -> f64 {
 fn layout_lead_bonus() -> f64 {
     1.0
 }
+fn layout_late_wide() -> usize {
+    15
+}
 
 impl Default for LayoutPolicy {
     fn default() -> Self {
@@ -526,6 +537,7 @@ impl Default for LayoutPolicy {
             min_width: layout_min_width(),
             wide_ratio: layout_wide_ratio(),
             lead_bonus_cm: layout_lead_bonus(),
+            late_wide_lines: layout_late_wide(),
         }
     }
 }

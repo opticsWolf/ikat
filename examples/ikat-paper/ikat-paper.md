@@ -246,6 +246,15 @@ in the tree.
 
 ## 5. Engines and templates
 
+%% table {span=wide}
+
+| Token | Fills from | Required |
+|---|---|---|
+| `{{title}}` `{{author}}` `{{thanks}}` | manuscript H1, spec author and thanks | as level 1, braces included |
+| `{{body}}` | woven floats, tables, and text | exactly once, always |
+| `{{bibliography}}` | style plus staged `.bib` name | exactly once unless `bib_name` is empty |
+| `{{abstract}}` | the whole woven abstract env | exactly once when the manuscript has one |
+
 %% table {pos=barrier}
 
 | Question | pdflatex (default) | tectonic (optional) |
@@ -283,7 +292,8 @@ checksum-pinned binary, both in the tree.
 ## 6. Appendix: skeleton token contract
 
 The contract is small on purpose: four token families cover title,
-body, bibliography, and abstract, each filled exactly once.
+body, bibliography, and abstract, each filled exactly once (Table 3
+above lists all four).
 `{{thanks}}` rides with `{{title}}` because only some heads set it;
 empty thanks emit nothing rather than an empty footnote.
 `{{bibliography}}` is conditional on `bib_name`: an engine that
@@ -298,12 +308,3 @@ build directory holds exactly that set after one command: woven
 `.tex`, staged `.bib`, and standalone plot PDFs beside it. Nothing
 in the manuscript names an engine or a template, so the same
 sources submit anywhere a head exists.
-
-%% table {span=wide}
-
-| Token | Fills from | Required |
-|---|---|---|
-| `{{title}}` `{{author}}` `{{thanks}}` | manuscript H1, spec author and thanks | as level 1, braces included |
-| `{{body}}` | woven floats, tables, and text | exactly once, always |
-| `{{bibliography}}` | style plus staged `.bib` name | exactly once unless `bib_name` is empty |
-| `{{abstract}}` | the whole woven abstract env | exactly once when the manuscript has one |
