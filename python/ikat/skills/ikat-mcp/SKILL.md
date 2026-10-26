@@ -21,6 +21,14 @@ description: >
   "cwd": "/path/to/ikat" } } }
 ```
 
+The server also serves the bundled skill packs as resources —
+`skill://ikat` (general guide), `skill://ikat-api`, `skill://ikat-cli`,
+`skill://ikat-mcp` — so an MCP-only host can read them without a repo
+checkout. Every tool carries MCP annotations (readOnlyHint etc.): all
+are local, network-free computation except `ensure_tex_packages` (tlmgr
+installs into the TeX environment). Schemas carry per-parameter
+descriptions; `legend` is an enum.
+
 ## Which tool when
 
 | Need | Tool |

@@ -295,6 +295,25 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.9 — MCP schema fidelity + bundled skills (gossamer-audit transfer) → 0.10.11
+
+An audit of the gossamer MCP surface (registry-driven, drift-tested,
+but with lossy schemas) transferred here: ikat's FastMCP tools now
+carry per-parameter descriptions and enum constraints in the
+inputSchema (`legend` renders as a real enum; previously every
+parameter was an undescribed bare type), every tool declares MCP
+annotations (readOnly/destructive/idempotent/openWorld — all tools
+are local, network-free, read-only computation except
+`ensure_tex_packages`, the one tlmgr-mutating tool), and the server
+sets `instructions` describing the weave-here-compile-via-CLI
+doctrine. The four agent skills moved into the package
+(`python/ikat/skills/`, ships in the wheel) and are served as
+resources `skill://ikat*` so MCP-only hosts can read them; drift
+tests pin every taught CLI command, MCP tool, and API name to the
+live surfaces, frontmatter name/description validity included. The
+CLI reconfigures stdio to UTF-8 so unicode error echoes cannot crash
+a cp1252 console.
+
 ## M7.8b — Calibrated display-math width (probe, don't guess) → 0.10.10
 
 The M7.8 estimator's guessed constants (0.16–0.35 cm/char) mis-sized

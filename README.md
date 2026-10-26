@@ -77,7 +77,8 @@ ikat/
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
   docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
-  skills/          Agent Skills: ikat guide, ikat-api, ikat-cli, ikat-mcp
+  python/ikat/skills/  Agent Skills (bundled in the wheel, served as MCP
+                  resources): ikat guide, ikat-api, ikat-cli, ikat-mcp
   examples/       mini.md starter + ikat-paper/ showcase (6-page paper
                   built by ikat itself), plot/float/skeleton proofs
 ```
@@ -97,9 +98,9 @@ cargo test                       # Rust unit tests
 
 Use ikat programmatically through its Python API, automate it with the
 CLI, or connect the optional stdio MCP server as agent tools. The repo
-also includes focused [Python API](skills/ikat-api/SKILL.md),
-[CLI](skills/ikat-cli/SKILL.md), and [MCP](skills/ikat-mcp/SKILL.md)
-skills, plus a general [ikat guide](skills/ikat/SKILL.md). These interfaces
+also includes focused [Python API](python/ikat/skills/ikat-api/SKILL.md),
+[CLI](python/ikat/skills/ikat-cli/SKILL.md), and [MCP](python/ikat/skills/ikat-mcp/SKILL.md)
+skills, plus a general [ikat guide](python/ikat/skills/ikat/SKILL.md). These interfaces
 use the same Rust-backed pipeline; the skills guide the agent but do not
 install or run ikat.
 

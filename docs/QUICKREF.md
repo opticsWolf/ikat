@@ -216,7 +216,7 @@ The same Rust-backed operations are available through four entry points:
 - **Python API:** build documents and emit TikZ/pgfplots in process.
 - **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, `standalone`, templates, and skeletons.
 - **MCP:** optional stdio tools for connected agents; install `mcp>=1,<2` and run `python -m ikat.mcp_server`.
-- **Skills:** focused [Python API](../skills/ikat-api/SKILL.md), [CLI](../skills/ikat-cli/SKILL.md), and [MCP](../skills/ikat-mcp/SKILL.md) guides, plus a general [ikat guide](../skills/ikat/SKILL.md). Install a chosen skill directory in the agent's configured skill location.
+- **Skills:** focused [Python API](../python/ikat/skills/ikat-api/SKILL.md), [CLI](../python/ikat/skills/ikat-cli/SKILL.md), and [MCP](../python/ikat/skills/ikat-mcp/SKILL.md) guides, plus a general [ikat guide](../python/ikat/skills/ikat/SKILL.md). Install a chosen skill directory in the agent's configured skill location.
 
 ## Python API
 

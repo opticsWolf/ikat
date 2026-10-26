@@ -409,7 +409,26 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _configure_utf8_stdio() -> None:
+    """Prefer UTF-8 CLI output without breaking captured streams.
+
+    Error echoes carry manuscript text (and tikz output can carry
+    unicode through passthrough math), which mojibakes or crashes a
+    cp1252 console. Reconfigure when the stream allows it; leave
+    wrapped/closed streams alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (OSError, TypeError, ValueError):
+            continue
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_utf8_stdio()
     a = build_parser().parse_args(argv)
     try:
         return a.func(a)

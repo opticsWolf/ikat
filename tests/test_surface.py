@@ -191,6 +191,136 @@ def test_version(capsys):
     assert capsys.readouterr().out.strip() == __version__
 
 
+# ──── MCP schema fidelity + annotations (gossamer-audit transfer) ────
+
+
+@needs_mcp
+def test_mcp_schemas_carry_descriptions_and_enums():
+    import asyncio
+
+    from ikat import mcp_server
+
+    assert mcp_server.mcp.instructions, "server instructions unset"
+    tools = {t.name: t for t in asyncio.run(mcp_server.mcp.list_tools())}
+    assert len(tools) == 14
+    for name, t in tools.items():
+        for pname, prop in (t.inputSchema or {}).get("properties", {}).items():
+            assert prop.get("description"), f"{name}.{pname} lacks a schema description"
+    legend = tools["barchart_to_tikz"].inputSchema["properties"]["legend"]
+    assert legend["enum"] == ["auto", "below", "top-left", "top-right",
+                              "bottom-left", "bottom-right", "outside-right"]
+    assert tools["lineplot_to_tikz"].inputSchema["properties"]["legend"]["enum"] == legend["enum"]
+
+
+@needs_mcp
+def test_mcp_annotations_pure_vs_install():
+    import asyncio
+
+    from ikat import mcp_server
+
+    tools = {t.name: t for t in asyncio.run(mcp_server.mcp.list_tools())}
+    assert tools["ensure_tex_packages"].annotations.readOnlyHint is False
+    assert tools["ensure_tex_packages"].annotations.openWorldHint is True
+    for name, t in tools.items():
+        if name == "ensure_tex_packages":
+            continue
+        ann = t.annotations
+        assert ann.readOnlyHint is True, f"{name} should be read-only"
+        assert ann.destructiveHint is False, f"{name} should be non-destructive"
+        assert ann.openWorldHint is False, f"{name} should be network-free"
+
+
+@needs_mcp
+def test_mcp_skill_resources():
+    import asyncio
+
+    from ikat import mcp_server
+
+    resources = {str(r.uri): r for r in asyncio.run(mcp_server.mcp.list_resources())}
+    assert set(resources) == {"skill://ikat", "skill://ikat-api",
+                              "skill://ikat-cli", "skill://ikat-mcp"}
+    result = asyncio.run(mcp_server.mcp.read_resource("skill://ikat-cli"))
+    from ikat.skills import skill_text
+
+    assert result[0].content == skill_text("ikat-cli")  # verbatim bundle
+
+
+# ──── Skill drift: the bundled SKILL.md files cannot rot ────
+
+
+def _commands_taught(skill_text: str) -> set[str]:
+    """`ikat CMD` subcommands taught inside fenced code blocks."""
+    import re
+
+    fences = re.findall(r"```(?:bash|sh)?\n(.*?)```", skill_text, re.DOTALL)
+    taught = set()
+    for fence in fences:
+        for line in fence.splitlines():
+            for piece in re.split(r"\||&&|;", line):
+                piece = piece.strip()
+                if piece.startswith("ikat "):
+                    taught.add(piece.split()[1])
+    return taught
+
+
+def test_skill_frontmatter_is_valid():
+    from ikat.skills import iter_skills
+
+    pairs = dict(iter_skills())  # raises when a frontmatter rots
+    assert set(pairs) == {"ikat", "ikat-api", "ikat-cli", "ikat-mcp"}
+    assert all(pairs.values())
+
+
+def test_cli_skill_teaches_real_commands():
+    from ikat.cli import build_parser
+    from ikat.skills import skill_text
+
+    taught = _commands_taught(skill_text("ikat-cli"))
+    real = set(build_parser()._subparsers._group_actions[0].choices)
+    phantom = taught - real
+    assert not phantom, f"ikat-cli SKILL.md teaches phantom commands: {sorted(phantom)}"
+    missing = real - taught
+    assert not missing, f"ikat-cli SKILL.md never mentions: {sorted(missing)}"
+
+
+@needs_mcp
+def test_mcp_skill_teaches_real_tools():
+    import asyncio
+    import re
+
+    from ikat import mcp_server
+    from ikat.skills import skill_text
+
+    text = skill_text("ikat-mcp")
+    named = set(re.findall(r"\b([a-z][a-z_]{3,})\(", text))
+    real = {t.name for t in asyncio.run(mcp_server.mcp.list_tools())}
+    phantom = {n for n in named
+               if n not in real and not hasattr(mcp_server, n) and n not in ikat_exports()}
+    assert not phantom, f"ikat-mcp SKILL.md names phantom tools: {sorted(phantom)}"
+    for tool in real:
+        assert tool in text, f"ikat-mcp SKILL.md never mentions {tool}"
+
+
+def ikat_exports():
+    import ikat
+
+    return set(ikat.__all__)
+
+
+def test_api_skill_names_real_exports():
+    import builtins
+    import re
+
+    import ikat
+    from ikat.skills import skill_text
+
+    text = skill_text("ikat-api")
+    named = set(re.findall(r"\b([a-z][a-z_]{3,})\(", text))
+    phantom = {n for n in named
+               if n not in ikat.__all__ and not hasattr(builtins, n)}
+    assert not phantom, f"ikat-api SKILL.md names phantom calls: {sorted(phantom)}"
+
+
 @needs_mcp
 def test_mcp_tools_registered():
     from ikat import mcp_server
