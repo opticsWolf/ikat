@@ -41,6 +41,9 @@ from ikat import BuildSpec, DiagramEntry, apply_layout, build_document, compile_
 
 import pymupdf  # noqa: E402  (AGPL, bench-only like fetch.py)
 
+from mml import EQ_PRE, eq_mark, merge_math, split_displays  # noqa: E402
+from mml import mathify as mml_mathify, mml_to_tex  # noqa: E402  (M7.8 honest math)
+
 MIN_AREA_CM2 = 5.0  # bench-proven bar: kills logos, equation shards, rule tiles
 PT_CM = 2.54 / 72
 COL_CM = 8.9
@@ -93,6 +96,7 @@ FOLD = {
     "\u0142": "l", "\u0141": "L", "\u00f8": "o", "\u00d8": "O",
     "\u00e6": "ae", "\u00c6": "Ae", "\u0153": "oe", "\u00df": "ss",
     "\u0111": "d", "\u014b": "ng", "\u0131": "i",
+    "\u01bb": "$\\zeta$", "\u049f": "$\\beta$", "\u0277": "k",
     "\u03c5": "$\\upsilon$", "\u03f5": "$\\epsilon$", "\u03d0": "$\\beta$",
     "\u03d1": "$\\theta$", "\u03d5": "$\\phi$", "\u03d6": "$\\varpi$",
     "\u2254": "$:=$", "\u2261": "$\\equiv$", "\u25c7": "$\\diamond$",
@@ -149,6 +153,8 @@ def clean_prose(s: str, ctx: Ctx, what: str) -> str:
     if "[ [`ref" in s:
         ctx.stats["brackets"] = ctx.stats.get("brackets", 0) + s.count("[ [`ref")
         s = s.replace("[ [`ref", "[[`ref")
+    # M7.8: fuse JATS-split math spans before the weave guard counts $.
+    s = merge_math(s)
     return mathsafe(s, ctx.stats, what)
 
 
@@ -161,6 +167,8 @@ class Ctx:
         self.refkey = {}   # rid -> refNN
         self.stats = {}
         self.dropped = {}
+        self.displays = []  # (tex, label) display formulas in order
+        self.converted = 0  # MathML formulas reconstructed (M7.8)
 
 
 def rich_text(el: ET.Element, ctx: Ctx) -> str:
@@ -175,14 +183,20 @@ def rich_text(el: ET.Element, ctx: Ctx) -> str:
                     parts.append(f" [`{ctx.refkey[rid]}`]")
             return
         if t in ("sup",):
-            inner = fold("".join(node.itertext()), ctx.stats)
-            # MathML inside (mi gamma etc.) already folds to $..$:
-            # wrapping again nests math spans and kills pdflatex.
-            parts.append(mathsafe(inner, ctx.stats, t) if "$" in inner else f"$^{{{inner}}}$")
+            inner = "".join(node.itertext())
+            if "$" in inner:
+                parts.append(mathsafe(inner, ctx.stats, t))
+            else:
+                parts.append("$^{%s}$" % mml_mathify(inner, ctx.stats))
             return
         if t in ("sub",):
-            inner = fold("".join(node.itertext()), ctx.stats)
-            parts.append(mathsafe(inner, ctx.stats, t) if "$" in inner else f"$_{{{inner}}}$")
+            inner = "".join(node.itertext())
+            if "$" in inner:
+                parts.append(mathsafe(inner, ctx.stats, t))
+            else:
+                # mathify: a JATS-level beta next to math must become
+                # \beta inside the span, not a raw Unicode beta.
+                parts.append("$_{%s}$" % mml_mathify(inner, ctx.stats))
             return
         if t in ("italic", "i"):
             parts.append("*" + fold("".join(node.itertext()), ctx.stats) + "*")
@@ -193,9 +207,23 @@ def rich_text(el: ET.Element, ctx: Ctx) -> str:
         if t in ("ext-link", "uri"):
             parts.append(fold("".join(node.itertext()), ctx.stats))
             return
-        if t in ("inline-formula", "disp-formula"):
-            ctx.dropped["formula"] = ctx.dropped.get("formula", 0) + 1
-            parts.append(fold("".join(node.itertext()), ctx.stats))
+        if t == "inline-formula":
+            # M7.8: reconstruct one structured span (fractions keep
+            # their bar, sub/superscripts nest) instead of flattening
+            # per-symbol $..$ fragments that can never line-break.
+            kids = [c for c in node if isinstance(c.tag, str)]
+            m = next((c for c in kids if local(c.tag) == "math"), kids[0] if kids else None)
+            tex = mml_to_tex(m, ctx.stats) if m is not None else ""
+            ctx.converted += 1
+            parts.append("$%s$" % tex if tex else "")
+            return
+        if t == "disp-formula":
+            kids = [c for c in node if isinstance(c.tag, str)]
+            m = next((k for k in kids if local(k.tag) == "math"), kids[0] if kids else None)
+            tex = mml_to_tex(m, ctx.stats) if m is not None else ""
+            lab = (node.findtext("label") or "").strip()
+            ctx.displays.append((tex, lab))
+            parts.append("\ue000%d\ue001" % (len(ctx.displays) - 1))
             return
         if node.text:
             parts.append(fold(node.text, ctx.stats))
@@ -210,6 +238,21 @@ def rich_text(el: ET.Element, ctx: Ctx) -> str:
 
 def para_text(p: ET.Element, ctx: Ctx) -> str:
     return rich_text(p, ctx)
+
+
+def emit_eq(tex: str, lab: str) -> str:
+    """Display-math md line. The tag rides inside the fence so the
+    weaver keeps number and equation in one `\\[...\\]`."""
+    tex = (tex or "").strip()
+    if not tex:
+        return ""
+    lab = (lab or "").strip()
+    if len(lab) > 2 and lab.startswith("(") and lab.endswith(")"):
+        num = lab[1:-1]
+    else:
+        num = lab
+    tag = " \\tag{%s}" % num if num else ""
+    return "$$%s%s$$" % (tex, tag)
 
 
 def table_md(tw: ET.Element, ctx: Ctx) -> tuple[str, str]:
@@ -228,6 +271,12 @@ def table_md(tw: ET.Element, ctx: Ctx) -> tuple[str, str]:
             if local(c.tag) not in ("td", "th"):
                 continue
             cell = re.sub(r"\s+", " ", rich_text(c, ctx)).replace("|", " / ")
+            # Table cells cannot host display blocks: fall back to
+            # inline for any placeholder the cell picked up.
+            def _eq_inline(m):
+                tex, _lab = ctx.displays[int(m.group(1))]
+                return "$%s$" % tex if tex else ""
+            cell = re.sub(EQ_PRE + r"(\d+)" + "\ue001", _eq_inline, cell)
             cell = mathsafe(cell, ctx.stats, "cell")
             if cell.lstrip().startswith("["):
                 cell = "{} " + cell  # \\[ trap: row-start [ reads as \\ dimen
@@ -269,7 +318,19 @@ def walk(sec: ET.Element, depth: int, ctx: Ctx, blocks: list, floats: list):
                 txt = para_text(item, ctx)
                 if txt:
                     blocks.append(("p", 0, txt))
-        elif t in ("disp-formula", "supplementary-material", "media", "boxed-text"):
+        elif t == "disp-formula":
+            # M7.8: section-level display math used to be dropped — emit
+            # it as its own block instead (data-loss fix).
+            kids = [c for c in child if isinstance(c.tag, str)]
+            m = next((k for k in kids if local(k.tag) == "math"), kids[0] if kids else None)
+            tex = mml_to_tex(m, ctx.stats) if m is not None else ""
+            lab = (child.findtext("label") or "").strip()
+            if tex:
+                ctx.converted += 1
+                blocks.append(("eq", 0, (tex, lab)))
+            else:
+                ctx.dropped[t] = ctx.dropped.get(t, 0) + 1
+        elif t in ("supplementary-material", "media", "boxed-text"):
             if t == "boxed-text":
                 for p in child.findall(".//p"):
                     txt = para_text(p, ctx)
@@ -382,7 +443,7 @@ def export_one(pid: str) -> dict:
     title_el = front.find("title-group/article-title") if front is not None else None
     if title_el is None:
         title_el = ET.Element("nil")
-    title = mathsafe(re.sub(r"\s+", " ", rich_text(title_el, ctx)).strip(), ctx.stats, "title") or pid
+    title = mathsafe(merge_math(re.sub(r"\s+", " ", rich_text(title_el, ctx)).strip()), ctx.stats, "title") or pid
     surnames = [c.findtext("name/surname") or "" for c in front.findall(".//contrib")]
     surnames = [s for s in surnames if s]
     author = f"{surnames[0]} et al." if surnames else "PLOS ONE"
@@ -398,7 +459,15 @@ def export_one(pid: str) -> dict:
         for p in abstract.findall("p"):
             txt = para_text(p, ctx)
             if txt:
-                md.append(txt + "\n")
+                for kind, pay in split_displays(txt, ctx):
+                    if kind == "eq":
+                        line = emit_eq(*pay)
+                        if line:
+                            md.append(line + "\n")
+                    else:
+                        pay = clean_prose(pay, ctx, "para")
+                        if pay:
+                            md.append(pay + "\n")
 
     body = root.find("body")
     blocks: list = []
@@ -452,9 +521,22 @@ def export_one(pid: str) -> dict:
                 md.append(f"**{payload}.**\n")
         elif bkind == "p":
             seen_prose += 1 if payload.strip() else 0
-            payload = clean_prose(payload, ctx, "para")
-            if payload:
-                md.append(payload + "\n")
+            # M7.8: display placeholders split out BEFORE clean_prose
+            # (its pipe guard would eat \left| bars); eq tex is
+            # already weave-safe straight from the converter.
+            for kind, pay in split_displays(payload, ctx):
+                if kind == "eq":
+                    line = emit_eq(*pay)
+                    if line:
+                        md.append(line + "\n")
+                else:
+                    pay = clean_prose(pay, ctx, "para")
+                    if pay:
+                        md.append(pay + "\n")
+        elif bkind == "eq":
+            line = emit_eq(*payload)
+            if line:
+                md.append(line + "\n")
         elif bkind == "FIG":
             n_fig_floats += 1
             fig_el = next(f for k, f, _ in fig_hits if f.get("id", "") == payload)

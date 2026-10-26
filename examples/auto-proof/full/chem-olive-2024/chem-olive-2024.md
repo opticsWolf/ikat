@@ -43,24 +43,16 @@ The reaction of the Schiff base ligand (**H**$_{2}$**L**) from amino-N-(4,6-dime
 For the condensation reaction: 1 HN + 1 ANB → 1 **H**$_{2}$**L** + 1 H$_{2}$O, the reaction energy ($\Delta$E) was determined according to the following equation:
 
 
+$$\Delta\mathrm{E}=\mathrm{E}({\mathbf{H}}_{2}\mathbf{L})+\mathrm{E}({\mathrm{H}}_{2}\mathrm{O})?\mathrm{E}(\mathrm{H}\mathrm{N})?\mathrm{E}(\mathrm{A}\mathrm{N}\mathrm{B}) \tag{Eq 1}$$
 
-
-$\Delta$E=E(H2L)+E(H2O)-E(HN)-E(ANB)
-
-
-(Eq 1)
 
 Here, E(H$_{2}$L), E(H$_{2}$O), E(HN), and E(ANB) stood for the total electronic energies of **H**$_{2}$**L**, H$_{2}$O, HN, and ANB, respectively, including the dispersion energy adjustment. While accounting for zero-point energy and thermal adjustment for enthalpy and Gibbs free energy, the appropriate reaction enthalpy (H) and reaction free energy (G) were determined.
 
 The interaction between the Schiff base ligand (**H**$_{2}$**L**) and CdCl$_{2}$ to create the Cd(II) complex (Cd$_{2}$ **H**$_{2}$**L**) was similarly simulated in a way comparable to the aforementioned condensation reaction and using the same theoretical methodology and degree of theory. Calculations were made for each reaction's energy (E), enthalpy (H), and free energy (G). Based on projected preferred binding orientations and conformations, the first geometries for the Cd(II) complex were constructed. The Cd(II) complex now has four possible conformers. For each Cd(II) complex conformer, the reaction was simulated as 1 **H**$_{2}$**L** + 2 CdCl$_{2}$ → 1 Cd$_{2}$ **H**$_{2}$**L**, and the corresponding reaction energy ($\Delta$E) was calculated as follows:
 
 
+$$\Delta\mathrm{E}=\mathrm{E}(\mathrm{C}{\mathrm{d}}_{2}\;{\mathbf{H}}_{2}\mathbf{L})?\mathrm{E}({\mathbf{H}}_{2}\mathbf{L})?2\;\ast\;\mathrm{E}(\mathrm{C}\mathrm{d}\mathrm{C}{\mathrm{l}}_{2}) \tag{Eq 2}$$
 
-
-$\Delta$E=E(Cd2H2L)-E(H2L)-2*E(CdCl2)
-
-
-(Eq 2)
 
 Here, E(Cd$_{2}$ **H**$_{2}$**L**), E(**H**$_{2}$**L**), and E(CdCl$_{2}$) denoted, respectively, the total electronic energies for each of the Cd(II) complex conformers, Cd$_{2}$ **H**$_{2}$**L**, **H**$_{2}$**L**, and CdCl$_{2}$. The matching reaction enthalpy (H) and reaction free energy (G) were calculated with similar thermal and zero-point energy corrections. Since there are many different Cd(II) complex conformers that could exist, Eq 2 produced distinct sets of E, H, and G values, each of which was unique to a given conformer.
 

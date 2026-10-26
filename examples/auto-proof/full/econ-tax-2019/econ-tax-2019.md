@@ -27,13 +27,19 @@ In this section we model the hypothesis to be tested building on a model similar
 ### Economic complexity
 
 Assuming that *j* denotes the country and *k* the product, the total exports of product *k* from country *j* equal:
-X j = $\sum$ k x j k (1)
+
+
+$$\begin{matrix} X_{j}=\sum_{k}x_{jk} \end{matrix} \tag{1}$$
 
 If (*y*/*l*)$_{j}$ denotes the per-capita GDP of country *j*, the productivity level associated with product *k* equals the weighted average of per capita GDPs, where the weights represent the *Revealed Comparative Advantage* (RCA) of each country for that product:
-P R O D Y k = $\sum$ j ( x j k / X j ) $\sum$ j ( x j k / X j ) ( y / l ) j (2)
+
+
+$$\begin{matrix} PRODY_{k}=\sum_{j}\frac{(x_{jk}/X_{j})}{\sum_{j}(x_{jk}/X_{j})}(y/l)_{j} \end{matrix} \tag{2}$$
 
 Then, the *PRODY* metric can be used to compute the productivity level associated with country *i*'s economic sophistication, *EXPY*$_{i}$, as the average income and productivity level associated with all products exported by a country. It is computed as the weighted average of all relevant *PRODY*s, where the weights represent the share of the relevant product in the country's export basket:
-E X P Y i = $\sum$ k x i k X i P R O D Y k = $\sum$ k $\sum$ j ( x i k / X i ) ( x j k / X j ) $\sum$ j ( x j k / X j ) ( y / l ) j (3)
+
+
+$$\begin{matrix} EXPY_{i}=\sum_{k}\frac{x_{ik}}{X_{i}}PRODY_{k}=\sum_{k}\sum_{j}\frac{(x_{ik}/X_{i})(x_{jk}/X_{j})}{\sum_{j}(x_{jk}/X_{j})}(y/l)_{j} \end{matrix} \tag{3}$$
 
 Having derived the equation for the economic sophistication index, *EXPY*$_{i}$, we are now going to link this index with the tax rates. Following the extremely rich theoretical literature on fiscal policy and economic growth [[`ref27`]– [`ref36`]] we use here a variant of Barro's [[`ref37`]] well-known model (Angelopoulos et al. [[`ref21`]], develop a similar model), and we assume discrete time, infinite horizon and perfect foresight.
 
@@ -42,39 +48,69 @@ Having derived the equation for the economic sophistication index, *EXPY*$_{i}$,
 **Households.**
 
 The representative household maximizes its intertemporal utility:
-$\sum$ t = 0 $\infty$ $\beta$ t u ( c t ) (4)
-where *c*$_{t}$ is private consumption at time *t* and 0 < *$\beta$* < 1 is the discount rate. We follow Angelopoulos et al. [[`ref21`]] and for simplicity we use a logarithmic utility function:
-u ( c t ) = log c t (5)
 
-At each time t, the household rents its predetermined capital, *k*$_{t}$, to the firm and receives *r*$_{t}$*k*$_{t}$, (*r*$_{t}$ is the return to capital). It also supplies labor services, *l*$_{t}$, and receives labor income *w*$_{t}$*l*$_{t}$. Further, it receives the profits of its firms, *$\pi$*$_{t}$. Its budget constraint then is:
-k t + 1 + c t = ( 1 - $\theta$ t ) ( r t k t + w t l t + $\pi$ t ) (6)
-where *k*$_{t+1}$ is the end-of-period capital stock and 0 < *$\theta$* < 1 is the policy instrument/tax rates (for simplicity we assume full capital depreciation).
+
+$$\begin{matrix} \sum_{t=0}^{\infty}\beta^{t}u(c_{t}) \end{matrix} \tag{4}$$
+
+
+where *c*$_{t}$ is private consumption at time *t* and 0 < $\beta$ < 1 is the discount rate. We follow Angelopoulos et al. [[`ref21`]] and for simplicity we use a logarithmic utility function:
+
+
+$$\begin{matrix} u(c_{t})=logc_{t} \end{matrix} \tag{5}$$
+
+At each time t, the household rents its predetermined capital, *k*$_{t}$, to the firm and receives *r*$_{t}$*k*$_{t}$, (*r*$_{t}$ is the return to capital). It also supplies labor services, *l*$_{t}$, and receives labor income *w*$_{t}$*l*$_{t}$. Further, it receives the profits of its firms, $\pi_{t}$. Its budget constraint then is:
+
+
+$$\begin{matrix} k_{t+1}+c_{t}=(1-\theta_{t})(r_{t}k_{t}+w_{t}l_{t}+\pi_{t}) \end{matrix} \tag{6}$$
+
+
+where *k*$_{t+1}$ is the end-of-period capital stock and 0 < $\theta$ < 1 is the policy instrument/tax rates (for simplicity we assume full capital depreciation).
 
 The household chooses the paths of *c*$_{t}$ and *k*$_{t+1}$ in order to maximize its utility given its budget constraint and taking prices and tax policy as given. The first-order conditions of the maximization problem are:
-1 c t = $\beta$ [ ( 1 - $\theta$ t + 1 ) r t + 1 c t + 1 ] (7)
+
+
+$$\begin{matrix} \frac{1}{c_{t}}=\beta[\frac{(1-\theta_{t+1})r_{t+1}}{c_{t+1}}] \end{matrix} \tag{7}$$
+
+
 and household's budget constraint, Eq (6).
 
 **Firms.**
 
 The representative firm chooses *k*$_{t}$ and *l*$_{t}$ (taking prices as given) in order to maximize its profits:
-$\pi$ t $\equiv$ A k t $\alpha$ l t 1 - $\alpha$ h t $\alpha$ - r t k t - w t l t (8)
-where A k t $\alpha$ l t 1 - $\alpha$ h t $\alpha$ = y t is firm's production function. We assume that firm's technology is represented by a Cobb-Douglas production function which is a form widely used in the economics literature (see Barro and Sala-i-Martin [[`ref27`]], chapter 4). Following the relevant literature (see e.g. Barro [[`ref37`]]) we assume that public services at time *t*, *h*$_{t}$, provide production externalities to firms; *A* > 0 is the level of technology and 0 < *$\alpha$* < 1. The static first order conditions of firm's maximization problem are:
-r t = $\alpha$ y t k t (9) w t = ( 1 - $\alpha$ ) y t l t (10)
+
+
+$$\begin{matrix} \pi_{t}\equiv Ak_{t}^{\alpha}l_{t}^{1-\alpha}h_{t}^{\alpha}-r_{t}k_{t}-w_{t}l_{t} \end{matrix} \tag{8}$$
+
+
+where $Ak_{t}^{\alpha}l_{t}^{1-\alpha}h_{t}^{\alpha}=y_{t}$ is firm's production function. We assume that firm's technology is represented by a Cobb-Douglas production function which is a form widely used in the economics literature (see Barro and Sala-i-Martin [[`ref27`]], chapter 4). Following the relevant literature (see e.g. Barro [[`ref37`]]) we assume that public services at time *t*, *h*$_{t}$, provide production externalities to firms; *A* > 0 is the level of technology and 0 < $\alpha$ < 1. The static first order conditions of firm's maximization problem are:
+
+
+$$\begin{matrix} r_{t}=\frac{\alpha y_{t}}{k_{t}} \end{matrix} \tag{9}$$
+
+ 
+
+$$\begin{matrix} w_{t}=\frac{(1-\alpha)y_{t}}{l_{t}} \end{matrix} \tag{10}$$
 
 **Government.**
 
-The government runs a balanced budget by taxing the household's income at a rate 0 < *$\theta$* < 1:
-h t = $\theta$ t ( r t k t + w t l t + $\pi$ t ) (11)
+The government runs a balanced budget by taxing the household's income at a rate 0 < $\theta$ < 1:
+
+
+$$\begin{matrix} h_{t}=\theta_{t}(r_{t}k_{t}+w_{t}l_{t}+\pi_{t}) \end{matrix} \tag{11}$$
 
 **Competitive decentralized equilibrium.**
 
-Given the path of the policy instrument (tax rates), { $\theta$t }t=0$\infty$, the equilibrium is defined to be the sequence of allocations { ct,yt,kt+1,lt }t=0$\infty$, and prices { rt,wt }t=0$\infty$ such that: economic agents, households and firms, maximize their utility and profits respectively, by taking prices, tax rates and public services as given, all budget constraints are satisfied and all markets clear. Then, using Eq (11) and *r*$_{t}$*k*$_{t}$ + *w*$_{t}$*l*$_{t}$ + *$\pi$*$_{t}$ = *y*$_{t}$ with *$\pi$*$_{t}$ = 0, the productivity of the economy in the steady-state is given by:
-y l = A 1 1 - $\alpha$ k $\alpha$ 1 - $\alpha$ $\theta$ $\alpha$ 1 - $\alpha$ (12)
+Given the path of the policy instrument (tax rates), $\left\{\theta_{t}\right\}_{t=0}^{\infty}$, the equilibrium is defined to be the sequence of allocations $\left\{c_{t},y_{t},k_{t+1},l_{t}\right\}_{t=0}^{\infty}$, and prices $\left\{r_{t},w_{t}\right\}_{t=0}^{\infty}$ such that: economic agents, households and firms, maximize their utility and profits respectively, by taking prices, tax rates and public services as given, all budget constraints are satisfied and all markets clear. Then, using Eq (11) and *r*$_{t}$*k*$_{t}$ + *w*$_{t}$*l*$_{t}$ + $\pi_{t}$ = *y*$_{t}$ with $\pi_{t}$ = 0, the productivity of the economy in the steady-state is given by:
+
+
+$$\begin{matrix} \frac{y}{l}=A^{\frac{1}{1-\alpha}}k^{\frac{\alpha}{1-\alpha}}\theta^{\frac{\alpha}{1-\alpha}} \end{matrix} \tag{12}$$
 
 ### Economic complexity and fiscal policy in the steady-state
 
 Substituting Eq (12) in Eq (3) we get:
-E X P Y i = $\sum$ k $\sum$ j ( x i k / X i ) ( x j k / X j ) $\sum$ j ( x j k / X j ) ( y / l ) j = $\sum$ k $\sum$ j ( x i k / X i ) ( x j k / X j ) $\sum$ j ( x j k / X j ) A j 1 1 - $\alpha$ k j $\alpha$ 1 - $\alpha$ $\theta$ j $\alpha$ 1 - $\alpha$ (13)
+
+
+$$\begin{matrix} EXPY_{i}=\sum_{k}\sum_{j}\frac{(x_{ik}/X_{i})(x_{jk}/X_{j})}{\sum_{j}(x_{jk}/X_{j})}(y/l)_{j}=\sum_{k}\sum_{j}\frac{(x_{ik}/X_{i})(x_{jk}/X_{j})}{\sum_{j}(x_{jk}/X_{j})}A_{j}^{\frac{1}{1-\alpha}}k_{j}^{\frac{\alpha}{1-\alpha}}\theta_{j}^{\frac{\alpha}{1-\alpha}} \end{matrix} \tag{13}$$
 
 This is the equation that qualitatively delivers the link between the policy instrument (tax rates) and steady-state sophistication of exported products. Building upon this intuition we formulate the main hypothesis to be tested in the paper. We thus *empirically test the hypothesis that two countries that differ in their fiscal policy (tax rates)—everything else being constant across countries (ceteris paribus)—manifest differences in economic sophistication. That is, if one of the two countries moves for example to higher capital tax rate relative to labour tax rate, in the steady-state, economic sophistication would be lower in the country with the higher ratio of capital tax to labour tax*.
 
@@ -93,24 +129,36 @@ We measure countries' economic sophistication using the Economic Complexity Inde
 ## Methods
 
 To calculate the measure of economic sophistication used in this work, we rely on the methodology described in Hausmann et al. [[`ref07`]]. In short, let us assume that we have trade information for *l* number of countries and *k* products. With this information we can fill an (*l* × *k*) exports matrix **E**, so that matrix element *E*$_{ij}$ will be equal to the monetary value country *i* gains by exporting product *j*. Of course, if country *i* does not export product *j*, then *E*$_{ij}$ = 0. From this matrix it is easy to calculate the ratio between the share of a given product in a country's exports and the share of this product in the total global exports. This ratio is called the *Revealed Comparative Advantage* (RCA) [[`ref40`]], and is given by
-RCA c p = X c p /$\sum$ p ' X c p ' $\sum$ c ' X c ' p /$\sum$ c ' p ' X c ' p ' , (14)
+
+
+$$\begin{matrix} {\text{RCA}}_{cp}=\frac{X_{cp}/\sum_{p^{'}}X_{cp^{'}}}{\sum_{c^{'}}X_{c^{'}p}/\sum_{c^{'}p^{'}}X_{c^{'}p^{'}}}, \end{matrix} \tag{14}$$
+
+
 where *X*$_{cp}$ is the total value of product *p* exports by country *c*. As previously discussed by others [[`ref06`], [`ref24`], [`ref25`]], a country has a comparative advantage in a product (in other words, is a competitive exporter of a product) when RCA$_{cp}$ ≥ 1.
 
 Using this threshold value, we obtain the (*l* × *k*) matrix **M**, with matrix elements *M*$_{cp}$ = 1 if country *c* has a revealed comparative advantage for product *p*, and zero otherwise. This matrix can be viewed as the incidence matrix of a bipartite network linking countries to products.
 
-From this matrix Hidalgo and Hausmann [[`ref06`]] introduced the *Economic Complexity Index* (*ECI*) as a measure of the production characteristics of different countries. To obtain the *ECI*, we calculate the (*l* × *l*) square matrix M~. In short, matrix M~ provides information about links connecting two countries *c* and *c*' based on the number of products they both export. The matrix elements M~ c c ' are computed as
-M ~ c c ' = 1 k c , 0 $\sum$ p M c p M c ' p k p , 0 , (15)
-where *k*$_{c,0}$ = $\sum$$_{p}$ *M*$_{cp}$ measures the diversification of country *c* in terms of the number of different products it exports, and *k*$_{p,0}$ = $\sum$$_{c}$ *M*$_{cp}$ measures the number of countries that export a certain product *p*. If **K** is the eigenvector of M~ associated with the second largest eigenvalue, then according to Hausmann et al. [[`ref07`]] the *ECI* is calculated as
-ECI = K - < K > std ( K ) . (16)
+From this matrix Hidalgo and Hausmann [[`ref06`]] introduced the *Economic Complexity Index* (*ECI*) as a measure of the production characteristics of different countries. To obtain the *ECI*, we calculate the (*l* × *l*) square matrix $\overset{\sim}{\mathbf{M}}$. In short, matrix $\overset{\sim}{\text{M}}$ provides information about links connecting two countries *c* and *c*' based on the number of products they both export. The matrix elements ${\overset{\sim}{M}}_{cc^{'}}$ are computed as
+
+
+$$\begin{matrix} {\overset{\sim}{M}}_{cc^{'}}=\frac{1}{k_{c,0}}\sum_{p}\frac{M_{cp}M_{c^{'}p}}{k_{p,0}}, \end{matrix} \tag{15}$$
+
+
+where *k*$_{c,0}$ = $\sum_{p}$ *M*$_{cp}$ measures the diversification of country *c* in terms of the number of different products it exports, and *k*$_{p,0}$ = $\sum_{c}$ *M*$_{cp}$ measures the number of countries that export a certain product *p*. If **K** is the eigenvector of $\overset{\sim}{\text{M}}$ associated with the second largest eigenvalue, then according to Hausmann et al. [[`ref07`]] the *ECI* is calculated as
+
+
+$$\begin{matrix} \text{ECI}=\frac{\mathrm{K}-\langle\mathbf{K}\rangle}{\text{std}(\mathbf{K})}. \end{matrix} \tag{16}$$
 
 ## Econometric model
 
 To study the effect of countries' tax structures on the sophistication of their productive structures, we use dataset 1 (see Data section). The dataset includes 17 OECD countries and spans the period 1970-2001, for which there is information available on both effective/implicit taxation and economic complexity.
 
 In order to avoid the problem of confounding variables, we follow a fixed-effects 2SLS/IV strategy and regress the baseline specification described by the following equation:
-ECI i , t = $\alpha$ 0 + $\beta$ 1 T a x R a t e i , t + $\beta$ k c o n t r o l s i , t + $\gamma$ i + $\delta$ t + u i , t . (17)
 
-Here, the *ECI* is expressed as a function of the tax policy in country *i* and in period *t*, a set of control variables, country *$\gamma$*$_{i}$ and time *$\delta$*$_{t}$ fixed effects, and a stochastic term *u*$_{i,t}$. We ran different regressions where the main explanatory variable in Eq (17) was the *capital* *tax* *rate* (effective and implicit), the *labor* *tax* *rate* (effective and implicit) and the ratio of (effective and implicit) labor to capital tax burden. The results of these regressions are summarized in Tables 1–6. In what follows, we discuss in detail the control variables, while explicit definitions, descriptive statistics and sources of all the variables employed are provided in the S1 Appendix.
+
+$$\begin{matrix} {\text{ECI}}_{i,t}=\alpha_{0}+\beta_{1}TaxRate_{i,t}+\beta_{k}controls_{i,t}+\gamma_{i}+\delta_{t}+u_{i,t}. \end{matrix} \tag{17}$$
+
+Here, the *ECI* is expressed as a function of the tax policy in country *i* and in period *t*, a set of control variables, country $\gamma_{i}$ and time $\delta_{t}$ fixed effects, and a stochastic term *u*$_{i,t}$. We ran different regressions where the main explanatory variable in Eq (17) was the *capital* *tax* *rate* (effective and implicit), the *labor* *tax* *rate* (effective and implicit) and the ratio of (effective and implicit) labor to capital tax burden. The results of these regressions are summarized in Tables 1–6. In what follows, we discuss in detail the control variables, while explicit definitions, descriptive statistics and sources of all the variables employed are provided in the S1 Appendix.
 
 %% table
 
@@ -269,9 +317,17 @@ Though we are aware that we cannot fully deal with possible omitted country-leve
 ### Instrumental variables
 
 To account for the potential reverse causality between economic complexity and taxation, we use a fixed-effects 2SLS/IV approach. We follow Iosifidi and Mylonidis [[`ref44`]] and we instrument tax rates with their respective measures of tax competition for each country. We expect that the effect of tax competition on economic complexity will be distributed through the effect of changes in taxation and that there will be no direct effect of tax competition on economic complexity. Following the relevant literature [[`ref44`]– [`ref46`]], we construct tax competition measures for both capital and labor taxes:
-t c - i , t - 1 = $\sum$ j = 1 N w i , j t c j , t - 1 (18)
+
+
+$$\begin{matrix} {tc}_{-i,t-1}=\sum_{j=1}^{N}w_{i,j}{tc}_{j,t-1} \end{matrix} \tag{18}$$
+
+
 where the tax competition for country (*i*) is defined as the weighted average of the other countries' (*j*) tax rates at time *t* $-$ 1, with weights *w*$_{i,j}$ ≥ 0 if *i* $\neq$ *j* and *w*$_{i,j}$ = 0 if *i* = *j*. For the weights, we consider the following formula:
-w i , j = ln ( p o p j + 1 )/ d i , j 2 $\sum$ k $\neq$ j ln ( p o p k + 1 ) d i , k 2 (19)
+
+
+$$\begin{matrix} w_{i,j}=\frac{ln(pop_{j}+1)/d_{i,j}^{2}}{\sum_{k\neq j}\frac{ln(pop_{k}+1)}{d_{i,k}^{2}}} \end{matrix} \tag{19}$$
+
+
 where *pop*$_{j}$ is the population of country *j*, *d*$_{i,j}$ is the air travel distance between countries *i* and *j*, and the denominator is the sum of all other *k* countries. This weight ensures that countries with larger populations exert a relatively stronger effect on other countries' tax policies, compared to countries with smaller populations. Moreover, following the related literature, we assume that as the geographical distance increases, information and transaction costs increase and profits from economic transactions decline [[`ref47`]]. Therefore, this weight also internalizes the fact that governments care more about the tax policies of their neighboring countries than the tax policies of more distant countries [[`ref44`]].
 
 The underidentification tests (UIT) and the F-statistics for the relevance of instruments (whether all excluded instruments are significantly different from zero), provide evidence of the instruments' validity.
@@ -380,7 +436,9 @@ In addition, Table 9 establishes the robustness of our results to the use of alt
 ### The impact of economic development on the nexus between taxation and economic sophistication
 
 In this subsection we highlight the potential differential effect of a country's level of economic development on the nexus between taxation and economic sophistication. To identify this channel, we introduce the interaction term *TaxRate* * *GDP* *per* *capita* into Eq (17):
-ECI i , t = $\alpha$ 0 + $\beta$ 1 T a x R a t e i , t + $\beta$ 2 T a x R a t e i , t * G D P p e r c a p i t a i , t + $\beta$ k c o n t r o l s i , t + $\gamma$ i + $\delta$ t + u i , t . (20)
+
+
+$$\begin{matrix} {\text{ECI}}_{i,t}=\alpha_{0}+\beta_{1}TaxRate_{i,t}+\beta_{2}TaxRate_{i,t}\ast GDP\,per\,capita_{i,t}+\beta_{k}controls_{i,t}+\gamma_{i}+\delta_{t}+u_{i,t}. \end{matrix} \tag{20}$$
 
 The interaction term *TaxRate* * *GDP* *per* *capita* consists of the product between the mean-centered value of *TaxRate*, and the mean-centered value of the economic development measure, *GDPpercapita*. By taking differences from the mean (mean-centered variables), we avoid the potential problem of multicollinearity between the constitutive terms and the interaction term. The estimation method is again fixed-effects 2SLS/IV with time dummies and the same set of controls as in the benchmark equation. Table 10 presents the results for both the effective (labor in column (1) and capital in column (2)) and implicit tax rates (columns (3) and (4), respectively).
 

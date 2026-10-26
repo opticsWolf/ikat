@@ -295,6 +295,21 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.8 — Honest math (MathML rebuild + auto-stretch) → 0.10.8
+
+The bench exporter flattened 511 real MathML equations into symbol soup
+(fractions lost their bar, 993 glyphs became ?, 70 overfulls to 494pt).
+A structural MathML-to-LaTeX converter (mml.py) reconstructs single
+breakable spans: sub/sup/fractions/sums/limits/roots/matrices/cases,
+empty-base prescripts, JATS sub/sup merging, three publisher-misencoded
+glyphs mapped by role (time renders as zeta, upright beta, k-index).
+Core weaves whole-paragraph double-dollar spans to display math:
+wider than the column takes a cuted strip; wider than the full measure
+breaks at top-level relations into multline rows (matrix spans take
+one strip per piece instead). A glyph-aware width estimator (TeX glue,
+script extension, banked matrices, depth-matched envs, nested-aware
+row splits) decides. math-hilfer-2024: 70 to 0 hbox overfulls;
+econ/physics formulas restored from dropped to rendered.
 ## M7.7 — Honest portrait limits (Tiny rung + pin height) → 0.10.7
 
 `Tiny`: a fourth ladder rung — `\scriptsize` + 2pt padding but

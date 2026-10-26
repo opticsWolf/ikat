@@ -54,6 +54,10 @@ pub enum MdKind {
     Table(Vec<String>),
     Directive(String),
     Para(Vec<String>),
+    /// Display math: a paragraph that is exactly one `$$...$$`
+    /// span (M7.8). The weaver emits `\[...\]`, widening to a
+    /// full-width `strip` when the span exceeds the column.
+    DisplayMath(String),
 }
 
 /// Fence-aware pre-pass: drop `>` quote lines, extract
@@ -345,12 +349,75 @@ pub fn blocks(md: &str) -> Result<Vec<MdBlock>, Error> {
         }
         merged.push(b);
     }
-    Ok(merged)
+    // Display math: a paragraph that is exactly one `$$...$$` span
+    // becomes its own block; anything else holding `$$` is a hard
+    // error naming the subset (inline `$$` would silently misrender).
+    let mut final_blocks: Vec<MdBlock> = Vec::with_capacity(merged.len());
+    for b in merged {
+        match b.kind {
+            MdKind::Para(ls) => {
+                let joined = ls.join(" ");
+                let t = joined.trim();
+                if t.starts_with("$$") && t.ends_with("$$") && t.len() >= 4 { // `$$$$` reports empty
+                    let inner = t[2..t.len() - 2].trim();
+                    if inner.is_empty() {
+                        return Err(Error::data(
+                            format!("line {}: empty display math `$$$$`", b.line),
+                            String::new(),
+                        ));
+                    }
+                    if inner.contains("$$") {
+                        return Err(Error::data(
+                            format!(
+                                "line {}: display math holds a second `$$`; one span per paragraph",
+                                b.line
+                            ),
+                            String::new(),
+                        ));
+                    }
+                    final_blocks.push(MdBlock { line: b.line, kind: MdKind::DisplayMath(inner.to_string()) });
+                } else {
+                    if t.contains("$$") {
+                        return Err(Error::data(
+                            format!(
+                                "line {}: `$$` outside a whole-paragraph span is not in the subset; display math must fill its own paragraph",
+                                b.line
+                            ),
+                            String::new(),
+                        ));
+                    }
+                    final_blocks.push(MdBlock { line: b.line, kind: MdKind::Para(ls) });
+                }
+            }
+            _ => final_blocks.push(b),
+        }
+    }
+    Ok(final_blocks)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_math_whole_paragraph() {
+        let b = blocks("# T\n\n$$x^2$$\n").unwrap();
+        assert!(matches!(b[1].kind, MdKind::DisplayMath(_)));
+    }
+
+    #[test]
+    fn display_math_stray_dollars_error() {
+        let err = blocks("# T\n\nsee $$x$$ here\n").unwrap_err();
+        assert!(err.msg.contains("own paragraph"), "got {}", err.msg);
+    }
+
+    #[test]
+    fn display_math_empty_and_double_error() {
+        let err = blocks("# T\n\n$$$$\n").unwrap_err();
+        assert!(err.msg.contains("empty"), "got {}", err.msg);
+        let err = blocks("# T\n\n$$a$$b$$\n").unwrap_err();
+        assert!(err.msg.contains("second"), "got {}", err.msg);
+    }
 
     #[test]
     fn error_refdef_names_line() {

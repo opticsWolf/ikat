@@ -185,9 +185,13 @@ argument structs.
 - `doc.rs`: `convert()`, the document assembler. Walks the line
   stream, dispatches fences/tables/citations/paragraphs, threads
   `FloatNeeds` upward, enforces the citation keyset (a dangling
-  key fails the build instead of printing raw). The golden test
-  rebuilds the frozen paper `.tex` byte-identical — the paper is
-  the test suite.
+  key fails the build instead of printing raw). Whole-paragraph
+  `$$...$$` display math (M7.8) emits `\[...\]`, widening to a
+  cuted `strip` past the column and to `multline*` row-breaks past
+  the full measure (matrix spans take one strip per piece); a
+  glyph-aware estimator (TeX glue, rightward scripts, banked
+  matrices) decides. The golden test rebuilds the frozen paper
+  `.tex` byte-identical — the paper is the test suite.
 
 ### 3.4 `config.rs` — `ikat.toml`, validated
 

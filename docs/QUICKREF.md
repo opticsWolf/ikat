@@ -76,6 +76,15 @@ on the line above.
 Hard errors: `figure*` + `here`/`force`; unknown attrs/keys.
 Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 `float`/`placeins` (or the template must carry them).
+
+Display math fills its own paragraph as one `$$...$$` span (M7.8):
+the weaver emits `\[...\]` (`\tag{N}` rides inside, from the
+exporter's `$$tex \tag{N}$$`). A span wider than the column
+takes a full-width `strip` (cuted); wider than the full measure
+breaks at top-level `=`/`+`/`-` into `multline*` rows (matrix
+spans split into one strip per piece instead — `&` is illegal in
+multline). Whole-paragraph only: stray `$$`, empty spans, alien
+environments, and unbalanced braces are hard errors.
 Fraction `width` scales TikZ coordinates, not text (no `transform
 shape`): labels stay full-size, so leave air around them.
 `[floats]` tuning (fractions, counters, `barrier_sections`,
@@ -223,7 +232,8 @@ MCP (`python -m ikat.mcp_server`, stdio): `weave_document`,
 `pdflatex` (+ `bibtex` with a `.bib`); minimal set: `amsmath
 amssymb tabularx graphicx hyperref lmodern textcomp` + class;
 + `tikz` (+`shapes.geometric arrows.meta positioning`) for
-diagrams; + `pgfplots` for plots. `tex_requirements(tikz, plots)`
+diagrams; + `pgfplots` for plots; + `cuted` (sttools bundle) for
+over-wide display math. `tex_requirements(tikz, plots)`
 reports a body's needs; `ensure_tex_packages` installs them.
 arXiv: ship `.tex` + `.bbl` + figure PDFs, no class/style files.
 

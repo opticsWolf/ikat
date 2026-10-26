@@ -170,6 +170,9 @@ fn pdc_parse(md: &str) -> Result<Vec<Block>, crate::error::Error> {
             crate::md::MdKind::Table(rows) => out.push(Block::Table(rows)),
             crate::md::MdKind::Directive(a) => out.push(Block::Directive(a)),
             crate::md::MdKind::Para(ls) => out.push(Block::Para(ls.join(" "))),
+            // Parity with hand_parse: a `$$` paragraph stays one
+            // Para there, so the oracle sees the same shape here.
+            crate::md::MdKind::DisplayMath(t) => out.push(Block::Para(format!("$${t}$$"))),
         }
     }
     Ok(out)

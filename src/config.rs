@@ -159,6 +159,9 @@ pub struct FloatNeeds {
     pub dblfloat: bool,
     pub graphicx: bool,
     pub rotating: bool,
+    /// A display-math span wider than the column takes a full-width
+    /// `strip` (M7.8) — needs the cuted package.
+    pub strip: bool,
 }
 
 impl FloatNeeds {
@@ -172,6 +175,7 @@ impl FloatNeeds {
         self.dblfloat |= o.dblfloat;
         self.graphicx |= o.graphicx;
         self.rotating |= o.rotating;
+        self.strip |= o.strip;
     }
 
     /// Preamble lines, in load order.
@@ -188,6 +192,9 @@ impl FloatNeeds {
         }
         if self.rotating {
             out.push("\\usepackage{rotating}".to_string());
+        }
+        if self.strip {
+            out.push("\\usepackage{cuted}".to_string());
         }
         out
     }
@@ -206,6 +213,9 @@ impl FloatNeeds {
         }
         if self.rotating {
             out.push("rotating");
+        }
+        if self.strip {
+            out.push("cuted");
         }
         if self.graphicx {
             out.push("graphicx");

@@ -62,13 +62,13 @@ Considering the evolution of DL model architectures over the past decade, this a
 | VGGNet-16 | RexNext-50(32×4d) | Swin-B |
 |---|---|---|
 | {} [3×3, 64]×2 | 7×7,64, stride 2 | concat 4×4, 128-d, LN |
-| maxpool | 3×3 max pool, stride 2 | {} [ win. sz. 7 × 7 , dim 128, head 4 ] × 2 |
-| {} [3×3, 128]×2 | {} [ 1 × 1 , 128 3 × 3 , 128 , C = 32 1 × 1 , 256 ] × 3 | concat 2×2, 256-d, LN |
-| maxpool | {} [ 1 × 1 , 256 3 × 3 , 256 , C = 32 1 × 1 , 512 ] × 4 | {} [ win . sz . 7 × 7 , dim 256 , head 8 ] × 2 |
-| {} [3×3, 256]×21×1,256 | {} [ 1 × 1 , 512 3 × 3 , 512 , C = 32 1 × 1 , 1024 ] × 2 | concat 2×2, 512-d, LN |
-| maxpool | $\triangle$ [ 1 × 1 , 1024 3 × 3 , 1024 , C = 32 1 × 1 , 2048 ] × 3 | {} [ win . sz . 7 × 7 , dim 512 , head 16 ] × 18 |
+| maxpool | 3×3 max pool, stride 2 | $[\begin{matrix} \text{win.}\,\text{sz.}\,7\times7, \\ \text{dim}\,\text{128,}\,\text{head}\,\text{4} \end{matrix}]\times2$ |
+| {} [3×3, 128]×2 | $[\begin{matrix} 1\times1,128 \\ 3\times3,128,C=32 \\ 1\times1,256 \end{matrix}]\times3$ | concat 2×2, 256-d, LN |
+| maxpool | $[\begin{matrix} 1\times1,256 \\ 3\times3,256,C=32 \\ 1\times1,512 \end{matrix}]\times4$ | $[\begin{matrix} \text{win}.\,\text{sz}.\,7\times7, \\ \text{dim}\,256,\,\text{head}\,8 \end{matrix}]\times2$ |
+| {} [3×3, 256]×21×1,256 | $[\begin{matrix} 1\times1,512 \\ 3\times3,512,\text{C}=32 \\ 1\times1,1024 \end{matrix}]\times2$ | concat 2×2, 512-d, LN |
+| maxpool | $\triangle$ $[\begin{matrix} 1\times1,1024 \\ 3\times3,1024,\text{C}=32 \\ 1\times1,2048 \end{matrix}]\times3$ | $[\begin{matrix} \text{win}.\,\text{sz}.\,7\times7, \\ \text{dim}\,512,\,\text{head}\,16 \end{matrix}]\times18$ |
 | {} [3×3, 512]×21×1,512 | $\star$ global average pool | concat 2×2, 1024-d, LN |
-| maxpool | 1000-d | {} [ win . sz . 7 × 7 , dim 1024 , head 32 ] × 2 |
+| maxpool | 1000-d | $[\begin{matrix} \text{win}.\,\text{sz}.\,7\times7, \\ \text{dim}\,1024,\,\text{head}\,32 \end{matrix}]\times2$ |
 | $\triangle$ [3×3, 512]×21×1,512 | softmax | $\triangle$ LN |
 | maxpool |  | $\star$ global average pool |
 | $\star$ [4096-d]×2 |  | 1000-d |
@@ -191,7 +191,9 @@ Table 4 shows the dimensions of deep features obtained using different pre-train
 ### 3.3 Performance metric
 
 The metric used to evaluate the classification performance is accuracy. Accuracy is defined as the proportion of correct predictions made by the model out of all predictions. It is calculated as follows:
-Accuracy = Number of Correct Predictions Total Number of Predictions (1)
+
+
+$$\begin{matrix} \text{Accuracy}=\frac{\text{Number}\,\text{of}\,\text{Correct}\,\text{Predictions}}{\text{Total}\,\text{Number}\,\text{of}\,\text{Predictions}} \end{matrix} \tag{1}$$
 
 This metric provides a straightforward measure of the model's performance on the classification task. The choice to use accuracy as the sole performance metric is justified for two main reasons. Firstly, the training and testing sets derived from each dataset are balanced, with the exception of the Caltech-101 dataset. In the case of the Caltech-101 dataset, a few classes have an uneven number of samples. However, to mitigate this issue, we specifically selected a maximum of 20 images per class for testing. Secondly, our goal in this study is to assess the overall performance of the BoDVW model across all classes, rather than focusing on its performance on specific classes. Accuracy, which provides a straightforward measure of all correct predictions out of all predictions, aligns better with this goal.
 

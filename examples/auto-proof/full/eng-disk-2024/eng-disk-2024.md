@@ -39,70 +39,49 @@ info:doi/10.1371/journal.pone.0307525.g002
 In camera coordinate system, equation of the part lower end face obtained by calibration is
 
 
-
-
-A0x+B0y+C0z+1=0
-
-
-(1)
+$$A_{0}x+B_{0}y+C_{0}z+1=0 \tag{1}$$
 
 The normal vector of lower end face is (*A*$_{0}$,*B*$_{0}$,*C*$_{0}$), then directional cosine of the *Z*-axis of world coordinate system **Z**$_{k}$ is
 
 
-
-
-Zk=(i13,i23,i33)T=($-$A0A02+B02+C02,$-$B0A02+B02+C02,$-$C0A02+B02+C02)T
-
-
-(2)
+$$Z_{k}=(i_{13},i_{23},i_{33})^{T}=(-\frac{A_{0}}{\sqrt{A_{0}^{2}+B_{0}^{2}+C_{0}^{2}}},-\frac{B_{0}}{\sqrt{A_{0}^{2}+B_{0}^{2}+C_{0}^{2}}},-\frac{C_{0}}{\sqrt{A_{0}^{2}+B_{0}^{2}+C_{0}^{2}}})^{T} \tag{2}$$
 
 Directional cosine of the *z*-axis of camera coordinate system is **z**$_{k}$ = (0,0,1)$^{T}$, and the directional vector **v**$_{d}$ of axis **V** is the cross product of **Z**$_{k}$ and **z**$_{k}$.
 
+$$v_{d}=z_{k}\times Z_{k}=(-i_{23},i_{13},0)^{T} \tag{3}$$
+
 Unitizing **v**$_{d}$ to obtain the directional cosine **v**$_{k}$ of axis **V**.
+
+$$v_{k}=(\frac{-i_{23}}{\sqrt{i_{13}^{2}+i_{23}^{2}}},\frac{i_{13}}{\sqrt{i_{13}^{2}+i_{23}^{2}}},\;0)^{T} \tag{4}$$
 
 The cross product matrix **K** of **v**$_{k}$ is
 
 
+$$K=[\begin{matrix} 0 & 0 & \frac{i_{13}}{\sqrt{i_{13}^{2}+i_{23}^{2}}} \\ 0 & 0 & \frac{i_{23}}{\sqrt{i_{13}^{2}+i_{23}^{2}}} \\ -\frac{i_{13}}{\sqrt{i_{13}^{2}+i_{23}^{2}}} & -\frac{i_{23}}{\sqrt{i_{13}^{2}+i_{23}^{2}}} & 0 \end{matrix}] \tag{5}$$
+
+Directional cosine of the *z*-axis of camera coordinate system is **z**$_{k}$ =(0, 0, 1)$^{T}$, and that of the *Z*-axis of world coordinate system is **Z**$_{k}$ = (*i*$_{13}$, *i*$_{23}$, *i*$_{33}$)$^{T}$. Their included angle $\beta_{R}$ is
 
 
-K=[00i13i132+i23200i23i132+i232$-$i13i132+i232$-$i23i132+i2320]
-
-
-(5)
-
-Directional cosine of the *z*-axis of camera coordinate system is **z**$_{k}$ =(0, 0, 1)$^{T}$, and that of the *Z*-axis of world coordinate system is **Z**$_{k}$ = (*i*$_{13}$, *i*$_{23}$, *i*$_{33}$)$^{T}$. Their included angle *$\beta$*$_{R}$ is
-
-
-
-
-$\beta$R=arccos(i33)
-
-
-(6)
+$$\beta_{R}=\mathrm{arccos}(i_{33}) \tag{6}$$
 
 According to the Rodrigues rotation transformation [[`ref19`]], combined with Eqs (5) and (6), the rotation matrix **R** of *z*-axis and *Z*-axis can be obtained.
 
 
+$$R=[I_{one}+(1-\cos\beta_{R})K^{2}+\sin\beta_{R}K] \tag{7}$$
 
-
-R=[Ione+(1$-$cos$\beta$R)K2+sin$\beta$RK]
-
-
-(7)
 
 Where **I**$_{one}$ is identity matrix.
 
 When the *z*-axis of camera coordinate system is rotated to the position coincided with the *Z*-axis of world coordinate system, positions of the *x*-axis and *y*-axis of camera coordinate system after rotation are those of the *X*-axis and *Y*-axis of world coordinate system. According to directional cosines **x**$_{k}$ = (1, 0, 0)$^{T}$ and **y**$_{k}$ = (0, 1, 0)$^{T}$ of the x-axis and y-axis of camera coordinate system, those of the *X*-axis and *Y*-axis of world coordinate system in camera coordinate system can be obtained by Eq (7).
 
+$$X_{k}=(i_{11},i_{21},i_{31})^{T}=Rx_{k}=(1-\frac{i_{13}^{2}}{1+i_{33}},-\frac{i_{13}i_{23}}{1+i_{33}},-i_{13})^{T} \tag{8}$$
+
+$$Y_{k}=(i_{12},i_{22},i_{32})^{T}=Ry_{k}=(-\frac{i_{13}i_{23}}{1+i_{33}},1-\frac{i_{23}^{2}}{1+i_{33}},-i_{23})^{T} \tag{9}$$
+
 Set camera coordinates of the point to (*x*,*y*,*z*), and its world coordinates to (*X*,*Y*,*Z*). Then the transformation relationship between two coordinate systems can be expressed as
 
 
-
-
-[xyz]=I[XYZ]=[i11i12i13i21i22i23i31i32i33][XYZ]=[1$-$i1321+i33$-$i13i231+i33i13$-$i13i231+i331$-$i2321+i33i23$-$i13$-$i23i33][XYZ]
-
-
-(10)
+$$[\begin{matrix} x \\ y \\ z \end{matrix}]=I[\begin{matrix} X \\ Y \\ Z \end{matrix}]=[\begin{matrix} i_{11} & i_{12} & i_{13} \\ i_{21} & i_{22} & i_{23} \\ i_{31} & i_{32} & i_{33} \end{matrix}][\begin{matrix} X \\ Y \\ Z \end{matrix}]=[\begin{matrix} 1-\frac{i_{13}^{2}}{1+i_{33}} & -\frac{i_{13}i_{23}}{1+i_{33}} & i_{13} \\ -\frac{i_{13}i_{23}}{1+i_{33}} & 1-\frac{i_{23}^{2}}{1+i_{33}} & i_{23} \\ -i_{13} & -i_{23} & i_{33} \end{matrix}][\begin{matrix} X \\ Y \\ Z \end{matrix}] \tag{10}$$
 
 The transformation matrix **I** can be determined based on the lower end face equation, as shown in Eq (1), obtained by extrinsic parameter calibration. Calculate camera coordinates of the intersection point *P*$_{0}$ between the *z*-axis of camera coordinate system and the lower end face equation, and then convert them into world coordinates by Eq (10), the *Z* world coordinate *Z*$_{0}$ of the point on lower end face can be obtained. To see Appendix B in S1 Appendix for details.
 
@@ -116,83 +95,58 @@ Projection distortion is mainly caused by the measured part surface not being pa
 
 In camera coordinate system, let the detection coordinates of measurement points on theoretical image plane be (*x*$_{Li}$,*y*$_{Li}$,1). According to Eq (10), they can be transformed into world coordinates (*X*$_{Li}$,*Y*$_{Li}$,*Z*$_{Li}$). Then the world coordinates (*X*$_{Ti}$,*Y*$_{Ti}$,*Z*$_{Ti}$) of measurement points on projection plane can be obtained by perspective projection transformation, as shown in Eq (11).
 
+$$X_{Ti}=\frac{X_{Li}}{Z_{Li}},\;Y_{Ti}=\frac{Y_{Li}}{Z_{Li}},\;Z_{Ti}=1 \tag{11}$$
+
 In world coordinate system, edges on both sides of the part chamfer on projection plane are circles. According to Eq (11) and the least squares method [[`ref20`], [`ref21`]], the geometric fitting function of the circle is established.
 
 
+$$\mathrm{Min}F=\sum_{i=1}^{n}[(X-X_{Ti})^{2}+(Y-Y_{Ti})^{2}] \tag{12}$$
 
-
-MinF=$\sum$i=1n[(X$-$XTi)2+(Y$-$YTi)2]
-
-
-(12)
 
 Where (*X*,*Y*,1) are world coordinates of the point on the circle to be fitted that corresponds perpendicular to the measurement point (*X*$_{Ti}$,*Y*$_{Ti}$,1).
 
 In world coordinate system, the circle equation to be fitted can be expressed as
 
 
+$$\left\{\begin{matrix} (X-X_{c})^{2}+(Y-Y_{c})^{2}-r_{t}^{2}=0 \\ Z=1 \end{matrix} \right. \tag{13}$$
 
-
-{(X$-$Xc)2+(Y$-$Yc)2$-$rt2=0Z=1
-
-
-(13)
 
 Where (*X*$_{c}$,*Y*$_{c}$,1) are world coordinates of the circle center, and *r*$_{t}$ is the circle radius
 
 Expand the circle equation in Eq (13) into a general form, we can get
 
 
-
-
-X2+Y2$-$2XcX$-$2YcY+Xc2+Yc2$-$rt2=0
-
-
-(14)
+$$X^{2}+Y^{2}-2X_{c}X-2Y_{c}Y+X_{c}^{2}+Y_{c}^{2}-r_{t}^{2}=0 \tag{14}$$
 
 According to the geometric relationship [[`ref22`], [`ref23`]] between (*X*$_{Ti}$,*Y*$_{Ti}$,1) and (*X*,*Y*,1), Eq (15) are established.
+
+$$\begin{matrix} f_{1}(X,Y)=X^{2}+Y^{2}-2X_{c}X-2Y_{c}Y+X_{c}^{2}+Y_{c}^{2}-r_{t}^{2}=0 \\ f_{2}(X,Y)=(X-X_{Ti})(Y_{Ti}-Y_{c})-(X_{Ti}-X_{c})(Y-Y_{Ti})=0 \end{matrix} \tag{15}$$
 
 The Jacobian matrix **J**$_{c}$ of points coordinates (*X*,*Y*) on the circle over coefficients (*X*$_{c}$,*Y*$_{c}$,*r*$_{t}$) of the circle equation general form can be obtained by Eq (15).
 
 
-
-
-C=(X$-$XcY$-$YcYTi$-$YcXc$-$XTi)
-
-
-(16)
+$$C=(\begin{matrix} X-X_{c} & Y-Y_{c} \\ Y_{Ti}-Y_{c} & X_{c}-X_{Ti} \end{matrix}) \tag{16}$$
 
 
 
 
-
-B=(X$-$XcY$-$YcrtYTi$-$YX$-$XTi0)
-
-
-(17)
+$$B=(\begin{matrix} X-X_{c} & Y-Y_{c} & r_{t} \\ Y_{Ti}-Y & X-X_{Ti} & 0 \end{matrix}) \tag{17}$$
 
 
 
 
+$$J_{c}=C^{-1}B \tag{18}$$
 
-Jc=C$-$1B
-
-
-(18)
 
 When fitting, the center coordinates and radius obtained from the circle algebraic fitting are used as the initial values for geometric fitting. Then, according to Eq (18), the Gauss Newton iteration method [[`ref24`]] is used to geometrically fit Eq (12), and the radii *r*$_{1}$ and *r*$_{2}$ of circles on both sides of the part chamfer on projection plane are obtained.
 
 **3.1.2 Determine the position of measurement plane based on projection plane.**
 
-As shown in Fig 3, *O*$_{c}$ is the camera optical center, and line segment *O*$_{c}$*k*$_{1}$ is on the *Z*-axis of world coordinate system. Points *s*$_{2}$ and *s*$_{3}$ are centers of the circles on both sides of the part chamfer fitted on projection plane, and the real centers corresponding to them are *k*$_{2}$ and *t*$_{3}$. Line segments *s*$_{3}$*s*$_{4}$ and *s*$_{2}$*s*$_{5}$ are the radii *r*$_{1}$ and *r*$_{2}$ of the circles fitted on projection plane, which are the perspective projections of line segments *t*$_{3}$*t*$_{4}$ on upper end face and *k*$_{2}$*k*$_{5}$ on plane $\Pi$ respectively. Line segment *t*$_{3}$*t*$_{4}$ is radius *R*$_{1}$ of the edge circle on upper end face, while line segment *k*$_{2}$*k*$_{5}$ is the true radius *R*$_{2}$, which on plane II paralleled to upper end face. Since the projection plane is parallel to the upper end face, then $\Delta$Ocs1s3$\sim$$\Delta$Oct1t3, $\Delta$Ocs3s4$\sim$$\Delta$Oct3t4, we can get
+As shown in Fig 3, *O*$_{c}$ is the camera optical center, and line segment *O*$_{c}$*k*$_{1}$ is on the *Z*-axis of world coordinate system. Points *s*$_{2}$ and *s*$_{3}$ are centers of the circles on both sides of the part chamfer fitted on projection plane, and the real centers corresponding to them are *k*$_{2}$ and *t*$_{3}$. Line segments *s*$_{3}$*s*$_{4}$ and *s*$_{2}$*s*$_{5}$ are the radii *r*$_{1}$ and *r*$_{2}$ of the circles fitted on projection plane, which are the perspective projections of line segments *t*$_{3}$*t*$_{4}$ on upper end face and *k*$_{2}$*k*$_{5}$ on plane $\Pi$ respectively. Line segment *t*$_{3}$*t*$_{4}$ is radius *R*$_{1}$ of the edge circle on upper end face, while line segment *k*$_{2}$*k*$_{5}$ is the true radius *R*$_{2}$, which on plane II paralleled to upper end face. Since the projection plane is parallel to the upper end face, then $\Delta O_{c}s_{1}s_{3}\sim\Delta O_{c}t_{1}t_{3}$, $\Delta O_{c}s_{3}s_{4}\sim\Delta O_{c}t_{3}t_{4}$, we can get
 
 
+$$\frac{O_{c}s_{1}}{O_{c}t_{1}}=\frac{O_{c}s_{3}}{O_{c}t_{3}}=\frac{s_{3}s_{4}}{t_{3}t_{4}}=\frac{1}{Z_{u}}=\frac{r_{1}}{R_{1}} \tag{19}$$
 
-
-Ocs1Oct1=Ocs3Oct3=s3s4t3t4=1Zu=r1R1
-
-
-(19)
 
 
 10.1371/journal.pone.0307525.g003
@@ -204,37 +158,24 @@ Determination of the upper end face position.
 
 Where *Z*$_{u}$ is the *Z* world coordinate of the point on measurement plane.
 
-Similarly, $\Delta$Ocs1s2$\sim$$\Delta$Ock1k2, $\Delta$Ocs2s5$\sim$$\Delta$Ock2k5, and the length of line segment *t*$_{1}$*k*$_{1}$ is the known axial chamfer size *q*$_{1}$ of the part, so
+Similarly, $\Delta O_{c}s_{1}s_{2}\sim\Delta O_{c}k_{1}k_{2}$, $\Delta O_{c}s_{2}s_{5}\sim\Delta O_{c}k_{2}k_{5}$, and the length of line segment *t*$_{1}$*k*$_{1}$ is the known axial chamfer size *q*$_{1}$ of the part, so
 
 
-
-
-Ocs1Ock1=Ocs2Ock2=s2s5k2k5=1Zu+q1=r2R2
-
-
-(20)
+$$\frac{O_{c}s_{1}}{O_{c}k_{1}}=\frac{O_{c}s_{2}}{O_{c}k_{2}}=\frac{s_{2}s_{5}}{k_{2}k_{5}}=\frac{1}{Z_{u}+q_{1}}=\frac{r_{2}}{R_{2}} \tag{20}$$
 
 According to the lengths of line segment *t*$_{3}$*t*$_{4}$ and *k*$_{2}$*k*$_{5}$, it can be obtained
 
 
+$$R_{2}-R_{1}=q_{2} \tag{21}$$
 
-
-R2$-$R1=q2
-
-
-(21)
 
 Where *q*$_{2}$ is the known radial chamfer size of the part, usually *q*$_{2}$ = *q*$_{1}$.
 
 The *Z* world coordinate *Z*$_{u}$ of the point on measurement plane can be determined by substituting Eqs (19) and (20) into Eq (21).
 
 
+$$Z_{u}=\frac{q_{2}-r_{2}q_{1}}{r_{2}-r_{1}} \tag{22}$$
 
-
-Zu=q2$-$r2q1r2$-$r1
-
-
-(22)
 
 Where *Z*$_{u}$ is a scalar, and its symbol is determined by the actual position of measurement plane relative to the *Z*-axis of world coordinate system.
 
@@ -242,17 +183,23 @@ Where *Z*$_{u}$ is a scalar, and its symbol is determined by the actual position
 
 According to Eqs (11) and (22), the world coordinates (*X*$_{ui}$,*Y*$_{ui}$,*Z*$_{ui}$) of measurement points on measurement plane are reconstructed by the ray tracing method, as shown in Eq (23).
 
+$$X_{ui}=\frac{X_{Li}}{Z_{Li}}Z_{u},\;Y_{ui}=\frac{Y_{Li}}{Z_{Li}}Z_{u},\;Z_{ui}=Z_{u} \tag{23}$$
+
 ### 3.2 Reduce the impact of chamfer on measurement accuracy
 
-Due to the part chamfer, the measurement points on measurement plane (upper end face of the part), as shown in Eq (23), are not the accurate measurement points for minimum inner diameter or maximum outer diameter of the part. The accurate measurement points should be on the edge of plane $\Pi$ in Fig 3. Plane $\Pi$ is parallel to the measurement plane, and the distance between two planes is known axial chamfer size *q*$_{1}$ of the part, so the *Z* world coordinate of the point on plane $\Pi$ is *Z*$\Pi$ = *Z*$_{u}$+*q*$_{1}$.
+Due to the part chamfer, the measurement points on measurement plane (upper end face of the part), as shown in Eq (23), are not the accurate measurement points for minimum inner diameter or maximum outer diameter of the part. The accurate measurement points should be on the edge of plane $\Pi$ in Fig 3. Plane $\Pi$ is parallel to the measurement plane, and the distance between two planes is known axial chamfer size *q*$_{1}$ of the part, so the *Z* world coordinate of the point on plane $\Pi$ is *Z*$_{\Pi}$ = *Z*$_{u}$+*q*$_{1}$.
 
 According to Eq (11), the world coordinates of measurement points on plane $\Pi$ are reconstructed by the ray tracing method, as shown in Eq (24).
+
+$$X_{\Pi i}=\frac{X_{Li}}{Z_{Li}}Z_{\Pi},\;Y_{\Pi i}=\frac{Y_{Li}}{Z_{Li}}Z_{\Pi},\;Z_{\Pi i}=Z_{\Pi} \tag{24}$$
 
 ### 3.3 Visual measurement of inner, outer diameters and thickness of disk parts
 
 The circle geometric fitting model on plane $\Pi$ can be established according to Eqs (12)–(18) and (18), and then the inner and outer diameters *d*$_{n}$ and *d*$_{w}$ of disk parts are obtained by geometrically fitting the circle on plane II.
 
 In section 2.2, The *Z* world coordinate *Z*$_{0}$ of the point on lower end face can be obtained by camera extrinsic parameters. So thickness *L*$_{H}$ of the disk part is calculated by *Z*$_{0}$ and Eq (22).
+
+$$L_{H}=Z_{0}-Z_{u} \tag{25}$$
 
 ## 4 Experiment and analysis
 

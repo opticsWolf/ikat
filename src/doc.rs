@@ -113,7 +113,7 @@ fn width_to_tex(width: Option<&str>, span_w: &str) -> String {
 
 /// Per-element float options from a `{k=v ...}` attribute string
 /// (fence info lines, `%% table {...}` comments, plot registry).
-/// Unknown keys and bad values are errors — strict subset doctrine.
+/// Unknown keys and bad values are errors â€” strict subset doctrine.
 #[derive(Debug, Clone, Default)]
 pub struct ElemAttrs {
     pub span: Option<Span>,
@@ -141,7 +141,7 @@ fn parse_width(s: &str) -> Result<String, String> {
 
 /// Attribute parser. `line` is the 1-based source line of the attr
 /// string (fence info or directive line); the echo is the attr
-/// string itself — short, and it always contains the bad token.
+/// string itself â€” short, and it always contains the bad token.
 pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bool), crate::error::Error> {
     use crate::error::Error;
     let mut out = ElemAttrs::default();
@@ -152,7 +152,7 @@ pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bo
             continue;
         }
         // Caret column of this token inside the attr string (char
-        // columns; leading whitespace inside braces counts — the
+        // columns; leading whitespace inside braces counts â€” the
         // classic off-by-indent lives here).
         let tok_col = attr.find(tok).map(|b| crate::error::col_of(attr, b));
         let Some((k, v)) = tok.split_once('=') else {
@@ -363,7 +363,7 @@ fn strip_tex_comments(skel: &str) -> String {
 /// `{{title}}/{{author}}/{{thanks}}` fill as level 1;
 /// 1-based line number of the byte index inside a head/skeleton
 /// file (template errors are head-relative; Python attributes the
-/// head file — see `document._with_file`).
+/// head file â€” see `document._with_file`).
 fn head_line(tex: &str, byte_idx: usize) -> usize {
     tex[..byte_idx.min(tex.len())].matches('\n').count() + 1
 }
@@ -388,7 +388,7 @@ fn tok_line(skel: &str, tok: &str) -> (usize, String, Option<usize>) {
 /// required exactly once unless `bib` is empty (biblatex-style
 /// skeletons print refs themselves); `{{abstract}}` is required
 /// exactly once when `abstract_tex` is non-empty, else renders
-/// empty. Unknown `{{word}}` tokens and duplicates are errors —
+/// empty. Unknown `{{word}}` tokens and duplicates are errors â€”
 /// a typo'd token must fail here, not as a silent blank page.
 pub fn render_skeleton(
     skel: &str,
@@ -481,7 +481,7 @@ pub fn render_skeleton(
 /// `titlesec` breaks `IEEEtran` sectioning (notably
 /// `[nobottomtitles]`): reject the combination naming both, and
 /// point at the built-in `[typography]` guards as the replacement.
-/// Do NOT re-propose titlesec here — this error is the record.
+/// Do NOT re-propose titlesec here â€” this error is the record.
 pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), crate::error::Error> {
     let uses_titlesec = crate::texenv::used_packages(preamble_tex).iter().any(|p| p == "titlesec");
     if uses_titlesec && class.map(|c| c.starts_with("IEEE")).unwrap_or(false) {
@@ -559,7 +559,392 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     if tex.contains("sidewaystable") {
         out.push("\\usepackage{rotating}".to_string());
     }
+    if tex.contains("\\begin{strip}") {
+        out.push("\\usepackage{cuted}".to_string());
+    }
     out
+}
+
+/// Width estimate for display math (M7.8): bare-LaTeX span in cm at
+/// the document size. `\tag` is right-margin furniture (excluded);
+/// `\frac`/`\sqrt` take their widest part; accents and sub/supers
+/// add nothing; matrices take their widest row. Unknown commands
+/// contribute nothing â€” the estimate only needs the glyph bulk that
+/// decides column-vs-strip. Same 0.16 cm/char factor as the table
+/// ruler, so the err direction (strip when unsure) is benign: a
+/// full-width display is always legal, a column overflow is not.
+pub(crate) fn display_math_width_cm(tex: &str) -> f64 {
+    // A display holds one equation; `\\` separates its rows.
+    let mut tex = tex.to_string();
+    // Excise the tag: it sits in the margin, never binds the width.
+    while let Some(i) = tex.find("\\tag{") {
+        // Inside the tag's brace already: depth starts at 1.
+        let mut depth = 1usize;
+        let mut j = i + 5;
+        let bytes = tex.as_bytes();
+        while j < bytes.len() {
+            match bytes[j] {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        j += 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            j += 1;
+        }
+        tex.replace_range(i..j.min(tex.len()), "");
+    }
+    split_display_rows(&tex)
+        .iter()
+        .map(|row| math_row_width_cm(row))
+        .reduce(f64::max)
+        .unwrap_or(0.0)
+}
+
+/// Split a display on `\\\\` row breaks, ignoring `\\\\` inside
+/// `matrix` environments (their rows size inside-out via
+/// `math_row_width_cm`; splitting there would measure shards).
+fn split_display_rows(tex: &str) -> Vec<&str> {
+    let mut rows = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    let mut i = 0usize;
+    while i < tex.len() {
+        if tex[i..].starts_with("\\begin{matrix}") {
+            depth += 1;
+            i += "\\begin{matrix}".len();
+            continue;
+        }
+        if tex[i..].starts_with("\\end{matrix}") {
+            depth = (depth - 1).max(0);
+            i += "\\end{matrix}".len();
+            continue;
+        }
+        if depth == 0 && tex[i..].starts_with("\\\\") {
+            rows.push(&tex[start..i]);
+            i += 2;
+            start = i;
+            continue;
+        }
+        i += 1;
+    }
+    rows.push(&tex[start..]);
+    rows
+}
+
+/// Width of one `\\`-free display row.
+fn math_row_width_cm(row: &str) -> f64 {
+    // Matrices bank their width and leave a zero-width placeholder:
+    // a matrix sits INLINE (text + matrix + text sum on one row),
+    // so max() would undercount side-by-side content.
+    let mut bank = 0.0;
+    let mut s = row.to_string();
+    loop {
+        let Some(mstart) = s.find("\\begin{matrix}") else { break };
+        let inner_start = mstart + "\\begin{matrix}".len();
+        // Depth-matched close: nested matrices (A=(...)) must pair
+        // with their own end, not the first one in the row.
+        let mut mend_opt = None;
+        let mut d = 1i32;
+        let mut k = inner_start;
+        while k < s.len() {
+            if s[k..].starts_with("\\begin{matrix}") {
+                d += 1;
+                k += "\\begin{matrix}".len();
+            } else if s[k..].starts_with("\\end{matrix}") {
+                d -= 1;
+                if d == 0 {
+                    mend_opt = Some(k - inner_start);
+                    break;
+                }
+                k += "\\end{matrix}".len();
+            } else {
+                k += 1;
+            }
+        }
+        let Some(mend) = mend_opt else { break };
+        let inner = s[inner_start..inner_start + mend].to_string();
+        let widest = split_display_rows(&inner)
+            // (row breaks respect nesting: shared splitter)
+            .iter().map(|r| {
+                // Columns share the row: sum like tabular does.
+                let cells: Vec<f64> = r.split('&').map(math_row_width_cm).collect();
+                cells.iter().sum::<f64>() + 0.3 * cells.len().saturating_sub(1) as f64
+            })
+                        .reduce(f64::max)
+            .unwrap_or(0.0);
+        bank += widest;
+        s = format!("{}\u{E000}{}", &s[..mstart], &s[inner_start + mend + "\\end{matrix}".len()..]);
+    }
+    let mut w = bank;
+    let mut cs = s.chars().peekable();
+    while let Some(c) = cs.next() {
+        if c == '\\' {
+            let mut name = String::new();
+            while let Some(&d) = cs.peek() {
+                if d.is_ascii_alphabetic() {
+                    name.push(d);
+                    cs.next();
+                } else {
+                    break;
+                }
+            }
+            if name.is_empty() {
+                // `\{`, `\}`, `\%`, `\,` ... two-char command.
+                match cs.next() {
+                    Some(',') | Some(':') => w += 0.15,
+                    Some(';') => w += 0.25,
+                    Some('!') => {}
+                    Some(' ' | '\\') => {}
+                    Some(_) => w += 0.25,
+                    None => {}
+                }
+                continue;
+            }
+            match name.as_str() {
+                "left" | "right" => {}
+                "frac" => {
+                    let a = take_group(&mut cs);
+                    let b = take_group(&mut cs);
+                    w += math_row_width_cm(&a).max(math_row_width_cm(&b));
+                }
+                "sqrt" => {
+                    // Optional `[n]` root index adds nothing.
+                    if cs.peek() == Some(&'[') {
+                        take_bracket(&mut cs);
+                    }
+                    let a = take_group(&mut cs);
+                    w += math_row_width_cm(&a);
+                }
+                "text" => {
+                    let a = take_group(&mut cs);
+                    w += a.chars().count() as f64 * 0.12;
+                }
+                "sum" | "prod" | "int" | "iint" | "oint" | "bigcup" | "bigcap" | "lim"
+                | "max" | "min" | "sup" | "inf" | "liminf" | "limsup" => w += 0.35,
+                "quad" => w += 0.5,
+                "qquad" => w += 1.0,
+                "langle" | "rangle" => w += 0.16,
+                _ => {
+                    // Wrappers (accents, fonts): the widest braced
+                    // argument decides (sub/superscripts attach).
+                    // BARE commands (alpha, int, in, to, infty) are
+                    // single glyphs: count one at 0.22 (Greek and
+                    // operators run wider than the 0.16 text factor).
+                    let mut best = 0.0f64;
+                    let mut any = false;
+                    while cs.peek() == Some(&'{') {
+                        any = true;
+                        let g = take_group(&mut cs);
+                        best = best.max(math_row_width_cm(&g));
+                    }
+                    if any {
+                        w += best;
+                    } else if matches!(name.as_str(),
+                        "leq" | "geq" | "neq" | "approx" | "equiv" | "sim" | "simeq" | "cong"
+                        | "to" | "leftarrow" | "rightarrow" | "Rightarrow" | "in" | "ni" | "notin"
+                        | "subset" | "supset" | "subseteq" | "supseteq" | "propto" | "angle" | "perp") {
+                        // Relations: glyph plus thick glue.
+                        w += 0.5;
+                    } else if matches!(name.as_str(),
+                        "pm" | "times" | "div" | "cdot" | "circ" | "ast" | "star"
+                        | "cap" | "cup" | "oplus" | "otimes" | "wedge" | "vee") {
+                        // Binary ops: glyph plus medium glue.
+                        w += 0.4;
+                    } else if name.as_str() == "Vert" {
+                        w += 0.4;
+                    } else {
+                        w += 0.22;
+                    }
+                }
+            }
+        } else if c == '_' || c == '^' {
+            // Scripts ride above/below but extend RIGHTWARD past
+            // the base (x^{gamma+alpha-1} is wider than x): add the
+            // script width. Stacked sub+sup overcounts slightly â€”
+            // conservative, strip-biased, exactly the safe side.
+            if cs.peek() == Some(&'{') {
+                let g = take_group(&mut cs);
+                w += math_row_width_cm(&g);
+            } else {
+                cs.next();
+                w += 0.16;
+            }
+        } else if c == '{' || c == '}' || c == '~' {
+            // Grouping / non-breaking space: no width.
+        } else if c == '&' {
+            w += 0.3;
+        } else if c == '=' {
+            // Relation with thick glue both sides.
+            w += 0.5;
+        } else if c == '+' || c == '-' {
+            // Binary op with medium glue (unary slightly
+            // overcounts: safe side).
+            w += 0.35;
+        } else if c == '<' || c == '>' {
+            w += 0.5;
+        } else if c == ',' {
+            w += 0.2;
+        } else if c == ';' {
+            w += 0.3;
+        } else if c == '\u{E000}' {
+            // Banked matrix placeholder: zero width.
+
+        } else {
+            w += 0.17;
+        }
+    }
+    w
+}
+
+/// Split an over-wide display into breakable rows (M7.8): only at
+/// brace-depth 0 and outside `\\left..\\right` pairs (which may not
+/// span `\\\\`). Prefer `=` (operator closes the row); else binary
+/// `+`/`-` (operator opens the continuation). Never invent breaks
+/// inside fractions, scripts, or matrices â€” unbreakable rows stay
+/// whole and keep their residual overfull honestly.
+pub(crate) fn break_display_rows(tex: &str) -> Vec<String> {
+    let mut rows = vec![tex.to_string()];
+    for _ in 0..6 {
+        let idx = rows
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| display_math_width_cm(r) > 17.8)
+            .max_by(|(_, a), (_, b)| {
+                display_math_width_cm(a).partial_cmp(&display_math_width_cm(b)).unwrap()
+            })
+            .map(|(i, _)| i);
+        let i = match idx {
+            Some(i) => i,
+            None => break,
+        };
+        match split_row_once(&rows[i]) {
+            Some((a, b)) => {
+                rows[i] = b;
+                rows.insert(i, a);
+            }
+            None => break,
+        }
+    }
+    rows
+}
+
+/// One split of a display row at a top-level break point.
+fn split_row_once(row: &str) -> Option<(String, String)> {
+    // Candidate split byte offsets with their operator class.
+    let mut eq_at: Option<usize> = None;
+    let mut bin_at: Option<usize> = None;
+    let mut depth = 0i32;
+    let mut left_depth = 0i32;
+    let mut matrix_depth = 0i32;
+    let mut prev_closable = false;
+    let bytes = row.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i] as char;
+        if c == '\\' {
+            let mut j = i + 1;
+            while j < bytes.len() && (bytes[j] as char).is_ascii_alphabetic() {
+                j += 1;
+            }
+            let name = &row[i + 1..j];
+            if name == "left" {
+                left_depth += 1;
+                prev_closable = false;
+            } else if name == "right" {
+                // The unclosed-fence fixup appends a matchless
+                // `\right.`: never let it drive the depth negative.
+                left_depth = (left_depth - 1).max(0);
+                prev_closable = true;
+            } else if name == "begin" {
+                matrix_depth += 1;
+            } else if name == "end" {
+                matrix_depth = (matrix_depth - 1).max(0);
+            } else if !name.is_empty() {
+                // A typeset command is an atom (`\\alpha - x`
+                // breaks after the alpha, not before the minus).
+                prev_closable = true;
+            }
+            i = if name.is_empty() { j + 1 } else { j };
+            continue;
+        }
+        match c {
+            '{' => {
+                depth += 1;
+                prev_closable = false;
+            }
+            '}' => {
+                depth -= 1;
+                prev_closable = true;
+            }
+            '=' if depth == 0 && left_depth == 0 && matrix_depth == 0 => {
+                eq_at = Some(i);
+                prev_closable = false;
+            }
+            '+' | '-' if depth == 0 && left_depth == 0 && matrix_depth == 0 && prev_closable => {
+                bin_at = Some(i);
+                prev_closable = false;
+            }
+            ')' | ']' => prev_closable = true,
+            ',' | ';' => prev_closable = false,
+            ' ' => {}
+            _ if c.is_alphanumeric() => prev_closable = true,
+            _ => prev_closable = false,
+        }
+        i += 1;
+    }
+    // Latest `=` keeps rows longest-first; else latest binary op.
+    if let Some(p) = eq_at {
+        // Operator closes the row: `A =` / `B =` / `C`.
+        return Some((format!("{}", row[..p + 1].trim_end()), row[p + 1..].trim_start().to_string()));
+    }
+    if let Some(p) = bin_at {
+        // Operator opens the continuation: `A` / `+ B`.
+        return Some((row[..p].trim_end().to_string(), row[p..].trim_start().to_string()));
+    }
+    None
+}
+
+/// Consume one `{...}` group (caller ate the `{`), nested-aware.
+fn take_group(cs: &mut std::iter::Peekable<std::str::Chars>) -> String {
+    let mut out = String::new();
+    if cs.peek() != Some(&'{') {
+        return out;
+    }
+    cs.next();
+    let mut depth = 1usize;
+    for c in cs.by_ref() {
+        match c {
+            '{' => {
+                depth += 1;
+                out.push(c);
+            }
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+                out.push(c);
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Consume one `[...]` optional argument.
+fn take_bracket(cs: &mut std::iter::Peekable<std::str::Chars>) {
+    if cs.peek() == Some(&'[') {
+        for c in cs.by_ref() {
+            if c == ']' {
+                break;
+            }
+        }
+    }
 }
 
 /// Does this `.tex` fragment need TikZ? (standalone preamble builder)
@@ -620,7 +1005,7 @@ pub fn convert(
         Ok(())
     };
 
-    // E.1 (M5.4): the line walk is gone — `crate::md::blocks()`
+    // E.1 (M5.4): the line walk is gone â€” `crate::md::blocks()`
     // owns boundaries (pulldown-cmark) with raw-slice content, and
     // every arm below is the old branch body verbatim on the same
     // inputs. `lines` is rejoined because offsets need one source.
@@ -678,7 +1063,7 @@ pub fn convert(
             MdKind::Directive(a) => {
                 // Same stash rule, parsed with the same `table #N`
                 // context; the Table arm below takes it. (A
-                // dangling `%% table` never becomes a Directive —
+                // dangling `%% table` never becomes a Directive â€”
                 // the pre-pass leaves it as paragraph text.)
                 let (attrs, _) = parse_attrs(&a, &format!("table #{table_idx}"), line)?;
                 if attrs.span.is_some()
@@ -767,7 +1152,7 @@ pub fn convert(
             MdKind::Para(ls) => {
                 // Consecutive Para blocks are always blank-separated
                 // (`blocks()` splits there), so a pending para must
-                // flush first — the old scanner flushed on the blank
+                // flush first â€” the old scanner flushed on the blank
                 // line itself. Lines WITHIN one block join safely.
                 if !para.is_empty() {
                     flush(&mut out, &mut para, para_line)?;
@@ -775,6 +1160,111 @@ pub fn convert(
                 // The block's line is its first fed line's original.
                 para_line = line;
                 para.extend(ls);
+            }
+            MdKind::DisplayMath(t) => {
+                // M7.8 honest math: structured spans break at
+                // relations inside the column; a span wider than the
+                // column takes a full-width `strip` (cuted) instead
+                // of overflowing. Weaver-side and deterministic â€” no
+                // advisory needed, the width is intrinsic.
+                flush(&mut out, &mut para, para_line)?;
+                if t.contains("$$") {
+                    return Err(Error::new(
+                        format!("line {line}: display math holds a second `$$`; one span per paragraph"),
+                        line,
+                        t.clone(),
+                    ));
+                }
+                let no_matrix = t.replace("\\begin{matrix}", "").replace("\\end{matrix}", "");
+                if no_matrix.contains("\\begin") || no_matrix.contains("\\end") {
+                    return Err(Error::new(
+                        format!("line {line}: display math allows no environments except matrix"),
+                        line,
+                        t.clone(),
+                    ));
+                }
+                // `\\left\\{` delimiters and `\\{` literals are not
+                // groups: skip them so a cases-Brace (`\\left\\{` +
+                // `\\right.`) does not read as unbalanced.
+                let mut balance = 0i32;
+                let mut bs = t.chars().peekable();
+                while let Some(c) = bs.next() {
+                    if c != '\\' {
+                        if c == '{' {
+                            balance += 1;
+                        } else if c == '}' {
+                            balance -= 1;
+                        }
+                        continue;
+                    }
+                    let mut name = String::new();
+                    while let Some(&d) = bs.peek() {
+                        if d.is_ascii_alphabetic() {
+                            name.push(d);
+                            bs.next();
+                        } else {
+                            break;
+                        }
+                    }
+                    if name == "left" || name == "right" {
+                        // Delimiter token: `{`, `}`, `|`, `.`, `\\{`,
+                        // or a command (`\\langle`). A lone backslash
+                        // followed by a non-letter is ONE delimiter
+                        // (`\\{`); consuming only the backslash would
+                        // strand the brace and fake an imbalance.
+                        if bs.peek() == Some(&'\\') {
+                            bs.next();
+                            if bs.peek().map(|d| d.is_ascii_alphabetic()).unwrap_or(false) {
+                                while let Some(&d) = bs.peek() {
+                                    if d.is_ascii_alphabetic() {
+                                        bs.next();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            } else {
+                                bs.next();
+                            }
+                        } else {
+                            bs.next();
+                        }
+                    } else if name.is_empty() {
+                        bs.next(); // `\\{`, `\\%` ... literal, not a group.
+                    }
+                }
+                if balance != 0 {
+                    return Err(Error::new(
+                        format!("line {line}: display math has unbalanced braces"),
+                        line,
+                        t.clone(),
+                    ));
+                }
+                let w = display_math_width_cm(&t);
+                if w <= cfg.layout.column_cm {
+                    out.push(format!("\\[{t}\\]\n"));
+                } else {
+                    needs.strip = true;
+                    if w > cfg.layout.textwidth_cm {
+                        // Wider than the full measure: break at
+                        // top-level relations. Plain spans use one
+                        // multline* inside the strip; matrix spans
+                        // keep `&` tabs, which multline forbids, so
+                        // each piece takes its own strip instead.
+                        let rows = break_display_rows(&t);
+                        if t.contains("\\begin{matrix}") {
+                            for r in rows {
+                                out.push(format!("\\begin{{strip}}\n\\[{r}\\]\n\\end{{strip}}\n"));
+                            }
+                        } else {
+                            out.push(format!(
+                                "\\begin{{strip}}\n\\begin{{multline*}}\n{}\n\\end{{multline*}}\n\\end{{strip}}\n",
+                                rows.join(" \\\\\n")
+                            ));
+                        }
+                    } else {
+                        out.push(format!("\\begin{{strip}}\n\\[{t}\\]\n\\end{{strip}}\n"));
+                    }
+                }
             }
         }
     }
@@ -805,7 +1295,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         let mut figs = Vec::new();
         for (key, cap) in &spec.plots {
             // Plot attrs ride the spec dict (JSON/Python), not the
-            // manuscript: line 0 (data class — no manuscript line).
+            // manuscript: line 0 (data class â€” no manuscript line).
             let pattrs = match spec.plot_attrs.get(key) {
                 Some(a) => parse_attrs(a, &format!("plot {key}"), 0)?.0,
                 None => ElemAttrs::default(),
@@ -847,7 +1337,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     let has_plots = body.contains("\\begin{axis}");
     let mut head: Vec<String> = if !spec.skeleton.is_empty() {
         // Level 3: the skeleton IS the document. No generated
-        // head/tail at all — render tokens, splice appends, done.
+        // head/tail at all â€” render tokens, splice appends, done.
         if !spec.preamble_override.is_empty() || !cfg.template.preamble_file.is_empty() {
             return Err(crate::error::Error::data(
                 "[template] skeleton is mutually exclusive with preamble_file",
@@ -1184,7 +1674,7 @@ mod tests {
     #[test]
     fn error_attr_caret_counts_leading_whitespace() {
         // The attr string keeps its inner leading space (`{ ...}`)
-        // — the caret must count it, not the trimmed token.
+        // â€” the caret must count it, not the trimmed token.
         let err = parse_attrs("  span=wide bogus=1", "t", 9).unwrap_err();
         assert_eq!(err.line, 9, "got: {err}");
         assert_eq!(err.col, Some(13), "bogus starts char 13, got: {err}");
@@ -1273,7 +1763,7 @@ mod tests {
         let pos_r = r.tex.find("\\bibliography{refs-paper}").unwrap();
         assert!(pos_b < pos_r, "barrier flushes before the refs");
         assert!(r.tex.contains("\\usepackage{placeins}"));
-        // No bib: knob on but nothing to guard — no stray barrier.
+        // No bib: knob on but nothing to guard â€” no stray barrier.
         let mut s = spec();
         s.bib_name.clear();
         s.diagrams.clear();
@@ -1296,6 +1786,94 @@ mod tests {
         // unbreakable columns cannot live in 8.9cm at any size.
         assert!(r.tex.contains("\\begin{sidewaystable*}[p]"), "rotates wide");
         assert!(r.tex.contains("\\usepackage{rotating}"), "package follows needs");
+    }
+
+    #[test]
+    fn display_math_narrow_stays_column() {
+        // Short spans center in-flow: no strip, no cuted.
+        let md = "# T\n\n$$\\vartheta_{\\beta}(\\zeta)$$\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\[\\vartheta_{\\beta}(\\zeta)\\]"), "plain display");
+        assert!(!r.tex.contains("strip"), "no strip for narrow math");
+        assert!(!r.tex.contains("cuted"), "no cuted for narrow math");
+    }
+
+    #[test]
+    fn display_math_wide_takes_strip() {
+        // A 13-column-style monster cannot fit 8.9cm: full-width
+        // strip + cuted package, tag preserved.
+        let inner = "\\vartheta_{\\beta}=0.086^{*}+0.080^{**}+0.088^{**}+0.085^{**}+0.093^{**}".to_string()
+            + &"+0.080^{**}+0.068^{*}+0.072^{*}+0.070^{*}+0.065^{*}+0.056^{*}+0.060^{*}";
+        let md = format!("# T\n\n$${}$$\n", format!("{inner} \\tag{{9}}"));
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(&md, "", &s).unwrap();
+        assert!(r.tex.contains("\\begin{strip}"), "wide math strips");
+        assert!(r.tex.contains("\\usepackage{cuted}"), "package follows needs");
+        assert!(r.tex.contains("\\tag{9}"), "tag rides inside");
+    }
+
+    #[test]
+    fn display_math_width_frac_takes_max() {
+        // A fraction is as wide as its widest part, not the sum.
+        let half = display_math_width_cm("\\frac{ab}{c}");
+        let whole = display_math_width_cm("abc");
+        assert!((half - 0.34).abs() < 1e-9, "got {half}");
+        assert!((whole - 0.51).abs() < 1e-9, "got {whole}");
+        assert!(display_math_width_cm("x \\tag{12}") < 0.5, "tag excluded");
+    }
+
+    #[test]
+    fn display_math_brace_delimiters_balance() {
+        // `\\left\\{` + `\\right.` is balanced delimiters, not groups.
+        let md = "# T\n\n$$\\left\\{x\\right. \\tag{2}$$\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.tex.contains("\\[\\left\\{x\\right. \\tag{2}\\]"), "kept: {}", r.tex);
+    }
+
+    #[test]
+    fn display_math_breaks_monster_rows() {
+        // A 610-char Galerkin monster: strip + multline, split at `=`.
+        let a = "\\vartheta(\\zeta)";
+        let chunk = format!("(\\frac{{x}}{{y}}+\\int_{{0}}^{{\\zeta}}{a}d{a})^{{\\frac{{1}}{{p}}}}+{a})", a = a);
+        let big = format!("G{a}={c}+{c}+{c}+{c}+{c}={a}", a = a, c = chunk);
+        let md = format!("# T\n\n$${big}$$\n");
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(&md, "", &s).unwrap();
+        assert!(r.tex.contains("\\begin{multline*}"), "breaks");
+        assert!(r.tex.contains("\\\\\n"), "rows split");
+    }
+
+    #[test]
+    fn display_math_no_split_inside_frac_or_matrix() {
+        // No top-level operator: one row, however wide.
+        let md = "# T\n\n$$\\frac{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}{b}$$\n";
+        let rows = break_display_rows(&md[5..md.len() - 3]);
+        assert_eq!(rows.len(), 1, "frac never splits");
+    }
+
+    #[test]
+    fn display_math_rejects_alien_environments() {
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let md = "# T\n\n$$\\begin{equation}x\\end{equation}$$\n";
+        let err = build_document(md, "", &s).unwrap_err();
+        assert!(err.msg.contains("except matrix"), "got {}", err.msg);
+    }
+
+    #[test]
+    fn strip_extra_package_detected() {
+        assert!(tex_extra_packages("\\begin{strip}x").contains(&"\\usepackage{cuted}".to_string()));
     }
 
     #[test]
@@ -1374,4 +1952,5 @@ mod tests {
         s.diagrams.clear();
         assert!(build_document("```mermaid\ngraph TD\na[x]\n```\n", "", &s).is_err());
     }
+
 }
