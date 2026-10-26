@@ -403,6 +403,54 @@ def _commands_taught(skill_text: str) -> set[str]:
     return taught
 
 
+def _flags_taught(skill_text: str) -> dict[str, set[str]]:
+    """Per-command `--flags` taught inside fenced code blocks.
+
+    A piece starting with `ikat CMD` rebinds the current command;
+    pipe-segments without `ikat` (`show NAME`, `install [--dest …]`)
+    and indented continuation lines belong to the current command.
+    """
+    import re
+
+    fences = re.findall(r"```(?:bash|sh)?\n(.*?)```", skill_text, re.DOTALL)
+    taught: dict[str, set[str]] = {}
+    cur = None
+    for fence in fences:
+        for line in fence.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            for piece in re.split(r"\||&&|;", stripped):
+                piece = piece.strip()
+                m = re.match(r"ikat ([a-z][a-z-]*)", piece)
+                if m:
+                    cur = m.group(1)
+                elif not stripped.startswith("ikat") and line[:1] not in (" ", "\t"):
+                    continue  # a non-command segment of a non-command line
+                taught.setdefault(cur, set())
+                taught[cur] |= set(re.findall(r"--([a-z][a-z-]*)", piece))
+    return taught
+
+
+def _real_flags(parser) -> dict[str, set[str]]:
+    """Per-command optional flags from the argparse parser itself."""
+    subs = parser._subparsers._group_actions[0].choices
+    real: dict[str, set[str]] = {}
+    for cmd, subp in subs.items():
+        flags = set()
+        actions = list(subp._actions)
+        # nested sub-subparsers (skills list/show/install): union them
+        for ga in getattr(subp._subparsers, "_group_actions", []) or []:
+            for nested in ga.choices.values():
+                actions.extend(nested._actions)
+        for a in actions:
+            for o in a.option_strings:
+                if o not in ("-h", "--help"):
+                    flags.add(o.lstrip("-"))
+        real[cmd] = flags
+    return real
+
+
 def test_skill_frontmatter_is_valid():
     from ikat.skills import iter_skills
 
@@ -421,6 +469,26 @@ def test_cli_skill_teaches_real_commands():
     assert not phantom, f"ikat-cli SKILL.md teaches phantom commands: {sorted(phantom)}"
     missing = real - taught
     assert not missing, f"ikat-cli SKILL.md never mentions: {sorted(missing)}"
+
+
+def test_cli_skill_teaches_real_flags():
+    """Every command's flags: none invented, none omitted.
+
+    Gossamer's drift-test model, extended past command names: the
+    skill's fenced syntax must match the argparse parser flag by
+    flag, so a new CLI flag without a skill update fails here.
+    """
+    from ikat.cli import build_parser
+    from ikat.skills import skill_text
+
+    taught = _flags_taught(skill_text("ikat-cli"))
+    real = _real_flags(build_parser())
+    for cmd in real:
+        got = taught.get(cmd, set())
+        phantom = got - real[cmd]
+        assert not phantom, f"{cmd}: SKILL.md invents flags {sorted(phantom)}"
+        missing = real[cmd] - got
+        assert not missing, f"{cmd}: SKILL.md omits flags {sorted(missing)}"
 
 
 @needs_mcp

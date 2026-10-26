@@ -307,6 +307,12 @@ discoverable from the CLI too. And bare `ikat` prints help with exit
 0 instead of an argparse error (gossamer errors on both; ikat
 previously errored on bare).
 
+The drift tests now pin FLAGS, not just command names: every
+optional flag of every subcommand (nested `skills install` flags
+included) must appear in the skill's fenced syntax, and invented
+flags fail — this audit caught `ikat weave` never teaching
+`--bib`.
+
 ## M7.9b — Tool registry + skill installer (gossamer transfer, tranche 2) → 0.10.12
 
 The second gossamer-learning tranche: the 14 MCP tools became DATA.
