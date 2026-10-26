@@ -63,29 +63,49 @@ no font mismatch between text and figures.
 
 ```text
 ikat/
-  src/            Rust core (pyo3): mermaid.rs (flowcharts), plot.rs
-                  (pgfplots + legend auto-placement), table.rs, doc.rs,
-                  esc.rs (unicode/citations), config.rs (ikat.toml),
+  src/            Rust core (19 modules, pyo3 bindings in lib.rs):
+                  md.rs (block splitter on pulldown-cmark, line
+                  numbers), mermaid.rs (flowcharts), sequence.rs
+                  (sequenceDiagram), state.rs (stateDiagram-v2),
+                  emit.rs (shared TikZ emission), table.rs,
+                  plot.rs (pgfplots + legend auto-placement),
+                  preset.rs (bar/line JSON presets),
+                  doc.rs (head/body assembly, author front matter),
                   mathwidth.rs (TeX-calibrated display-math width),
+                  esc.rs (unicode/citations), config.rs (ikat.toml),
                   autolayout.rs (float measuring + policy),
+                  layout.rs (shared 2D geometry),
                   texenv.rs (package scan), tectonic.rs (engine),
-                  md_spike.rs (parser-spike harness, tests only)
+                  error.rs (line/column errors), md_spike.rs
+                  (parser-spike harness, tests only)
   python/ikat/    thin wrappers: pipeline.py (fences/spans/floats),
-                  document.py (BuildSpec assembly), compile.py (pdflatex
-                  driver), texenv.py (kpsewhich/tlmgr), cli.py (`ikat`
-                  script), mcp_server.py (FastMCP stdio), layout.py
+                  document.py (BuildSpec assembly), compile.py
+                  (pdflatex/tectonic driver), texenv.py
+                  (kpsewhich/tlmgr), cli.py (`ikat` script),
+                  mcp_server.py (FastMCP stdio), layout.py
                   (suggest/apply/report for auto-layout),
-                  registry.py (one source of truth for CLI/MCP/API
-                  tools + skill installer),
-                  templates/ (9 heads + skeleton-plain)
-  tests/          pytest suite (runs against maturin develop build)
-  docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
-  python/ikat/skills/  Agent Skills (bundled in the wheel, served as MCP
-                  resources): ikat guide, ikat-api, ikat-cli, ikat-mcp
-  examples/       mini.md starter + ikat-paper/ showcase (7-page paper
-                  built by ikat itself), plot/float/skeleton proofs,
-                  auto-proof/ (layout-bench corpus + the auto-layout
-                  showcase), bench_fetch.py (downloads the bench cache)
+                  preset.py (chart preset files), standalone.py
+                  (single-fence figures), registry.py (one source
+                  of truth for CLI/MCP/API tools + the skill
+                  installer), templates/ (9 heads + skeleton-plain),
+                  skills/ (Agent Skills: ikat guide, ikat-api,
+                  ikat-cli, ikat-mcp — bundled in the wheel, served
+                  as MCP resources)
+  tests/          pytest suite incl. the surface drift tests
+                  (commands/flags/tools/skills pinned to the code)
+  docs/           ARCHITECTURE.md, QUICKREF.md, ROADMAP.md,
+                  RESEARCH.md, FORMAT-DRAFT.md, PLAN-dev.md
+  examples/       mini.md starter + ikat-paper/ showcase (7-page
+                  paper built by ikat itself), auto-proof/ (the
+                  layout-bench corpus + the auto-layout showcase,
+                  byte-identical to the hand build),
+                  bench_fetch.py (downloads the bench cache),
+                  plot/float/skeleton/heads proof scripts
+  site/           this website (index.html + assets incl. the
+                  showcase PDF, check_links.py)
+  .github/        ci.yml (3-OS matrix + tex proofs), pages.yml
+                  (site validate + link gate + deploy), release.yml
+                  (tag-triggered PyPI/crates publish)
 ```
 
 ## Develop
