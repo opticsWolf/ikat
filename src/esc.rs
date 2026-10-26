@@ -142,7 +142,9 @@ fn stash(ph: &mut Vec<String>, s: String) -> String {
     format!("\x00{}\x00", ph.len() - 1)
 }
 
-fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, String> {
+/// The error carries the offending key separately so `inline`
+/// can place the caret on it.
+fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, (String, String)> {
     if !inner.contains('`') {
         return Ok(format!("[{inner}]"));
     }
@@ -153,7 +155,7 @@ fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>)
             let key = &mm[2];
             if let Some(set) = keys {
                 if !set.contains(key) {
-                    return Err(format!("dangling citation key `{key}`"));
+                    return Err((format!("dangling citation key `{key}`"), key.to_string()));
                 }
             }
             match author {
@@ -170,7 +172,7 @@ fn cite_group(inner: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>)
     Ok(stash(ph, joined))
 }
 
-fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, String> {
+fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>) -> Result<String, (String, String)> {
     // Bracket groups (citations).
     let re = cite_re();
     let mut buf = String::new();
@@ -217,10 +219,22 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
 }
 
 /// Full inline render with placeholder restore (descending indices —
-/// nested stashes expand inside-out).
-pub fn inline(text: &str, keys: Option<&HashSet<String>>) -> Result<String, String> {
+/// nested stashes expand inside-out). `line` is the 1-based source
+/// line for errors (the caller knows it; the echo is the text
+/// itself, which always contains the offending key).
+pub fn inline(text: &str, keys: Option<&HashSet<String>>, line: usize) -> Result<String, crate::error::Error> {
     let mut ph = Vec::new();
-    let mut text = inline_inner(text, keys, &mut ph)?;
+    let mut text = inline_inner(text, keys, &mut ph)
+        .map_err(|(m, key)| {
+            // Caret on the key's backticked occurrence (char
+            // columns — the echo may hold multibyte text).
+            let mut e = crate::error::Error::new(m, line, text.to_string());
+            let pat = format!("`{key}`");
+            if let Some(b) = text.find(&pat) {
+                e.col = Some(text[..b].chars().count() + 1);
+            }
+            e
+        })?;
     for i in (0..ph.len()).rev() {
         text = text.replace(&format!("\x00{i}\x00"), &ph[i].clone());
     }
@@ -237,7 +251,7 @@ mod tests {
 
     #[test]
     fn single_cite() {
-        assert_eq!(inline("[`snodgrass90`]", no_keys().as_ref()).unwrap(), "\\cite{snodgrass90}");
+        assert_eq!(inline("[`snodgrass90`]", no_keys().as_ref(), 1).unwrap(), "\\cite{snodgrass90}");
     }
 
     #[test]
@@ -247,6 +261,7 @@ mod tests {
         let got = inline(
             "[Snodgrass survey chapter: `branching_temporal_dbs_LNCS639`; Sarda and Reddy 1999: `sarda_reddy_1999`; branching-time algebra, no open copy]",
             Some(&keys),
+            7,
         )
         .unwrap();
         assert_eq!(
@@ -258,21 +273,21 @@ mod tests {
     #[test]
     fn dangling_key_fails() {
         let keys: HashSet<String> = ["a".into()].into();
-        assert!(inline("[`nope`]", Some(&keys)).is_err());
+        assert!(inline("[`nope`]", Some(&keys), 3).is_err());
         // Without a keyset there is nothing to validate against.
-        assert!(inline("[`nope`]", None).is_ok());
+        assert!(inline("[`nope`]", None, 3).is_ok());
     }
 
     #[test]
     fn math_protected_from_escapes() {
-        let got = inline("fork at $r$ about $v$ and 1.1--1.3$x$", no_keys().as_ref()).unwrap();
+        let got = inline("fork at $r$ about $v$ and 1.1--1.3$x$", no_keys().as_ref(), 1).unwrap();
         assert!(got.contains("$r$"));
         assert!(got.contains("1.1--1.3$x$"));
     }
 
     #[test]
     fn code_unicode_emphasis() {
-        let got = inline("`as_of_valid(v)` §3.2 and *true at v* and **bold**", no_keys().as_ref()).unwrap();
+        let got = inline("`as_of_valid(v)` §3.2 and *true at v* and **bold**", no_keys().as_ref(), 1).unwrap();
         assert!(got.contains("\\texttt{as\\_of\\_valid(v)}"));
         assert!(got.contains("\\S{}3.2"));
         assert!(got.contains("\\textit{true at v}"));

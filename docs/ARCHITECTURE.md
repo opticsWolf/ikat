@@ -97,6 +97,42 @@ are parsed in Rust; the `[scale=]` splice exists in both the Rust
 and the Python mirror (a past double-bracket bug is pinned by a
 test on each side).
 
+`sequenceDiagram` dispatches on its header line through the same
+`flowchart_to_tikz` entry (Phase C.1): participant columns in
+declaration order, one row per message, `alt`/`else`/`opt` boxes
+spanning all columns with the label outside above the top edge
+(inside it would strike the first message's label — proven by
+probe, fixed before the showcase). The knockout (`fill=white`)
+and node (`\node (id) at (x,y)`) vocabulary live in `emit.rs`,
+lifted verbatim from `mermaid.rs` — the golden paper proves the
+move byte-neutral.
+
+`stateDiagram-v2` (Phase C.2, `state.rs`) reuses the flowchart
+placer itself: `Graph`/`depths`/`layered_xy` are `pub(crate)` in
+`mermaid.rs`, states become nodes and transitions become edges.
+Layout first, boxes second — the composite rect is computed from
+placed member coordinates, so a box can never move them. The
+box-label rule (inside-top with half-row headroom, after an
+outside-above label struck an edge label in review) is recorded
+in the code for the D.1 subgraph boxes to reuse. `[*]` renders
+as a filled dot (start) and bullseye (end); nested composites
+are a build error.
+
+Phase D.1 (`layout.rs`, `mermaid.rs`): the legend resolver's
+segment geometry (`segs_cross`, `seg_hits_rect`) moved here and
+is reused, not rewritten. `depths()` is longest-path layering
+(multi-parent = max+1; cyclic depths cap at n, still
+terminating). `subgraph ID [title]`…`end` clusters draw
+post-layout via the shared `cluster_box`/`cluster_rect`
+(same numbers as state composites). Edges crossing a
+non-endpoint node box (conservative 3.4×0.9cm estimate)
+reroute via a pushed perpendicular midpoint (8 pushes;
+exhaustion names the edge); clear segments emit the exact
+historical line, so clean graphs are provably untouched. The
+showcase Figure 1 re-laid under max-depth (reviewed, clean);
+the golden main paper never calls the emitter (precompiled
+mode), so it stays byte-identical by construction.
+
 ### 3.2 `plot.rs` — data → pgfplots
 
 Two emitters, no plotting library: `barchart` (grouped bars with
@@ -123,6 +159,20 @@ row, which clears tick labels by construction. Inside corners
 cannot touch axis labels — labels live outside the axis box.
 Unknown words fail naming the full set.
 
+**Presets** (`preset.rs`, Phase A.1): benchmark JSON in,
+`tikzpicture` out. The schema wraps what the showcase `build.py`
+assembled by hand — `kind` (`bar`|`line`), `title`, `ylabel`
+(+ `xlabel`), shared `series_names`, bar fields `group_labels`
+`values`/`mins`/`maxs` (+ `log_y`, `refline`), line fields `xs`
+`yss`/`errs`, optional `legend` and `footnote` (rendered
+`{\footnotesize …\par}` after the picture). Validation is
+strict: rectangular series, `min ≤ value ≤ max` elementwise, `xs`
+strictly increasing — violations name the key, never a bare serde
+dump. Filesystem rule holds: Rust parses strings, Python
+(`preset.py::load_preset`) reads files and names them in errors.
+The emitters are untouched; the loader converts into their
+argument structs.
+
 ### 3.3 `table.rs`, `esc.rs`, `doc.rs` — the paper path
 
 - `table.rs`: pipe tables → `tabularx` with per-table column
@@ -135,7 +185,15 @@ Unknown words fail naming the full set.
 - `doc.rs`: `convert()`, the document assembler. Walks the line
   stream, dispatches fences/tables/citations/paragraphs, threads
   `FloatNeeds` upward, enforces the citation keyset (a dangling
-  key fails the build instead of printing raw). The golden test
+  key fails the build instead of printing raw). Whole-paragraph
+  `$$...$$` display math (M7.8) emits `\[...\]`, widening to a
+  cuted `strip` past the column and to left-aligned `aligned`
+  row-breaks past the full measure (matrix spans take one strip
+  per piece); a
+  calibrated estimator (`mathwidth.rs`: per-style glyph table
+  probed from the Computer Modern math fonts, the TeX class-glue
+  table with previous-atom tracking, scriptstack and fraction
+  descent rules, column-aligned matrices) decides. The golden test
   rebuilds the frozen paper `.tex` byte-identical — the paper is
   the test suite.
 
@@ -151,23 +209,81 @@ non-default, so a default document weaves byte-identically before
 and after the feature existed. Non-default values are validated
 at parse time, not at TeX time.
 
-### 3.5 `texenv.rs`, `tectonic.rs`, `md_spike.rs`
+### 3.5 `texenv.rs`, `tectonic.rs`, `md.rs`, `md_spike.rs`
 
 - `texenv.rs`: scans any preamble into `(probe file, tlmgr
   package)` needs — the static half of the texliveonfly trick.
   The subprocess half lives in Python (`texenv.py`: one
   `kpsewhich` call to probe, one `tlmgr install` to fix).
 - `tectonic.rs`: the optional engine path (cargo feature, off by
-  default so wheels stay lean). `tex_for_tectonic` drops the
-  `inputenc` line; empty `bib_name` emits no bibliography lines
-  because tectonic auto-runs BibTeX and dies on an empty
-  `\bibliography{}`. Crate embedding does not link on Windows
-  (C deps) — the supported path is the `TECTONIC_EXE`/PATH
-  binary cascade, and embedding is a Linux-CI exercise.
-- `md_spike.rs`: test-only harness comparing the hand scanner
-  against pulldown-cmark events (verbatim info strings, identical
-  headings, matching table shapes). The switch itself (M5.4) is
-  gated on an empty diff plus a byte-identical golden paper.
+  default so wheels stay lean; hardened Phase G — 0.9.0).
+  `tex_for_tectonic` drops the `inputenc` line; empty `bib_name`
+  emits no bibliography lines because tectonic auto-runs BibTeX
+  and dies on an empty `\bibliography{}`. CI (`tex` job)
+  installs the pinned 0.17.0 binary (checksum-verified) and
+  builds demo + showcase with `--engine tectonic` under the
+  same undefined-citation gate: `_compile_tectonic` passes
+  `--keep-logs` (tectonic otherwise swallows the XeTeX log and
+  undefined citations would pass silently — found during G.1
+  verification) and the gate greps both engines' `.log` files.
+  Both papers build under both engines with 0 undefined
+  citations (22 + 10 pages, same geometry; engine deltas —
+  all font-encoding class — ledgered in `ACCEPTED.md`). Crate
+  embedding does not link on Windows (C deps) — the supported
+  path is the `TECTONIC_EXE`/PATH binary cascade, and embedding
+  stays a Linux-CI exercise by design (recorded so it stops
+  being re-proposed).
+- `md.rs` (E.1/M5.4): the block splitter. pulldown-cmark owns
+  boundaries (`Parser::into_offset_iter`, `TABLES` only — no
+  other extensions); content comes from raw source slices, so
+  `esc.rs`, fence attrs, tables, and directives behave exactly as
+  the retired hand scanner did. Inline events are ignored. The
+  fence-aware pre-pass drops `>` quotes (the old scanner dropped
+  them mid-paragraph too), extracts `%% table` directives by
+  table sequence number, and errors loudly on `[label]:`
+  reference definitions (the stream would swallow them silently).
+  Paragraphs break only on blank lines (line arithmetic, never
+  newline counting — spans swallow newlines); consecutive `Para`
+  blocks are blank-separated by construction, so `convert()`
+  flushes between them (the one consumption bug the golden test
+  caught mid-switch).
+- `md_spike.rs`: the frozen hand-scanner oracle beside a thin
+  production-backed mapping. Post-switch it runs as the permanent
+  cross-check: oracle vs `md::blocks()` on the full corpus
+  (141+35+3 blocks, empty diff) plus latent-divergence synthetics.
+  If the mapping ever drifts from the hand rules, this reddens
+  before the golden does.
+
+### 3.6 `autolayout.rs` — measure floats, suggest `span`/`pos` (M7.1, Phase H — 0.9.2)
+
+Advisory only: nothing here rewrites anything. `suggest_layout`
+walks the manuscript exactly the way `convert()` pairs fences
+with registry entries (same strict-subset and registry errors,
+with lines), measures each float, and returns per-fence
+`(span, pos, width)` with a one-line reason carrying numbers.
+`--apply` (Python side) rewrites fence attrs; the weaver is
+untouched, so the golden paper is byte-identical with the feature
+present but uncalled.
+
+Measurement sources: diagrams scan their own emitted TikZ
+(`tikz_bbox` over `(x,y)` numerics — node ids and `axis cs:`
+skipped), padded by the `layout::node_box` halves (1.7/0.45) plus
+edge-label air; plots use pgfplots default geometry constants
+(the emitters set no dims); tables use row count × `\small`
+pitch and widest-cell-per-column × per-char width; precompiled
+pictures and external plot PDFs are unmeasurable and keep hand
+attrs. Policy (`[layout]`, new `LayoutPolicy` in `config.rs`):
+pre-empt non-lead content over `page_frac` of the text height to
+`page`; the section lead is exempt with `lead_bonus_cm` extra
+budget; short tables/plots pin `force`, short diagrams sit `here`;
+tables over `wide_ratio` × column go `wide`+`top`; `width=`
+shrinks for column overflow only (coordinates scale, text does
+not), floored by the crowding floor from placed `\node (ID) at`
+labels (same-rank pairs, `NODE_CHAR_CM` 0.21 calibrated on the
+showcase sequence) and capped at 15% over the fit. Acceptance:
+applied to a showcase copy, the engine reproduces the hand layout
+(8pp, identical distribution, 0 overfull — Fig 2 `0.57` vs hand
+`0.58`, Table 3 `force` vs hand `barrier`).
 
 ## 4. Python layer (`python/ikat/`)
 
@@ -192,7 +308,11 @@ to each other by shared test vectors.
 (keyed caption registry), `plots` (keyed captions) + `plot_dir` +
 `plot_insert_before` + `plot_attrs` (per-plot span/pos tuning),
 `table_captions` + `table_specs` (per-table colspecs),
-`title_thanks`/`author`, `bib_name`/`bib_style`/`bib_keys`
+`title_thanks`/`author`, plus the full author front matter
+`authors`/`affiliations`/`author_affils` (M7.10: composed in
+doc.rs into one wrapped `\parbox` with numeric superscript marks;
+legacy scalar author keeps byte parity when `authors` is empty),
+`bib_name`/`bib_style`/`bib_keys`
 (derived from the `.bib` via `--bib`, never frozen),
 `graphicspaths`, `preamble_override`/`preamble_append`/`skeleton`.
 `spec_from_dict` is the one constructor; `to_json` round-trips
@@ -215,15 +335,33 @@ CLI, MCP, and headsproof alike.
 - `texenv.py`: `check` (report) / `ensure` (install + re-probe)
   around the Rust scan; failure carries the manual texmf-install
   recipe and the MiKTeX Portable fallback.
-- `cli.py`: twelve subcommands (`build weave check templates
+- `standalone.py`: `fence_to_tikz` (`mermaid`|`chart`), `wrap_standalone`
+  (minimal `[tikz,border=5pt]{standalone}` + detected libraries),
+  `compile_standalone` (writes `fig.tex`, drives `compile_pdf`).
+  MCP gets the source only (`standalone_figure`), never the binary.
+- `cli.py`: fifteen subcommands (`build weave layout check templates
   template skeletons skeleton flowchart barchart lineplot
-  version`), each a thin call into the API. Plot commands take a
+  standalone skills version help`), each a thin call into the API. Plot commands take a
   JSON payload (file or stdin) with an optional `--legend`
-  override.
-- `mcp_server.py`: FastMCP stdio, twelve tools mirroring the
-  CLI/API map one-to-one (minus `compile_pdf`). The surface
-  test pins the full tool list, so a new tool without MCP
-  registration fails loudly.
+  override. Stdio is reconfigured to UTF-8 so unicode error
+  echoes survive a cp1252 console. `skills` manages the bundled
+  skill packs (list/show/install into agent skill directories).
+- `registry.py`: `TOOL_REGISTRY` — the 14 agent tools as data
+  (name, description, callable, parameter specs with
+  descriptions/enums/defaults, return type, annotation flags).
+  `execute_tool(name, arguments)` dispatches the whole surface
+  without MCP; `llm_tool_definitions()` renders OpenAI-style
+  function-calling definitions. One source of truth; the MCP
+  server is generated from it and the drift tests pin the
+  skills to it.
+- `mcp_server.py`: thin FastMCP renderer over `TOOL_REGISTRY`:
+  schemas (per-parameter descriptions, `legend` enum),
+  docstrings, return types, and annotations are generated per
+  spec; the four bundled skill packs serve as `skill://…`
+  resources. The surface tests pin the tool list, the schema
+  fidelity, the annotations, and every
+  command/tool/API name the skills teach — the skill files
+  cannot rot.
 
 ## 5. Spanning model
 
@@ -263,17 +401,46 @@ preloaded) is the starting point. Validation scans the whole
 skeleton for package needs — the generated tail's assumptions do
 not leak into custom documents.
 
-## 7. Strictness catalog
+## 7. Strictness catalog (M4.1 closed, Phase F — 0.8.0)
 
 Fail-fast sites, each with a test: unknown mermaid statements,
 missing edge targets, empty diagrams; ragged plot series;
 dangling citation keys; unknown template/skeleton tokens and
 duplicates; template heads missing class or packages; wide floats
 with `here`/`force`; unknown float attrs or keys; unknown legend
-words; `--bib` keysets that exclude a cited key. The doctrine:
-nothing fails in a TeX log that could have failed in Rust or in
-the wrapper. Line-numbered errors (statement echo + caret) are
-the known gap (M4.1) — today these are context-free strings.
+words; `--bib` keysets that exclude a cited key; reference
+definitions; router exhaustion; subgraph/composite nesting. The
+doctrine: nothing fails in a TeX log that could have failed in
+Rust or in the wrapper.
+
+Errors are `src/error.rs::Error { msg, line, col, echo }`
+(`--help` never needed: the message IS the documentation):
+
+- `line` is 1-based in the relevant source — manuscript lines
+  for scanner/diagram/table errors (fence bodies resolve as
+  `fence line + row`; `md.rs` blocks carry original numbers
+  across pre-pass deletions), head-file lines for template
+  errors, snippet-relative for direct API calls. `line == 0`
+  means no manuscript line applies (JSON/TOML data errors:
+  ragged series, preset shapes, config values) — the `--> line`
+  part is then omitted, never rendered as `0`, and the echo
+  (offending shapes/values) carries the context.
+- `col` is `Some` where the grammar knows the token span
+  (attr keys, direction words, edge stop positions, template
+  token braces, citation keys, the `titlesec` word) and the
+  renderer adds a `^` line in character columns — including
+  through leading whitespace (the classic off-by-indent is
+  pinned by test). Elsewhere `col` stays `None`: absence of a
+  caret is never a failure, only missing precision.
+- `echo` is the offending source text — raw lines (indent
+  kept) so carets align under it.
+- The PyO3 boundary carries the Display string unchanged
+  (exception type still `ValueError`); Python — the only layer
+  that sees paths — upgrades to `file:line: message` in
+  `document.with_file` (template/skeleton lines resolve against
+  the head file, everything else against the md; line-less
+  errors become `path: message`). The CLI prints the rendering
+  verbatim; MCP returns it as the error text.
 
 ## 8. Testing and CI
 
@@ -296,7 +463,10 @@ The plan of record is `docs/ROADMAP.md` (milestones M1–M6 with
 acceptance gates). Done: pipeline parity + golden master (M1,
 M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
-workflows (M4.2b). The open frontier: benchmark-JSON presets and
-plot regeneration (M2.1, M2.2), figure subsets + layout (M3), the
-pulldown-cmark switch (M5.4), line-numbered errors (M4.1), and
-shipping itself (M4.3 — names claimed, tokens pending).
+workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
+Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
+0.6.0), parser switch (M5.4, Phase E — 0.7.0), line-numbered
+errors (M4.1, Phase F — 0.8.0), tectonic hardening (M4.10,
+Phase G — 0.9.0), auto-layout (M7.1, Phase H — 0.9.2/0.10.0).
+No open milestones; tectonic crate embedding remains a Linux-CI
+exercise by design.

@@ -1,0 +1,32 @@
+{
+  "kind": "bar",
+  "title": "Fork is flat across $3\\times$ data (O(1), one register row)",
+  "ylabel": "fork latency (ms)",
+  "log_y": false,
+  "group_labels": [
+    "scale 1 (640c/1520e)",
+    "scale 3 (1920c/4560e)"
+  ],
+  "series_names": [
+    "fork"
+  ],
+  "values": [
+    [
+      0.158,
+      0.19
+    ]
+  ],
+  "mins": [
+    [
+      0.158,
+      0.19
+    ]
+  ],
+  "maxs": [
+    [
+      0.158,
+      0.19
+    ]
+  ],
+  "footnote": "PRELIMINARY \u2014 non-reference hardware; medians of 5, bars show min/max. First readings, not reference figures (paper \u00a75)."
+}

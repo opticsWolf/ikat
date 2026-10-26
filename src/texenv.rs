@@ -145,6 +145,8 @@ pub fn probe_and_tlmgr(name: &str) -> (String, String) {
         "caption" => ("caption.sty", "caption"),
         "subcaption" => ("subcaption.sty", "caption"),
         "natbib" => ("natbib.sty", "natbib"),
+        // cuted.sty ships inside the sttools bundle, not a `cuted` package.
+        "cuted" => ("cuted.sty", "sttools"),
         "article" | "report" | "book" | "letter" => {
             return (format!("{name}.cls"), "latex".to_string());
         }
@@ -184,6 +186,12 @@ mod tests {
     use super::*;
 
     const TEX: &str = "% \\usepackage{commented}\n\\documentclass[10pt,conference]{IEEEtran}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amsmath,amssymb}\n\\usepackage{tikz}\n\\usetikzlibrary{arrows.meta}\n\\begin{document}\nHello.\n\\end{document}\n";
+
+    #[test]
+    fn cuted_maps_to_sttools_bundle() {
+        // cuted.sty has no standalone CTAN/TL package: it ships in sttools.
+        assert_eq!(probe_and_tlmgr("cuted"), ("cuted.sty".to_string(), "sttools".to_string()));
+    }
 
     #[test]
     fn scan_finds_packages_and_class() {

@@ -1,11 +1,21 @@
 """ikat command line: the same operations as the Python API and MCP tools.
 
-    ikat build MD [--toml T] [--outdir D] [--spec S.json] [--bib-style B]
+    ikat build MD [--toml T] [--outdir D] [--spec S.json] [--bib R.bib]
+                 [--engine pdflatex|tectonic] [--bib-style B]
                  [--ensure-packages] [--no-pdf]
-    ikat weave MD [--toml T] [--spec S.json]     # .tex to stdout
-    ikat check FILE.tex [--install]             # missing TeX packages
+    ikat weave MD [--toml T] [--spec S.json] [--bib R.bib]   # .tex to stdout
+    ikat layout MD [--toml T] [--spec S.json] [--json] [--apply]
+    ikat check FILE.tex [--install] [--verbose]   # missing TeX packages
     ikat templates | ikat template NAME [--show-preset]
-    ikat flowchart [FILE|-]                     # mermaid -> tikzpicture
+    ikat skeletons | ikat skeleton NAME
+    ikat flowchart [FILE|-]                       # mermaid -> tikzpicture
+    ikat barchart [FILE|-] [--preset P] [--legend WORD]
+    ikat lineplot [FILE|-] [--preset P] [--legend WORD]
+    ikat standalone MD [--out fig.pdf] [--engine E]
+    ikat skills list | show NAME | install [--dest DIR…] [--project]
+                                     [--skill NAME…] [--force]
+    ikat help [--json] [COMMAND]     # command list / one command's flags /
+                                     # agent-tool registry as JSON
     ikat version
 """
 
@@ -43,21 +53,57 @@ def _apply_bib(spec, bib_path: str | None) -> None:
         spec.bib_keys = bib_keys(Path(bib_path).read_text(encoding="utf-8"))
 
 
+def _apply_authors(spec, a: argparse.Namespace) -> None:
+    """`--author` / `--affiliation` / `--author-affil` accumulate onto
+    the spec's front-matter lists (M7.10). Marks are 1-based and
+    human-shaped: `--author-affil 1:1,2` marks author 1 with
+    affiliations 1 and 2; association may also live in `--spec`."""
+    spec.authors.extend(a.author or [])
+    spec.affiliations.extend(a.affiliation or [])
+    for pair in a.author_affil or []:
+        try:
+            head, tail = pair.split(":", 1)
+            author_i = int(head) - 1
+            marks = [int(x) - 1 for x in tail.split(",")]
+        except ValueError:
+            raise ValueError(
+                f"--author-affil wants 'AUTHOR:AFF[,AFF…]' (1-based), got {pair!r}"
+            ) from None
+        if author_i < 0:
+            raise ValueError(f"--author-affil author number must be >= 1, got {pair!r}")
+        while len(spec.author_affils) <= author_i:
+            spec.author_affils.append([])
+        spec.author_affils[author_i].extend(marks)
+    if a.authors_max < 0:
+        raise ValueError(f"--authors-max must be >= 0, got {a.authors_max}")
+    spec.authors_max = a.authors_max
+
+
 def cmd_build(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths, compile_pdf
+    from ikat.document import with_file
 
     spec = _spec_from_json(a.spec)
     if a.bib_style:
         spec.bib_style = a.bib_style
     _apply_bib(spec, a.bib)
+    try:
+        _apply_authors(spec, a)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     outdir = Path(a.outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
     stem = Path(a.md).stem
-    if a.toml:
-        r = build_from_paths(a.md, a.toml, spec)
-    else:
-        md, toml_src, _ = _read_md_toml(a.md, None)
-        r = build_document(md, toml_src, spec)
+    try:
+        if a.toml:
+            r = build_from_paths(a.md, a.toml, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            r = with_file(a.md, None, build_document, md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     tex_path = outdir / f"{stem}.tex"
     tex_path.write_text(r.tex, encoding="utf-8")
     print(f"tex: {tex_path} (diagrams={r.n_diagrams} tables={r.n_tables})")
@@ -74,22 +120,67 @@ def cmd_build(a: argparse.Namespace) -> int:
 
 def cmd_weave(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths
+    from ikat.document import with_file
 
     spec = _spec_from_json(a.spec)
     _apply_bib(spec, a.bib)
-    if a.toml:
-        r = build_from_paths(a.md, a.toml, spec)
-    else:
-        md, toml_src, _ = _read_md_toml(a.md, None)
-        r = build_document(md, toml_src, spec)
+    try:
+        _apply_authors(spec, a)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    try:
+        if a.toml:
+            r = build_from_paths(a.md, a.toml, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            r = with_file(a.md, None, build_document, md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     sys.stdout.write(r.tex + ("\n" if not r.tex.endswith("\n") else ""))
     return 0
 
 
+def cmd_layout(a: argparse.Namespace) -> int:
+    from ikat.layout import apply, report, suggest
+
+    spec = _spec_from_json(a.spec)
+    try:
+        if a.toml:
+            md = Path(a.md).read_text(encoding="utf-8")
+            toml_src = Path(a.toml).read_text(encoding="utf-8")
+            suggs = suggest(md, toml_src, spec)
+        else:
+            md, toml_src, _ = _read_md_toml(a.md, None)
+            suggs = suggest(md, toml_src, spec)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if a.json:
+        import json as _json
+
+        print(_json.dumps(suggs, indent=1))
+        return 0
+    if a.apply:
+        new_md, n = apply(md, suggs)
+        if n:
+            Path(a.md).write_text(new_md, encoding="utf-8")
+        print(f"applied {n} placement(s) to {a.md}")
+        return 0
+    print(report(suggs))
+    return 0
+
+
 def cmd_check(a: argparse.Namespace) -> int:
-    from ikat import check_tex_env, ensure_tex_packages
+    from ikat import check_tex_env, document_class, ensure_tex_packages, used_packages
 
     tex = Path(a.tex).read_text(encoding="utf-8")
+    cls = document_class(tex) or ""
+    if "titlesec" in used_packages(tex) and cls.startswith("IEEE"):
+        print(f"ikat check: titlesec under {cls} breaks sectioning "
+              "(use the [typography] keep_with_next guards instead)", file=sys.stderr)
+        return 1
     rep = ensure_tex_packages(tex) if a.install else check_tex_env(tex)
     print(json.dumps({k: v for k, v in rep.items() if k != "needs"}, indent=1))
     if rep.get("needs") is not None and a.verbose:
@@ -136,6 +227,8 @@ def cmd_flowchart(a: argparse.Namespace) -> int:
 
 def _read_payload(a: argparse.Namespace) -> dict:
     """JSON plot payload from a file or stdin (`-`)."""
+    if a.file is None:
+        raise ValueError("need FILE payload or --preset")
     raw = sys.stdin.read() if a.file == "-" else Path(a.file).read_text(encoding="utf-8")
     try:
         data = json.loads(raw)
@@ -146,9 +239,33 @@ def _read_payload(a: argparse.Namespace) -> dict:
     return data
 
 
+def _preset_tikz(a: argparse.Namespace) -> str:
+    """Render `--preset` JSON (file or stdin); `--legend` overrides its key."""
+    from ikat import preset_to_tikz
+
+    raw = sys.stdin.read() if a.preset == "-" else Path(a.preset).read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"bad preset JSON: {e}")
+    if not isinstance(data, dict):
+        raise ValueError("preset must be a JSON object")
+    if a.legend:
+        data["legend"] = a.legend
+    try:
+        return preset_to_tikz(json.dumps(data))
+    except ValueError as e:
+        raise ValueError(f"preset {a.preset}: {e}") from e
+
+
 def cmd_barchart(a: argparse.Namespace) -> int:
     from ikat import barchart_to_tikz
 
+    if a.preset is not None:
+        if a.file is not None:
+            raise ValueError("cannot use both FILE payload and --preset")
+        sys.stdout.write(_preset_tikz(a) + "\n")
+        return 0
     p = _read_payload(a)
     refline = p.get("refline")
     tikz = barchart_to_tikz(
@@ -170,6 +287,11 @@ def cmd_barchart(a: argparse.Namespace) -> int:
 def cmd_lineplot(a: argparse.Namespace) -> int:
     from ikat import lineplot_to_tikz
 
+    if a.preset is not None:
+        if a.file is not None:
+            raise ValueError("cannot use both FILE payload and --preset")
+        sys.stdout.write(_preset_tikz(a) + "\n")
+        return 0
     p = _read_payload(a)
     tikz = lineplot_to_tikz(
         p["title"],
@@ -182,6 +304,37 @@ def cmd_lineplot(a: argparse.Namespace) -> int:
         a.legend or p.get("legend", "auto"),
     )
     sys.stdout.write(tikz + "\n")
+    return 0
+
+
+def cmd_standalone(a: argparse.Namespace) -> int:
+    from ikat import compile_standalone, fence_to_tikz
+    from ikat.pipeline import extract_fences
+
+    md = sys.stdin.read() if a.md == "-" else Path(a.md).read_text(encoding="utf-8")
+    fences = [(lang, body) for lang, _, body in extract_fences(md) if lang in ("mermaid", "chart")]
+    if not fences:
+        print("ikat standalone: no mermaid/chart fence found", file=sys.stderr)
+        return 1
+    if len(fences) > 1:
+        print(f"ikat standalone: {len(fences)} mermaid/chart fences found, need exactly 1", file=sys.stderr)
+        return 1
+    lang, body = fences[0]
+    try:
+        tikz = fence_to_tikz(lang, body)
+    except ValueError as e:
+        print(f"ikat standalone: {e}", file=sys.stderr)
+        return 1
+    out = Path(a.out or "fig.pdf")
+    try:
+        pdf = compile_standalone(tikz, out.parent if str(out.parent) != "" else ".", engine=a.engine)
+    except Exception as e:
+        print(f"ikat standalone: compile failed: {e}", file=sys.stderr)
+        return 1
+    if pdf.resolve() != out.resolve():
+        out.unlink(missing_ok=True)
+        pdf.rename(out)
+    print(f"pdf: {out} ({out.stat().st_size} bytes)")
     return 0
 
 
@@ -209,8 +362,10 @@ def cmd_skeleton(a: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ikat", description="Weave Markdown into camera-ready LaTeX.")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(
+        prog="ikat", description="Weave Markdown into camera-ready LaTeX.")
+    # Bare `ikat` prints help (exit 0) instead of an argparse error.
+    sub = parser.add_subparsers(dest="cmd")
 
     b = sub.add_parser("build", help="md -> .tex -> .pdf in one go")
     b.add_argument("md")
@@ -218,6 +373,14 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--outdir", default=None)
     b.add_argument("--spec", default=None, help="BuildSpec JSON (diagrams/plots/captions/...)")
     b.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
+    b.add_argument("--author", action="append", default=[], metavar="NAME",
+                   help="full author name; repeatable (replaces the scalar author)")
+    b.add_argument("--affiliation", action="append", default=[], metavar="INST",
+                   help="institute in display order; repeatable")
+    b.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
+                   help="mark author A (1-based) with affiliations N (1-based); repeatable")
+    b.add_argument("--authors-max", type=int, default=0, metavar="N",
+                   help="collapse to the first N names + ', et al.' (0 = never)")
     b.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
@@ -229,7 +392,23 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--toml", default=None)
     w.add_argument("--spec", default=None)
     w.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
+    w.add_argument("--author", action="append", default=[], metavar="NAME",
+                   help="full author name; repeatable (replaces the scalar author)")
+    w.add_argument("--affiliation", action="append", default=[], metavar="INST",
+                   help="institute in display order; repeatable")
+    w.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
+                   help="mark author A (1-based) with affiliations N (1-based); repeatable")
+    w.add_argument("--authors-max", type=int, default=0, metavar="N",
+                   help="collapse to the first N names + ', et al.' (0 = never)")
     w.set_defaults(func=cmd_weave)
+
+    ly = sub.add_parser("layout", help="measure floats, suggest span/pos/width (no TeX needed)")
+    ly.add_argument("md")
+    ly.add_argument("--toml", default=None)
+    ly.add_argument("--spec", default=None)
+    ly.add_argument("--json", action="store_true", help="raw suggestion JSON")
+    ly.add_argument("--apply", action="store_true", help="rewrite fence attrs in place")
+    ly.set_defaults(func=cmd_layout)
 
     c = sub.add_parser("check", help="report missing TeX packages for a .tex file")
     c.add_argument("tex")
@@ -255,7 +434,8 @@ def build_parser() -> argparse.ArgumentParser:
         "title, ylabel, group_labels, series_names, values, mins, maxs; "
         "optional log_y, refline [x0,x1,y,label], legend)",
     )
-    bc.add_argument("file", help="JSON file or - for stdin")
+    bc.add_argument("file", nargs="?", default=None, help="JSON file or - for stdin")
+    bc.add_argument("--preset", default=None, help="preset JSON file or - for stdin (conflicts with FILE)")
     bc.add_argument("--legend", default=None, help="position keyword (overrides payload)")
     bc.set_defaults(func=cmd_barchart)
 
@@ -264,9 +444,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="line plot -> tikzpicture on stdout (JSON payload: "
         "title, xlabel, ylabel, xs, names, yss, errs; optional legend)",
     )
-    lp.add_argument("file", help="JSON file or - for stdin")
+    lp.add_argument("file", nargs="?", default=None, help="JSON file or - for stdin")
+    lp.add_argument("--preset", default=None, help="preset JSON file or - for stdin (conflicts with FILE)")
     lp.add_argument("--legend", default=None, help="position keyword (overrides payload)")
     lp.set_defaults(func=cmd_lineplot)
+
+    s = sub.add_parser("standalone", help="one mermaid/chart fence -> figure PDF")
+    s.add_argument("md", help="markdown file or - for stdin")
+    s.add_argument("--out", default=None, help="PDF path (default fig.pdf)")
+    s.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
+    s.set_defaults(func=cmd_standalone)
 
     k = sub.add_parser("skeletons", help="list shipped skeleton documents")
     k.set_defaults(func=cmd_skeletons)
@@ -275,13 +462,140 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("name")
     n.set_defaults(func=cmd_skeleton)
 
+    k = sub.add_parser("skills", help="Bundled agent skill packs (list/show/install)")
+    skills_sub = k.add_subparsers(dest="skills_command", required=True)
+    skills_sub.add_parser("list", help="List the bundled skills and what triggers them")
+    sp = skills_sub.add_parser("show", help="Print one bundled SKILL.md verbatim")
+    sp.add_argument("name", help="Bundled skill name (see `ikat skills list`)")
+    sp = skills_sub.add_parser(
+        "install", help="Copy the bundled skills into agent skill directories")
+    sp.add_argument("--dest", action="append", default=None, metavar="DIR",
+                    help="Skills directory to install into (repeatable). Default: "
+                         "~/.claude/skills, ~/.config/opencode/skills, "
+                         "~/.pi/agent/skills, ~/.agents/skills")
+    sp.add_argument("--project", action="store_true",
+                    help="Install into ./.claude/skills, ./.opencode/skills and "
+                         "./.agents/skills instead")
+    sp.add_argument("--skill", action="append", default=None, metavar="NAME",
+                    help="Only this skill (repeatable). Default: every bundled skill")
+    sp.add_argument("--force", action="store_true",
+                    help="Overwrite existing skill directories")
+
     v = sub.add_parser("version", help="print ikat version")
     v.set_defaults(func=lambda a: (print(ikat.__version__), 0)[1])
-    return p
+
+    h = sub.add_parser("help", help="list commands, or one command's flags (`ikat help CMD`)")
+    h.add_argument("command", nargs="?", default=None,
+                   help="a subcommand to explain (default: list every command)")
+    h.add_argument("--json", action="store_true",
+                   help="dump the agent-tool registry (the MCP tool surface) as "
+                        "JSON instead of CLI help; overrides COMMAND")
+    h.set_defaults(func=None)
+    return parser
+
+
+def _run_help(args: argparse.Namespace) -> int:
+    """`ikat help` / `ikat help CMD` / `ikat help --json`."""
+    if args.json:
+        import json
+
+        from ikat.registry import llm_tool_definitions
+
+        print(json.dumps(llm_tool_definitions(), indent=1))
+        return 0
+    parser = build_parser()
+    subs = parser._subparsers._group_actions[0].choices
+    if args.command is None:
+        parser.print_help()
+        return 0
+    target = subs.get(args.command)
+    if target is None:
+        print(f"ikat help: unknown command {args.command!r}; valid: "
+              + ", ".join(sorted(subs)), file=sys.stderr)
+        return 1
+    target.print_help()
+    return 0
+
+
+def _configure_utf8_stdio() -> None:
+    """Prefer UTF-8 CLI output without breaking captured streams.
+
+    Error echoes carry manuscript text (and tikz output can carry
+    unicode through passthrough math), which mojibakes or crashes a
+    cp1252 console. Reconfigure when the stream allows it; leave
+    wrapped/closed streams alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (OSError, TypeError, ValueError):
+            continue
+
+
+def _run_skills(args: argparse.Namespace) -> int:
+    """Handle `ikat skills …` (plain-text output; no toolbox needed)."""
+    from ikat.skills import (
+        SkillNotFound,
+        default_destinations,
+        install as install_skills,
+        iter_skills,
+        skill_text,
+    )
+
+    if args.skills_command == "list":
+        for name, description in iter_skills():
+            print(f"{name}\n    {description}")
+        print("Install with `ikat skills install`.")
+        return 0
+    if args.skills_command == "show":
+        try:
+            text = skill_text(args.name)
+        except SkillNotFound as e:
+            print(f"ikat skills: {e.args[0]}", file=sys.stderr)
+            return 1
+        print(text, end="")
+        return 0
+    # install
+    if args.dest and args.project:
+        print("ikat skills: --dest and --project are mutually exclusive",
+              file=sys.stderr)
+        return 1
+    targets = (
+        [Path(d) for d in args.dest] if args.dest
+        else list(default_destinations(project=args.project))
+    )
+    try:
+        results = [
+            result
+            for target in targets
+            for result in install_skills(target, names=args.skill, force=args.force)
+        ]
+    except SkillNotFound as e:
+        print(f"ikat skills: {e.args[0]}", file=sys.stderr)
+        return 1
+    for result in results:
+        print(f"{result.status:<9} {result.path}")
+    skipped = sum(result.status == "skipped" for result in results)
+    if skipped:
+        print(f"{skipped} skill(s) already present; use --force to overwrite.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_utf8_stdio()
     a = build_parser().parse_args(argv)
+    if a.cmd is None:
+        # Bare `ikat`: help, not an argparse error.
+        build_parser().print_help()
+        return 0
+    if a.cmd == "skills":
+        # Skill management needs no toolbox (no cache/config side effects).
+        return _run_skills(a)
+    if a.cmd == "help":
+        return _run_help(a)
     try:
         return a.func(a)
     except (ValueError, FileNotFoundError, TypeError) as e:

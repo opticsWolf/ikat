@@ -1,0 +1,11 @@
+{
+  "kind": "bar",
+  "title": "ikat Rust: lines of code by module",
+  "ylabel": "lines",
+  "log_y": false,
+  "group_labels": ["config", "doc", "esc", "lib", "mermaid", "plot", "table", "tectonic", "texenv"],
+  "series_names": ["shipped code"],
+  "values": [[473, 1065, 281, 214, 450, 224, 213, 43, 253]],
+  "mins": [[473, 1065, 281, 214, 450, 224, 213, 43, 253]],
+  "maxs": [[473, 1065, 281, 214, 450, 224, 213, 43, 253]]
+}

@@ -158,6 +158,10 @@ pub struct FloatNeeds {
     pub barrier: bool,
     pub dblfloat: bool,
     pub graphicx: bool,
+    pub rotating: bool,
+    /// A display-math span wider than the column takes a full-width
+    /// `strip` (M7.8) — needs the cuted package.
+    pub strip: bool,
 }
 
 impl FloatNeeds {
@@ -170,6 +174,8 @@ impl FloatNeeds {
         self.barrier |= o.barrier;
         self.dblfloat |= o.dblfloat;
         self.graphicx |= o.graphicx;
+        self.rotating |= o.rotating;
+        self.strip |= o.strip;
     }
 
     /// Preamble lines, in load order.
@@ -183,6 +189,12 @@ impl FloatNeeds {
         }
         if self.dblfloat {
             out.push("\\usepackage{dblfloatfix}".to_string());
+        }
+        if self.rotating {
+            out.push("\\usepackage{rotating}".to_string());
+        }
+        if self.strip {
+            out.push("\\usepackage{cuted}".to_string());
         }
         out
     }
@@ -198,6 +210,12 @@ impl FloatNeeds {
         }
         if self.dblfloat {
             out.push("dblfloatfix");
+        }
+        if self.rotating {
+            out.push("rotating");
+        }
+        if self.strip {
+            out.push("cuted");
         }
         if self.graphicx {
             out.push("graphicx");
@@ -280,6 +298,62 @@ pub struct Template {
     pub skeleton: String,
 }
 
+/// `[typography]` table: keep-with-next guards against stranded
+/// headings. A heading at a column/page bottom with its paragraph
+/// starting on the next one is a layout bug ikat makes structurally
+/// impossible — LaTeX's `\@afterheading` only partly prevents it
+/// (floats and two-column balancing defeat it), so the guards are
+/// explicit. Default ON: this is a bugfix, not a style choice.
+///
+/// ```toml
+/// [typography]
+/// keep_with_next = true  # penalties + needspace before sections
+/// min_lines = 2         # body lines required after a heading
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Typography {
+    #[serde(default = "keep_true")]
+    pub keep_with_next: bool,
+    #[serde(default = "min_two")]
+    pub min_lines: i64,
+}
+
+fn keep_true() -> bool {
+    true
+}
+fn min_two() -> i64 {
+    2
+}
+
+impl Default for Typography {
+    fn default() -> Self {
+        Self { keep_with_next: true, min_lines: 2 }
+    }
+}
+
+impl Typography {
+    /// Guard lines for knobs that differ from LaTeX defaults.
+    /// LaTeX ships club/widow penalties at 150 and no heading
+    /// guards, so a default `[typography]` EMITS lines (unlike
+    /// `[floats]`, whose defaults match LaTeX). Turning the guards
+    /// off emits nothing — free breaks are already the default.
+    pub fn setup_lines(&self) -> Vec<String> {
+        if !self.keep_with_next {
+            return Vec::new();
+        }
+        vec![
+            "\\clubpenalty=10000".to_string(),
+            "\\widowpenalty=10000".to_string(),
+        ]
+    }
+
+    /// `\needspace` reservation before a heading: the heading plus
+    /// `min_lines` of body must fit, else the break comes first.
+    pub fn needspace_line(&self) -> String {
+        format!("\\needspace{{{}\\baselineskip}}", self.min_lines + 1)
+    }
+}
+
 /// `[floats]` table: document-wide float tuning. Fraction/counter
 /// lines are emitted into the preamble ONLY when they differ from
 /// the LaTeX defaults, so default documents weave byte-identically.
@@ -294,6 +368,7 @@ pub struct Template {
 /// topnumber = 2
 /// bottomnumber = 2
 /// barrier_sections = false
+/// barrier_before_refs = false
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Floats {
@@ -313,6 +388,13 @@ pub struct Floats {
     pub bottomnumber: i64,
     #[serde(default)]
     pub barrier_sections: bool,
+    /// `\FloatBarrier` before `\bibliography`: pending floats flush
+    /// at the body end instead of spilling into/past the reference
+    /// list (bio-medsea's Figs 7-14 landed after `References` without
+    /// it). Off by default: it appends one line to the document, so
+    /// default weaves stay byte-identical.
+    #[serde(default)]
+    pub barrier_before_refs: bool,
 }
 
 fn pos_top() -> Pos {
@@ -348,6 +430,7 @@ impl Default for Floats {
             topnumber: 2,
             bottomnumber: 1,
             barrier_sections: false,
+            barrier_before_refs: false,
         }
     }
 }
@@ -376,6 +459,176 @@ impl Floats {
     }
 }
 
+/// `[layout]` table: auto-layout policy knobs consumed by
+/// `ikat layout` (see `crate::autolayout`). Input-only — nothing
+/// here is emitted into TeX, so absent means defaults and the
+/// golden paper is untouched.
+///
+/// ```toml
+/// [layout]
+/// textheight_cm = 23.0
+/// column_cm = 8.9
+/// textwidth_cm = 17.8
+/// caption_cm = 1.0
+/// here_max_cm = 7.0
+/// page_frac = 0.6
+/// min_width = 0.4
+/// wide_ratio = 1.25
+/// lead_bonus_cm = 1.0
+/// late_wide_lines = 15
+/// top_frac = 0.7
+/// tail_lines = 6
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutPolicy {
+    /// Usable column height (IEEE two-column page ≈ 23cm).
+    #[serde(default = "layout_textheight")]
+    pub textheight_cm: f64,
+    /// Single-column width (IEEE ≈ 3.5in = 8.9cm).
+    #[serde(default = "layout_column")]
+    pub column_cm: f64,
+    /// Full text width (IEEE ≈ 7in = 17.8cm).
+    #[serde(default = "layout_textwidth")]
+    pub textwidth_cm: f64,
+    /// Caption allowance added to content height in fit tests.
+    #[serde(default = "layout_caption")]
+    pub caption_cm: f64,
+    /// Tallest float (content + caption) that may sit in-flow (calibrated: the showcase sits a 6.8cm float in-flow).
+    #[serde(default = "layout_here_max")]
+    pub here_max_cm: f64,
+    /// Content taller than this fraction of the text height is a
+    /// dedicated-page float even before shrinking is tried.
+    #[serde(default = "layout_page_frac")]
+    pub page_frac: f64,
+    /// Narrowest `width=` the shrinker may emit (text never scales,
+    /// only coordinates, so below this labels crowd).
+    #[serde(default = "layout_min_width")]
+    pub min_width: f64,
+    /// Tables wider than this multiple of the column go `wide`.
+    /// X-columns wrap, so a table slightly over the column still
+    /// sets fine — only clearly wider ones earn full width.
+    #[serde(default = "layout_wide_ratio")]
+    pub wide_ratio: f64,
+    /// A `wide` float with fewer body prose lines remaining than
+    /// this takes a dedicated `page` instead of `top`: no downstream
+    /// tops are left, so it would pile at the document end — or meet
+    /// a `\FloatBarrier` still pending and eject the column (the
+    /// placeins eject leaves a half-empty column behind). Float pages
+    /// never strand columns: text flows past them. Skipped in
+    /// prose-free manuscripts (B1 stubs carry no discussing text, so
+    /// there is no adjacency to protect and their pins stay exact).
+    #[serde(default = "layout_tail_lines")]
+    pub tail_lines: usize,
+    /// A `wide` float declared more prose lines than this after
+    /// the section start (or the previous float) earns a move-the-
+    /// fence note: page-top floats declared late strand trailing
+    /// pages (showcase Table 4 lived alone on p8 until its fence
+    /// moved above the prose).
+    #[serde(default = "layout_late_wide")]
+    pub late_wide_lines: usize,
+    /// Extra in-flow budget (cm) for a section's lead diagram.
+    /// Section starts land near fresh columns, so the first float
+    /// has the best room odds; later floats face consumed columns.
+    #[serde(default = "layout_lead_bonus")]
+    pub lead_bonus_cm: f64,
+    /// Page-top budget: a `wide` float taller than this fraction
+    /// of the text height cannot take a page top (LaTeX `topfraction`
+    /// / `dbltopfraction`, both 0.7 by default) — `[t]` would refuse
+    /// it and the queue behind it strands toward the document end
+    /// (psych-maia's 41-row table piled on p25 until this rule
+    /// sent it to a dedicated page instead).
+    #[serde(default = "layout_top_frac")]
+    pub top_frac: f64,
+}
+
+fn layout_textheight() -> f64 {
+    23.0
+}
+fn layout_column() -> f64 {
+    8.9
+}
+fn layout_textwidth() -> f64 {
+    17.8
+}
+fn layout_caption() -> f64 {
+    1.0
+}
+fn layout_here_max() -> f64 {
+    7.0
+}
+fn layout_page_frac() -> f64 {
+    0.6
+}
+fn layout_min_width() -> f64 {
+    0.4
+}
+fn layout_wide_ratio() -> f64 {
+    1.25
+}
+fn layout_lead_bonus() -> f64 {
+    1.0
+}
+fn layout_late_wide() -> usize {
+    15
+}
+fn layout_tail_lines() -> usize {
+    // A top float needs about a column of downstream text to anchor
+    // against (~6 paragraphs); less takes a dedicated page. (Was 10
+    // prose *lines* under JATS-newline counting — the paragraph unit
+    // made that three times stricter than calibrated.)
+    6
+}
+fn layout_top_frac() -> f64 {
+    0.7
+}
+
+impl Default for LayoutPolicy {
+    fn default() -> Self {
+        Self {
+            textheight_cm: layout_textheight(),
+            column_cm: layout_column(),
+            textwidth_cm: layout_textwidth(),
+            caption_cm: layout_caption(),
+            here_max_cm: layout_here_max(),
+            page_frac: layout_page_frac(),
+            min_width: layout_min_width(),
+            wide_ratio: layout_wide_ratio(),
+            lead_bonus_cm: layout_lead_bonus(),
+            late_wide_lines: layout_late_wide(),
+            top_frac: layout_top_frac(),
+            tail_lines: layout_tail_lines(),
+        }
+    }
+}
+
+/// `[tables]` policy: portrait-fit compaction for dense tables.
+///
+/// ```toml
+/// [tables]
+/// compact_tables = false
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tables {
+    /// Run the portrait-fit ladder (M7.5): `Compact` shrinks to
+    /// `\footnotesize` + 3pt `\tabcolsep`, `Rotate` emits
+    /// `sidewaystable(*)` when portrait cannot hold the table at
+    /// any readable size. Off by default: auto-changing fonts and
+    /// rotating pages is a manuscript-level policy choice, and the
+    /// frozen paper track (58 accepted mild overfulls) must weave
+    /// byte-identically. The auto-layout notes always measure the
+    /// ladder and name the fix either way.
+    #[serde(default)]
+    pub compact_tables: bool,
+}
+
+impl Default for Tables {
+    fn default() -> Self {
+        Self {
+            compact_tables: false,
+        }
+    }
+}
+
 /// Whole-file configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -384,9 +637,15 @@ pub struct Config {
     #[serde(default)]
     pub spans: Spans,
     #[serde(default)]
+    pub tables: Tables,
+    #[serde(default)]
     pub floats: Floats,
     #[serde(default)]
+    pub typography: Typography,
+    #[serde(default)]
     pub template: Template,
+    #[serde(default)]
+    pub layout: LayoutPolicy,
 }
 
 impl Config {
@@ -418,6 +677,27 @@ mod tests {
         assert_eq!(cfg.spans.for_kind("plot").latex_env(), "figure*");
         assert_eq!(cfg.spans.for_kind("table").latex_env(), "figure");
         assert_eq!(cfg.spans.for_kind("diagram").latex_width(), "\\columnwidth");
+    }
+
+    #[test]
+    fn typography_defaults_and_guards() {
+        let t = Config::from_toml("").unwrap().typography;
+        assert!(t.keep_with_next);
+        assert_eq!(t.min_lines, 2);
+        let lines = t.setup_lines();
+        assert!(lines.contains(&"\\clubpenalty=10000".to_string()));
+        assert!(lines.contains(&"\\widowpenalty=10000".to_string()));
+        // Off emits nothing: free breaks are already the default.
+        let off = Config::from_toml("[typography]\nkeep_with_next = false\n").unwrap().typography;
+        assert!(off.setup_lines().is_empty());
+    }
+
+    #[test]
+    fn needspace_scales_with_min_lines() {
+        let t = Config::from_toml("").unwrap().typography;
+        assert_eq!(t.needspace_line(), "\\needspace{3\\baselineskip}");
+        let t4 = Config::from_toml("[typography]\nmin_lines = 4\n").unwrap().typography;
+        assert_eq!(t4.needspace_line(), "\\needspace{5\\baselineskip}");
     }
 
     #[test]

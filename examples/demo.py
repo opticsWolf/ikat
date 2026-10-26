@@ -1,9 +1,10 @@
 """End-to-end demo: mini.md -> TikZ -> figure* -> PDF.
 
-Usage (from ikat/ with the dev venv):  .venv/Scripts/python.exe examples/demo.py
-Requires pdflatex on PATH (TinyTeX is fine).
+Usage (from ikat/ with the dev venv):  .venv/Scripts/python.exe examples/demo.py [--engine tectonic]
+Requires the engine on PATH (pdflatex via TinyTeX, or tectonic).
 """
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -42,5 +43,7 @@ floats = [
 ]
 tex = PREAMBLE + "\n\n".join(floats) + "\n\\end{document}\n"
 (outdir / "mini.tex").write_text(tex, encoding="utf-8")
-pdf = compile_pdf(outdir, "mini.tex")
+ap = argparse.ArgumentParser()
+ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic"])
+pdf = compile_pdf(outdir, "mini.tex", engine=ap.parse_args().engine)
 print("demo PDF ->", pdf, f"({pdf.stat().st_size} bytes)")

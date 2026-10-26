@@ -69,44 +69,8 @@ enum Obstacle {
     Bar((f64, f64, f64, f64)),
 }
 
-fn pt_in_rect(x: f64, y: f64, r: (f64, f64, f64, f64)) -> bool {
-    x >= r.0 && x <= r.2 && y >= r.1 && y <= r.3
-}
-
-fn orient(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> f64 {
-    (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-}
-
-fn on_seg(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> bool {
-    cx >= ax.min(bx) && cx <= ax.max(bx) && cy >= ay.min(by) && cy <= ay.max(by)
-}
-
-fn segs_cross(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
-    let (o1, o2, o3, o4) = (
-        orient(a.0, a.1, b.0, b.1, c.0, c.1),
-        orient(a.0, a.1, b.0, b.1, d.0, d.1),
-        orient(c.0, c.1, d.0, d.1, a.0, a.1),
-        orient(c.0, c.1, d.0, d.1, b.0, b.1),
-    );
-    ((o1 > 0.0) != (o2 > 0.0) && (o3 > 0.0) != (o4 > 0.0))
-        || (o1 == 0.0 && on_seg(a.0, a.1, b.0, b.1, c.0, c.1))
-        || (o2 == 0.0 && on_seg(a.0, a.1, b.0, b.1, d.0, d.1))
-        || (o3 == 0.0 && on_seg(c.0, c.1, d.0, d.1, a.0, a.1))
-        || (o4 == 0.0 && on_seg(c.0, c.1, d.0, d.1, b.0, b.1))
-}
-
-fn seg_hits_rect(x1: f64, y1: f64, x2: f64, y2: f64, r: (f64, f64, f64, f64)) -> bool {
-    pt_in_rect(x1, y1, r)
-        || pt_in_rect(x2, y2, r)
-        || segs_cross((x1, y1), (x2, y2), (r.0, r.1), (r.2, r.1))
-        || segs_cross((x1, y1), (x2, y2), (r.2, r.1), (r.2, r.3))
-        || segs_cross((x1, y1), (x2, y2), (r.2, r.3), (r.0, r.3))
-        || segs_cross((x1, y1), (x2, y2), (r.0, r.3), (r.0, r.1))
-}
-
-fn rects_overlap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
-    a.0 < b.2 && a.2 > b.0 && a.1 < b.3 && a.3 > b.1
-}
+// Segment geometry lives in `layout.rs` now (moved, not rewritten).
+use crate::layout::{rects_overlap, seg_hits_rect};
 
 /// Candidate legend box for a corner, on the *visual* axis ranges
 /// (see callers). Deliberately oversized — 30% of the x-range by
@@ -160,7 +124,7 @@ fn pick_auto(
 }
 
 impl LegendPos {
-    pub fn parse(s: &str) -> Result<Self, String> {
+    pub fn parse(s: &str) -> Result<Self, crate::error::Error> {
         match s {
             "auto" => Ok(Self::Auto),
             "below" => Ok(Self::Below),
@@ -169,9 +133,12 @@ impl LegendPos {
             "bottom-left" => Ok(Self::BottomLeft),
             "bottom-right" => Ok(Self::BottomRight),
             "outside-right" => Ok(Self::OutsideRight),
-            _ => Err(format!(
-                "legend must be auto|below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
-            )),
+            _ => Err(crate::error::Error::data(
+                format!(
+                    "legend must be auto|below|top-left|top-right|bottom-left|bottom-right|outside-right, got {s:?}"
+                ),
+                s.to_string(),
+            ).with_col(Some(1))),
         }
     }
 
@@ -207,14 +174,18 @@ pub fn barchart(
     maxs: &[Vec<f64>],
     refline: Option<(f64, f64, f64, String)>,
     legend: LegendPos,
-) -> Result<String, String> {
+) -> Result<String, crate::error::Error> {
+    use crate::error::Error;
     if group_labels.is_empty() || series_names.is_empty() {
-        return Err("barchart: no groups or no series".to_string());
+        return Err(Error::data("barchart: no groups or no series", String::new()));
     }
     let (n_groups, n_series) = (group_labels.len(), series_names.len());
     for (tag, t) in [("values", values), ("mins", mins), ("maxs", maxs)] {
         if t.len() != n_series || t.iter().any(|col| col.len() != n_groups) {
-            return Err(format!("barchart: ragged {tag}"));
+            return Err(Error::data(
+                format!("barchart: ragged {tag}"),
+                format!("{tag} shapes {:?}, want {n_series}x{n_groups}", t.iter().map(|c| c.len()).collect::<Vec<_>>()),
+            ));
         }
     }
 
@@ -344,13 +315,17 @@ pub fn lineplot(
     xs: &[f64],
     series: &[(&str, Vec<f64>, Vec<f64>)],
     legend: LegendPos,
-) -> Result<String, String> {
+) -> Result<String, crate::error::Error> {
+    use crate::error::Error;
     if xs.is_empty() || series.is_empty() {
-        return Err("lineplot: empty data".to_string());
+        return Err(Error::data("lineplot: empty data", String::new()));
     }
-    for (_, ys, es) in series {
+    for (name, ys, es) in series {
         if ys.len() != xs.len() || es.len() != xs.len() {
-            return Err("lineplot: ragged series".to_string());
+            return Err(Error::data(
+                "lineplot: ragged series".to_string(),
+                format!("series {name}: ys={} es={} xs={}", ys.len(), es.len(), xs.len()),
+            ));
         }
     }
     let mut out = String::new();
@@ -464,7 +439,32 @@ mod tests {
     fn legend_auto_parses_and_errors_name_set() {
         assert_eq!(LegendPos::parse("auto").unwrap(), LegendPos::Auto);
         let err = LegendPos::parse("center").unwrap_err();
-        assert!(err.contains("auto|below|top-left"), "{err}");
+        assert!(err.msg.contains("auto|below|top-left"), "{err}");
+    }
+
+    #[test]
+    fn error_unknown_legend_word_has_no_line() {
+        // Legend words ride JSON/API strings, never the
+        // manuscript: line 0 omits the line part, the echo
+        // carries the offending word.
+        let err = LegendPos::parse("middle").unwrap_err();
+        assert_eq!(err.line, 0, "got: {err}");
+        assert!(err.echo.contains("middle"), "got: {err}");
+        assert!(!err.to_string().contains(" --> line"), "got: {err}");
+        // The echo IS the word: caret at column 1 (renderer pin).
+        assert_eq!(err.col, Some(1), "got: {err}");
+    }
+
+    #[test]
+    fn error_ragged_series_has_no_line() {
+        let gl = vec!["a".to_string(), "b".to_string()];
+        let sn = vec!["s".to_string()];
+        let v = vec![vec![1.0]]; // 1 value, 2 groups
+        let err = barchart("t", "y", false, &gl, &sn, &v, &v, &v, None, LegendPos::Auto)
+            .unwrap_err();
+        assert!(err.msg.contains("ragged values"), "got: {err}");
+        assert_eq!(err.line, 0, "got: {err}");
+        assert!(err.echo.contains("[1]"), "shapes echoed, got: {err}");
     }
 
     #[test]

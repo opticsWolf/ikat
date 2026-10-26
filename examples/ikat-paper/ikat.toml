@@ -10,6 +10,7 @@ bottomfraction = 0.7
 textfraction = 0.1
 topnumber = 3
 bottomnumber = 2
+barrier_sections = true
 
 [template]
 skeleton = "skel.tex"

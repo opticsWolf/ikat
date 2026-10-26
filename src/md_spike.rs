@@ -1,225 +1,295 @@
-//! M5.3 spike (FORMAT-DRAFT C.2): parse one manuscript with BOTH the
-//! hand scanner's block rules and pulldown-cmark, diff the structure.
-//! Test-only module (`#[cfg(test)]`); pulldown-cmark is a dev-dependency
-//! and ships in no wheel. Switching needs an EMPTY diff on the
-//! required properties plus a byte-identical golden paper — this
-//! spike settles whether that is even reachable.
+//! Phase E parity harness (M5.4/E.1): the hand scanner's block rules
+//! beside the candidate pulldown-cmark mapping, diffed on the REAL
+//! corpus plus synthetic latent-divergence cases. Test-only module;
+//! pulldown-cmark is still a dev-dependency here. When this harness
+//! is green, E.1 moves the `pdc_*` logic into `convert()` and this
+//! file stays as the permanent regression cross-check.
+//!
+//! Mapping principle (the whole bet): pulldown-cmark owns block
+//! BOUNDARIES; every content rule stays hand code on raw source
+//! slices (offsets), so inline escaping, fence attrs, tables, and
+//! directives behave byte-identically. Inline events are IGNORED —
+//! the slice is the truth. Constructs the hand scanner never knew
+//! (lists, HTML blocks, setext, `~~~`, indented code, H4+) feed
+//! their raw slice lines back as paragraph text — exactly what the
+//! hand scanner did with them. Two deliberate exceptions, both
+//! loud: `>` quote lines are pre-deleted (the hand scanner dropped
+//! them without even breaking paragraphs — deletion replicates
+//! that exactly), and link reference definitions are a hard error
+//! (pulldown consumes them silently; silent text loss is worse
+//! than a loud rejection, and they are outside the subset).
 
-use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
+// (pulldown-cmark now ships in production: see `crate::md`)
 
-/// Representative manuscript: every block shape `convert()` handles.
-const SAMPLE: &str = "# Title Here\n\
-\n\
-## Abstract\n\
-\n\
-Abs line one.\n\
-Abs line two.\n\
-\n\
-\n\
-## 1. First\n\
-\n\
-Para with math $x$ and cite [`k`] inline.\n\
-\n\
-```mermaid {span=column pos=both}\n\
-graph TD\n\
-%% caption: Cap one.\n\
-a[x]-->b[y]\n\
-```\n\
-\n\
-%% table {pos=barrier}\n\
-\n\
-| A | B |\n\
-|---|---|\n\
-| 1 | 2 |\n\
-| 3 | 4 |\n\
-\n\
-### 1.1 Sub\n\
-\n\
-```mermaid {inline}\n\
-graph TD\n\
-c[x]-->d[y]\n\
-```\n\
-\n\
-## Appendix\n\
-\n\
-Tail.\n";
+/// Block stream both parsers must agree on.
+#[derive(Debug, PartialEq)]
+enum Block {
+    Title(String), // `# ` — last one wins, never flushes
+    H2(String),    // `## ...` after `## ` stripped (pre-strip_section_number)
+    H3(String),    // `### ...` after `### ` stripped
+    Appendix,      // `## Appendix...` prefix
+    Abstract,      // `## Abstract...` prefix
+    Fence { lang: String, attr: String, body: String },
+    Table(Vec<String>), // trimmed source rows, delimiter included
+    Directive(String),   // `%% table ...` attr string (before a table)
+    Para(String),        // trimmed lines joined with one space
+}
 
-/// Block descriptors from the HAND scanner's rules (`doc.rs convert`):
-/// headings, fences (lang + verbatim attr string), table runs with
-/// shape, `%%` directives, paragraphs (breaks only, text elided).
-fn hand_blocks(md: &str) -> Vec<String> {
+/// Mirror of `convert()`'s line walk: blocks only, no spec/cfg.
+/// Any drift between this and `convert()` invalidates the harness.
+fn hand_parse(md: &str) -> Vec<Block> {
     let lines: Vec<&str> = md.lines().collect();
     let mut out = Vec::new();
+    let mut para: Vec<String> = Vec::new();
     let mut i = 0;
-    let mut para_open = false;
-    let flush = |out: &mut Vec<String>, para_open: &mut bool| {
-        if *para_open {
-            out.push("Para".to_string());
-            *para_open = false;
+    let flush = |out: &mut Vec<Block>, para: &mut Vec<String>| {
+        if !para.is_empty() {
+            out.push(Block::Para(para.join(" ")));
+            para.clear();
         }
     };
     while i < lines.len() {
         let s = lines[i].trim();
+        if s.is_empty() {
+            flush(&mut out, &mut para);
+            i += 1;
+            continue;
+        }
+        if s.starts_with('>') {
+            i += 1;
+            continue;
+        }
         if s.starts_with("```") {
-            flush(&mut out, &mut para_open);
+            flush(&mut out, &mut para);
             let info = s.trim_start_matches('`');
             let mut sp = info.splitn(2, char::is_whitespace);
-            let lang = sp.next().unwrap_or("");
-            let attr = sp.next().unwrap_or("").trim();
-            out.push(format!("Fence({lang}|{attr})"));
-            i += 1;
-            while i < lines.len() && !lines[i].trim().starts_with("```") {
-                i += 1;
+            let (lang, attr) = (
+                sp.next().unwrap_or("").to_string(),
+                sp.next().unwrap_or("").trim().to_string(),
+            );
+            let mut body = Vec::new();
+            let mut j = i + 1;
+            while j < lines.len() && !lines[j].trim().starts_with("```") {
+                body.push(lines[j].to_string());
+                j += 1;
             }
-            i += 1;
+            out.push(Block::Fence { lang, attr, body: body.join("\n") });
+            i = j + 1;
             continue;
         }
         if s.starts_with("%% table") {
-            flush(&mut out, &mut para_open);
-            out.push(format!("Directive({})", s.trim_start_matches("%% table").trim()));
+            let mut j = i + 1;
+            while j < lines.len() && lines[j].trim().is_empty() {
+                j += 1;
+            }
+            if j < lines.len() && lines[j].trim().starts_with('|') {
+                out.push(Block::Directive(crate::doc::fence_attr_str(s).to_string()));
+                i = j;
+                continue;
+            }
+        }
+        if s.starts_with('|') {
+            flush(&mut out, &mut para);
+            let mut rows = Vec::new();
+            while i < lines.len() && lines[i].trim().starts_with('|') {
+                rows.push(lines[i].trim().to_string());
+                i += 1;
+            }
+            out.push(Block::Table(rows));
+            continue;
+        }
+        if s.starts_with("## Appendix") {
+            flush(&mut out, &mut para);
+            out.push(Block::Appendix);
             i += 1;
             continue;
         }
-        if s.starts_with('|') {
-            flush(&mut out, &mut para_open);
-            let mut rows = 0;
-            let mut cols = 0;
-            while i < lines.len() && lines[i].trim().starts_with('|') {
-                let cells: Vec<&str> = lines[i]
-                    .trim()
-                    .trim_matches('|')
-                    .split('|')
-                    .map(str::trim)
-                    .collect();
-                cols = cols.max(cells.len());
-                rows += 1;
-                i += 1;
-            }
-            out.push(format!("Table(rows={rows},cols={cols})"));
+        if s.starts_with("## Abstract") {
+            flush(&mut out, &mut para);
+            out.push(Block::Abstract);
+            i += 1;
             continue;
         }
-        if let Some(h) = s.strip_prefix("### ") {
-            flush(&mut out, &mut para_open);
-            out.push(format!("H3({h})"));
-        } else if let Some(h) = s.strip_prefix("## ") {
-            flush(&mut out, &mut para_open);
-            out.push(format!("H2({h})"));
-        } else if let Some(h) = s.strip_prefix("# ") {
-            flush(&mut out, &mut para_open);
-            out.push(format!("H1({h})"));
-        } else if s.is_empty() {
-            flush(&mut out, &mut para_open);
-        } else {
-            para_open = true;
+        if s.starts_with("## ") {
+            flush(&mut out, &mut para);
+            out.push(Block::H2(s[3..].to_string()));
+            i += 1;
+            continue;
         }
+        if s.starts_with("### ") {
+            flush(&mut out, &mut para);
+            out.push(Block::H3(s[4..].to_string()));
+            i += 1;
+            continue;
+        }
+        if s.starts_with("# ") {
+            if let Some(Block::Title(_)) = out.last() {
+                out.pop();
+            }
+            // Hand keeps every `# ` but only the last survives as
+            // `title`; earlier ones vanish. Record just the last by
+            // replacing — the harness models the observable stream.
+            out.push(Block::Title(s[2..].to_string()));
+            i += 1;
+            continue;
+        }
+        para.push(s.to_string());
         i += 1;
     }
-    flush(&mut out, &mut para_open);
+    flush(&mut out, &mut para);
     out
 }
 
-/// Block descriptors from pulldown-cmark events: headings with text,
-/// fenced info strings VERBATIM, table head/row cell counts,
-/// paragraph breaks.
-fn pdc_blocks(md: &str) -> Vec<String> {
+/// Production-backed candidate: `crate::md::blocks()` mapped onto
+/// the harness `Block` stream. Post-switch this is the cross-check —
+/// the frozen `hand_parse` oracle vs the shipped mapping. Any drift
+/// between the two reddens here (and in the golden test).
+fn pdc_parse(md: &str) -> Result<Vec<Block>, crate::error::Error> {
     let mut out = Vec::new();
-    let mut heading: Option<(String, String)> = None;
-    let mut row_cells = 0;
-    let mut in_row = false;
-    let mut table_rows: Vec<usize> = Vec::new();
-    for ev in Parser::new_ext(md, Options::ENABLE_TABLES) {
-        match ev {
-            Event::Start(Tag::Heading { level, .. }) => {
-                heading = Some((format!("{level:?}").to_uppercase(), String::new()));
+    for b in crate::md::blocks(md)? {
+        match b.kind {
+            crate::md::MdKind::Title(t) => {
+                if let Some(Block::Title(_)) = out.last() {
+                    out.pop();
+                }
+                out.push(Block::Title(t));
             }
-            Event::Text(t) => {
-                if let Some((_, ref mut text)) = heading {
-                    text.push_str(&t);
-                } else if in_row {
-                    row_cells += 1;
-                }
+            crate::md::MdKind::H2(h) => out.push(Block::H2(h)),
+            crate::md::MdKind::H3(h) => out.push(Block::H3(h)),
+            crate::md::MdKind::Appendix => out.push(Block::Appendix),
+            crate::md::MdKind::Abstract => out.push(Block::Abstract),
+            crate::md::MdKind::Fence { info, body } => {
+                // Same backtick-strip the hand scanner applied.
+                let mut sp = info.trim_start_matches('`').splitn(2, char::is_whitespace);
+                out.push(Block::Fence {
+                    lang: sp.next().unwrap_or("").to_string(),
+                    attr: sp.next().unwrap_or("").trim().to_string(),
+                    body,
+                });
             }
-            Event::End(tag) => match tag {
-                pulldown_cmark::TagEnd::Heading(_) => {
-                    let (lvl, text) = heading.take().unwrap();
-                    let n: &str = match lvl.as_str() {
-                        "H1" => "1",
-                        "H2" => "2",
-                        _ => "3",
-                    };
-                    out.push(format!("H{n}({text})"));
-                }
-                pulldown_cmark::TagEnd::TableHead => {
-                    table_rows.push(row_cells);
-                    row_cells = 0;
-                    in_row = false;
-                }
-                pulldown_cmark::TagEnd::TableRow => {
-                    table_rows.push(row_cells);
-                    row_cells = 0;
-                    in_row = false;
-                }
-                pulldown_cmark::TagEnd::Table => {
-                    out.push(format!("Table(head+rows={table_rows:?})"));
-                    table_rows.clear();
-                }
-                pulldown_cmark::TagEnd::Paragraph => out.push("Para".to_string()),
-                _ => {}
-            },
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) => {
-                let info = info.trim();
-                let mut sp = info.splitn(2, char::is_whitespace);
-                out.push(format!(
-                    "Fence({}|{})",
-                    sp.next().unwrap_or(""),
-                    sp.next().unwrap_or("").trim()
-                ));
-            }
-            Event::Start(Tag::Table(_)) => {}
-            Event::Start(Tag::TableHead | Tag::TableRow) => {
-                in_row = true;
-                row_cells = 0;
-            }
-            _ => {}
+            crate::md::MdKind::Table(rows) => out.push(Block::Table(rows)),
+            crate::md::MdKind::Directive(a) => out.push(Block::Directive(a)),
+            crate::md::MdKind::Para(ls) => out.push(Block::Para(ls.join(" "))),
+            // Parity with hand_parse: a `$$` paragraph stays one
+            // Para there, so the oracle sees the same shape here.
+            crate::md::MdKind::DisplayMath(t) => out.push(Block::Para(format!("$${t}$$"))),
         }
     }
-    out
+    Ok(out)
 }
 
-#[test]
-fn spike_event_diff() {
-    let hand = hand_blocks(SAMPLE);
-    let pdc = pdc_blocks(SAMPLE);
-    eprintln!("HAND: {hand:#?}\nPDC:  {pdc:#?}");
-    // Required property 1: fenced info strings arrive verbatim.
-    let pinfos: Vec<String> = pdc
-        .iter()
-        .filter_map(|b| b.strip_prefix("Fence("))
-        .map(|s| s.strip_suffix(')').unwrap().to_string())
-        .collect();
-    assert_eq!(pinfos, ["mermaid|{span=column pos=both}", "mermaid|{inline}"]);
-    // Required property 2: headings identical (levels + text).
-    let hheads: Vec<&str> = hand
-        .iter()
-        .filter(|b| b.starts_with('H'))
-        .map(String::as_str)
-        .collect();
-    let pheads: Vec<&str> = pdc
-        .iter()
-        .filter(|b| b.starts_with('H'))
-        .map(String::as_str)
-        .collect();
-    assert_eq!(hheads, pheads);
-    // Required property 3: table shape parity (cols; data rows =
-    // total minus delimiter on the hand side, minus head on pdc).
-    assert!(hand.contains(&"Table(rows=4,cols=2)".to_string()));
-    assert!(pdc.contains(&"Table(head+rows=[2, 2, 2])".to_string()));
-    // Required property 4: paragraph breaks. pulldown-cmark sees the
-    // `%% table` directive line as paragraph TEXT (it cannot know our
-    // directives) — exactly one extra Para, identified, everything
-    // else aligned.
-    let hparas = hand.iter().filter(|b| *b == "Para").count();
-    let pparas = pdc.iter().filter(|b| *b == "Para").count();
-    assert_eq!((hparas, pparas), (3, 4));
-    assert!(hand.contains(&"Directive({pos=barrier})".to_string()));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Representative manuscript: every block shape `convert()` handles.
+    const SAMPLE: &str = "# Title Here\n\
+        \n\
+        ## Abstract\n\
+        \n\
+        Abs line one.\n\
+        Abs line two.\n\
+        \n\
+        \n\
+        ## 1. First\n\
+        \n\
+        Para with math $x$ and cite [`k`] inline.\n\
+        \n\
+        ```mermaid {span=column pos=both}\n\
+        graph TD\n\
+        %% caption: Cap one.\n\
+        a[x]-->b[y]\n\
+        ```\n\
+        \n\
+        %% table {pos=barrier}\n\
+        \n\
+        | A | B |\n\
+        |---|---|\n\
+        | 1 | 2 |\n\
+        | 3 | 4 |\n\
+        \n\
+        ### 1.1 Sub\n\
+        \n\
+        ```mermaid {inline}\n\
+        graph TD\n\
+        c[x]-->d[y]\n\
+        ```\n\
+        \n\
+        ## Appendix\n\
+        \n\
+        Tail.\n";
+
+    #[test]
+    fn sample_parity() {
+        let hand = hand_parse(SAMPLE);
+        let pdc = pdc_parse(SAMPLE).unwrap();
+        assert_eq!(hand, pdc);
+    }
+
+    fn corpus_path(name: &str) -> Option<String> {
+        let base = env!("CARGO_MANIFEST_DIR");
+        let p = std::path::Path::new(base).join(name);
+        std::fs::read_to_string(p).ok()
+    }
+
+    #[test]
+    fn corpus_parity() {
+        for rel in [
+            "../paper/paper-2026-10-05.md",
+            "examples/ikat-paper/ikat-paper.md",
+            "examples/mini.md",
+        ] {
+            let Some(md) = corpus_path(rel) else {
+                continue;
+            };
+            let hand = hand_parse(&md);
+            let pdc = pdc_parse(&md).unwrap();
+            assert_eq!(hand, pdc, "block stream differs for {rel}");
+        }
+    }
+
+    /// Latent divergences inside the accepted subset: each must be an
+    /// empty diff, with the rule that makes it so named above.
+    #[test]
+    fn latent_cases() {
+        // Directive directly followed by a table (no blank line).
+        let md = "# T\n\n%% table {pos=bottom}\n| A |\n|---|\n| 1 |\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Dangling directive (no table after): para text both sides.
+        let md = "# T\n\n%% table {pos=bottom}\n\nJust text.\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Quote splitting a paragraph: dropped without breaking it.
+        let md = "# T\n\nfoo\n> dropped\nbar\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Closed ATX stays verbatim (hand never stripped closings).
+        let md = "# T\n\n## X ##\n\nBody.\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // `#NoSpace` is paragraph text on both sides.
+        let md = "# T\n\n#NoSpace here\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // H4+ is paragraph text (hand never knew it).
+        let md = "# T\n\n#### deep\n\nBody.\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Tilde fence: raw lines as para text.
+        let md = "# T\n\n~~~mermaid\ngraph TD\na-->b\n~~~\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Title never flushes; last `# ` wins.
+        let md = "# T\n\nfoo\n# U\nbar\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Lone `|` line: hand tables it; driver re-scans for it.
+        let md = "# T\n\n| just a line\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Table interrupting a paragraph without a blank line.
+        let md = "# T\n\nfoo\n| A |\n|---|\n| 1 |\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // `## Appendix extra` prefix rule; `## Abstract` flow.
+        let md = "# T\n\n## Appendix B\n\nTail.\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Emphasis/code stay raw inside paras on both sides.
+        let md = "# T\n\nA *b* and `c` line.\n";
+        assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
+        // Reference definitions are a loud error, never silent loss.
+        let md = "# T\n\n[lab]: /url\n";
+        assert!(pdc_parse(md).is_err());
+    }
 }

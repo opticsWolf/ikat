@@ -1,0 +1,97 @@
+{
+  "bench": "ikat layout float-placement match",
+  "license_policy": "CC-BY 4.0 only (PLOS family applies CC-BY 4.0 to all articles). No NC/ND. PDFs git-ignored; manifest records DOI + license URL for reproducibility.",
+  "license_evidence": "https://journals.plos.org/plosone/s/licenses-and-copyright",
+  "papers": [
+    {
+      "id": "physics-pauli-2024",
+      "area": "physics",
+      "title": "Quantum simulation of Pauli channels and dynamical maps: Algorithm and implementation",
+      "doi": "10.1371/journal.pone.0297210",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0297210",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0297210&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "cs-bodvw-2024",
+      "area": "computer science",
+      "title": "Can using a pre-trained deep learning model as the feature extractor in the bag-of-deep-visual-words model always improve image classification accuracy?",
+      "doi": "10.1371/journal.pone.0298228",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0298228",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0298228&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "math-hilfer-2024",
+      "area": "mathematics",
+      "title": "Well-posedness analysis and pseudo-Galerkin approximations using Tau Legendre algorithm for fractional systems of delay differential models regarding Hilfer framework",
+      "doi": "10.1371/journal.pone.0305259",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0305259",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0305259&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "chem-olive-2024",
+      "area": "chemistry",
+      "title": "Olive leaf extract-assisted green synthesis of cd nano complex: A combined experimental and theoretical study",
+      "doi": "10.1371/journal.pone.0306040",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0306040",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0306040&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "eng-disk-2024",
+      "area": "engineering",
+      "title": "Online measurement method for dimensions of disk parts based on machine vision",
+      "doi": "10.1371/journal.pone.0307525",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0307525",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0307525&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "bio-medsea-2010",
+      "area": "biology",
+      "title": "The Biodiversity of the Mediterranean Sea: Estimates, Patterns, and Threats",
+      "doi": "10.1371/journal.pone.0011842",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0011842",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0011842&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "med-ioannidis-2005",
+      "area": "medicine",
+      "title": "Why Most Published Research Findings Are False",
+      "doi": "10.1371/journal.pmed.0020124",
+      "article": "https://journals.plos.org/plosmedicine/article?id=10.1371/journal.pmed.0020124",
+      "pdf": "https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.0020124&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "earth-ph-2011",
+      "area": "earth science",
+      "title": "High-Frequency Dynamics of Ocean pH: A Multi-Ecosystem Comparison",
+      "doi": "10.1371/journal.pone.0028983",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0028983",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0028983&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "psych-maia-2012",
+      "area": "psychology",
+      "title": "The Multidimensional Assessment of Interoceptive Awareness (MAIA)",
+      "doi": "10.1371/journal.pone.0048230",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0048230",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0048230&type=printable",
+      "license": "CC-BY 4.0"
+    },
+    {
+      "id": "econ-tax-2019",
+      "area": "economics",
+      "title": "Taxation and Economic Sophistication: Evidence from OECD Countries",
+      "doi": "10.1371/journal.pone.0213498",
+      "article": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0213498",
+      "pdf": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0213498&type=printable",
+      "license": "CC-BY 4.0"
+    }
+  ]
+}

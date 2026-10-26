@@ -4,26 +4,40 @@
 
 use pyo3::prelude::*;
 
+mod autolayout;
 mod config;
 mod doc;
+mod error;
+mod md;
+mod emit;
 mod esc;
-#[cfg(test)]
+mod mathwidth;
 mod md_spike;
 mod mermaid;
 mod plot;
+mod layout;
+mod preset;
+mod sequence;
+mod state;
 mod table;
 #[cfg(feature = "tectonic")]
 mod tectonic;
 mod texenv;
 
+/// Rendered error helper: the Display string crosses the
+/// boundary (exception type unchanged — still `ValueError`).
+fn verr(e: crate::error::Error) -> pyo3::PyErr {
+    pyo3::exceptions::PyValueError::new_err(e.to_string())
+}
+
 /// Convert a mermaid flowchart block to a standalone `tikzpicture`.
 ///
 /// Raises `ValueError` on empty input, unknown directions, or
-/// unparsable edges.
+/// unparsable edges. Errors carry snippet-relative line numbers
+/// (base 1 — bare snippets have no file).
 #[pyfunction]
 fn flowchart_to_tikz(src: &str) -> PyResult<String> {
-    mermaid::flowchart_to_tikz(src)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+    mermaid::flowchart_to_tikz(src, 1).map_err(verr)
 }
 
 /// Grouped bar chart with min/max whiskers → `tikzpicture` (pgfplots).
@@ -48,8 +62,7 @@ fn barchart_to_tikz(
     refline: Option<(f64, f64, f64, String)>,
     legend: &str,
 ) -> PyResult<String> {
-    let legend = plot::LegendPos::parse(legend)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+    let legend = plot::LegendPos::parse(legend).map_err(verr)?;
     plot::barchart(
         title,
         ylabel,
@@ -62,7 +75,7 @@ fn barchart_to_tikz(
         refline,
         legend,
     )
-    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+    .map_err(verr)
 }
 
 /// Line plot with symmetric error bars → `tikzpicture` (pgfplots).
@@ -79,12 +92,12 @@ fn lineplot_to_tikz(
     errs: Vec<Vec<f64>>,
     legend: &str,
 ) -> PyResult<String> {
-    let legend = plot::LegendPos::parse(legend)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))?;
+    let legend = plot::LegendPos::parse(legend).map_err(verr)?;
     if names.len() != yss.len() || names.len() != errs.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
+        return Err(verr(crate::error::Error::data(
             "lineplot: names/yss/errs length mismatch",
-        ));
+            format!("names={} yss={} errs={}", names.len(), yss.len(), errs.len()),
+        )));
     }
     let series: Vec<(&str, Vec<f64>, Vec<f64>)> = names
         .iter()
@@ -92,8 +105,14 @@ fn lineplot_to_tikz(
         .zip(errs.into_iter())
         .map(|((n, y), e)| (n.as_str(), y, e))
         .collect();
-    plot::lineplot(title, xlabel, ylabel, &xs, &series, legend)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+    plot::lineplot(title, xlabel, ylabel, &xs, &series, legend).map_err(verr)
+}
+
+/// Benchmark-JSON preset → `tikzpicture` (see `plot` for emitters).
+/// `legend`/`footnote` ride inside the JSON; errors name keys.
+#[pyfunction]
+fn preset_to_tikz(src: &str) -> PyResult<String> {
+    preset::preset_to_tikz(src).map_err(verr)
 }
 
 /// Parse an `ikat.toml` document config. Returns the resolved
@@ -124,6 +143,8 @@ fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>
     m.insert("float_topnumber".to_string(), cfg.floats.topnumber.to_string());
     m.insert("float_bottomnumber".to_string(), cfg.floats.bottomnumber.to_string());
     m.insert("float_barrier_sections".to_string(), cfg.floats.barrier_sections.to_string());
+    m.insert("typography_keep_with_next".to_string(), cfg.typography.keep_with_next.to_string());
+    m.insert("typography_min_lines".to_string(), cfg.typography.min_lines.to_string());
     m.insert("template_skeleton".to_string(), cfg.template.skeleton.clone());
     for kind in ["diagram", "plot", "table", "picture", "default"] {
         let span = cfg.spans.for_kind(kind);
@@ -142,10 +163,22 @@ fn parse_config(src: &str) -> PyResult<std::collections::HashMap<String, String>
 fn build_document(md_text: &str, toml_src: &str, spec_json: &str) -> PyResult<String> {
     let spec: doc::BuildSpec = serde_json::from_str(spec_json)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("spec: {e}")))?;
-    let r = doc::build_document(md_text, toml_src, &spec)
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let r = doc::build_document(md_text, toml_src, &spec).map_err(verr)?;
     serde_json::to_string(&r)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+}
+
+/// Auto-layout (M7.1): measure every floatable fence in `md_text`
+/// and suggest `span`/`pos`/`width` per fence (`spec_json` is the
+/// same `BuildSpec` JSON `build_document` takes; `toml_src` may
+/// carry `[layout]` knobs). Returns a JSON list of suggestions —
+/// advisory only, nothing is rewritten. Raises `ValueError` on
+/// strict-subset or registry errors, with file lines.
+#[pyfunction]
+fn suggest_layout(md_text: &str, toml_src: &str, spec_json: &str) -> PyResult<String> {
+    let spec: doc::BuildSpec = serde_json::from_str(spec_json)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("spec: {e}")))?;
+    autolayout::suggest_layout_json(md_text, toml_src, &spec).map_err(verr)
 }
 
 /// BibTeX-safe derivative of a `.bib` source (brace bare authors,
@@ -161,6 +194,18 @@ fn bib_keys(bib_src: &str) -> Vec<String> {
     let mut v: Vec<String> = table::bib_keys_of(bib_src).into_iter().collect();
     v.sort();
     v
+}
+
+/// Does this `.tex` fragment contain a `tikzpicture`? (standalone builder)
+#[pyfunction]
+fn tikz_needed(tex: &str) -> bool {
+    doc::tikz_needed(tex)
+}
+
+/// Does this `.tex` fragment contain a pgfplots `axis`?
+#[pyfunction]
+fn plots_needed(tex: &str) -> bool {
+    doc::plots_needed(tex)
 }
 
 /// LaTeX packages a woven body needs: TikZ for inline diagrams,
@@ -212,15 +257,19 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(flowchart_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(barchart_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(lineplot_to_tikz, m)?)?;
+    m.add_function(wrap_pyfunction!(preset_to_tikz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_config, m)?)?;
     m.add_function(wrap_pyfunction!(build_document, m)?)?;
     m.add_function(wrap_pyfunction!(bib_safe, m)?)?;
     m.add_function(wrap_pyfunction!(bib_keys, m)?)?;
     m.add_function(wrap_pyfunction!(tex_requirements, m)?)?;
+    m.add_function(wrap_pyfunction!(tikz_needed, m)?)?;
+    m.add_function(wrap_pyfunction!(plots_needed, m)?)?;
     m.add_function(wrap_pyfunction!(tex_extra_packages, m)?)?;
     m.add_function(wrap_pyfunction!(used_packages, m)?)?;
     m.add_function(wrap_pyfunction!(document_class, m)?)?;
     m.add_function(wrap_pyfunction!(package_needs, m)?)?;
+    m.add_function(wrap_pyfunction!(suggest_layout, m)?)?;
     #[cfg(feature = "tectonic")]
     m.add_function(wrap_pyfunction!(compile_tectonic_pdf, m)?)?;
     Ok(())

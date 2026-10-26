@@ -19,7 +19,7 @@ declare figures as data, weave at build time), short, memorable.
 | `pgfplots` (DJDuque) | 0.5.1 | **noted, not used** — real PGFPlots code generator (`Plot2D`, `Axis`, `AxisKey`/`PlotKey`, pdflatex *or* tectonic engines). Revisit if our emitter outgrows bar/line/log; today it would own our output formatting |
 | `mdbook-tikz`, `depict-tikz`, `ast-to-mermaid` | — | adjacent, none parse mermaid flowcharts |
 | `pyo3` / `maturin` / `serde` / `toml` | 0.29 / 1.15 / 1.0 / 1.1 | **used** — the whole stack |
-| `pulldown-cmark` | 0.13.4 | **spike only** (dev-dep, ships nowhere) — CommonMark event stream (mdBook's engine); M5.3 diff vs the hand scanner holds on all required properties (verbatim fence infos, identical headings, matching table shapes, paras aligned modulo `%%` directives). Switch viable, deferred to a golden-parity milestone; `esc.rs` inline pass untouched either way |
+| `pulldown-cmark` | 0.13.4 | **SWITCHED 2026-10-08 (E.1/M5.4)** — production dependency: `src/md.rs` owns block boundaries (event stream + raw-slice content), `convert()` consumes `MdBlock`s with the old arm bodies verbatim. Harness (`md_spike`, now production-backed) holds empty-diff on 141+35+3 corpus blocks + 12 latent synthetics; golden paper byte-identical (`ebe698db`); `esc.rs` inline pass untouched, as predicted |
 
 Online mermaid→TikZ converters (Underleaf, useoctree, assorted
 GitHub scripts) confirm demand but are services or unmaintained

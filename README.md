@@ -27,8 +27,14 @@ no font mismatch between text and figures.
 - **Markdown → LaTeX** (`ikat.pipeline`): headings, tables, citations,
   code, footnotes, and fenced elements → a complete `.tex` document.
 - **Mermaid → TikZ** (`ikat._core.flowchart_to_tikz`, Rust): the
-  `graph TD/LR` flowchart subset → a `tikzpicture` with deterministic
-  layered layout. No Node.js, no browser, no SVG round-trip.
+  `graph TD/LR` flowchart subset, `sequenceDiagram` messages
+  (`->>`/`-->>`) with `alt`/`else`/`opt` boxes, and
+  `stateDiagram-v2` states with `[*]` markers, `-->` transitions,
+  and one level of composite boxes → a `tikzpicture` with
+  deterministic layout.
+  Dispatch is on the header line; every grammar is strict
+  (unknown statements are string errors). No Node.js, no browser,
+  no SVG round-trip.
 - **Data → pgfplots** (`ikat._core`, Rust): bar charts with
   min/max whiskers, log axes, line plots → `tikzpicture` code compiled
   by your LaTeX installation, so figure fonts always match the paper.
@@ -40,7 +46,14 @@ no font mismatch between text and figures.
   global — each element kind (diagram, plot, table) declares
   `column` or `wide`, overridable per element from Markdown.
 - **Compile** (`ikat.compile`): `pdflatex`/`bibtex` driver that turns
-  the woven tree into PDF.
+  the woven tree into PDF, with a `tectonic` engine option
+  (`compile_pdf(..., engine="tectonic")`, `--engine` on the
+  `build`/`weave` CLIs and the example builders). The tectonic
+  Rust crate does NOT link on Windows (C dependencies) — the
+  supported path is the `tectonic` binary (`TECTONIC_EXE` or
+  PATH; CI pins 0.17.0 by checksum). Crate embedding stays a
+  Linux-CI exercise by design; wheels stay lean (feature-gated,
+  off by default).
 
 ## Showcase paper
 
@@ -53,16 +66,19 @@ ikat/
   src/            Rust core (pyo3): mermaid.rs (flowcharts), plot.rs
                   (pgfplots + legend auto-placement), table.rs, doc.rs,
                   esc.rs (unicode/citations), config.rs (ikat.toml),
+                  autolayout.rs (float measuring + policy),
                   texenv.rs (package scan), tectonic.rs (engine),
                   md_spike.rs (parser-spike harness, tests only)
   python/ikat/    thin wrappers: pipeline.py (fences/spans/floats),
                   document.py (BuildSpec assembly), compile.py (pdflatex
                   driver), texenv.py (kpsewhich/tlmgr), cli.py (`ikat`
-                  script), mcp_server.py (FastMCP stdio),
+                  script), mcp_server.py (FastMCP stdio), layout.py
+                  (suggest/apply/report for auto-layout),
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
   docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
-  skills/          Agent Skills: ikat guide, ikat-api, ikat-cli, ikat-mcp
+  python/ikat/skills/  Agent Skills (bundled in the wheel, served as MCP
+                  resources): ikat guide, ikat-api, ikat-cli, ikat-mcp
   examples/       mini.md starter + ikat-paper/ showcase (6-page paper
                   built by ikat itself), plot/float/skeleton proofs
 ```
@@ -82,9 +98,9 @@ cargo test                       # Rust unit tests
 
 Use ikat programmatically through its Python API, automate it with the
 CLI, or connect the optional stdio MCP server as agent tools. The repo
-also includes focused [Python API](skills/ikat-api/SKILL.md),
-[CLI](skills/ikat-cli/SKILL.md), and [MCP](skills/ikat-mcp/SKILL.md)
-skills, plus a general [ikat guide](skills/ikat/SKILL.md). These interfaces
+also includes focused [Python API](python/ikat/skills/ikat-api/SKILL.md),
+[CLI](python/ikat/skills/ikat-cli/SKILL.md), and [MCP](python/ikat/skills/ikat-mcp/SKILL.md)
+skills, plus a general [ikat guide](python/ikat/skills/ikat/SKILL.md). These interfaces
 use the same Rust-backed pipeline; the skills guide the agent but do not
 install or run ikat.
 
@@ -99,6 +115,8 @@ ikat templates | ikat template arxiv --show-preset
 ikat skeletons | ikat skeleton skeleton-plain
 printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{"title":"t",...}' | ikat barchart - [--legend top-left]
+ikat standalone fig.md --out fig.pdf   # one mermaid|chart fence → PDF
+ikat layout doc.md --toml ikat.toml [--apply]  # suggest span/pos/width, no TeX
 ikat version
 ```
 
@@ -121,8 +139,10 @@ python -m ikat.mcp_server
 |---|---|---|---|
 | weave document | `build_document` / `build_from_paths` | `ikat build` / `weave` | `weave_document` |
 | flowchart | `flowchart_to_tikz` | `ikat flowchart` | `flowchart_to_tikz` |
-| bar chart | `barchart_to_tikz` | `ikat barchart` (JSON, `--legend`) | `barchart_to_tikz` |
-| line plot | `lineplot_to_tikz` | `ikat lineplot` (JSON, `--legend`) | `lineplot_to_tikz` |
+| bar chart | `barchart_to_tikz` / `load_preset` | `ikat barchart` (JSON or `--preset`, `--legend`) | `barchart_to_tikz` (`preset_json=`) |
+| line plot | `lineplot_to_tikz` / `load_preset` | `ikat lineplot` (JSON or `--preset`, `--legend`) | `lineplot_to_tikz` (`preset_json=`) |
+| standalone | `compile_standalone` / `wrap_standalone` / `fence_to_tikz` | `ikat standalone` | `standalone_figure` (.tex only) |
+| auto-layout | `suggest_layout` / `apply_layout` / `layout_report` | `ikat layout [--apply]` | `suggest_layout` (advisory; plots report-only) |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |

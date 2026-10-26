@@ -127,26 +127,31 @@ def stage_bib_style(out: Path, style: str = "IEEEtran") -> None:
     raise SystemExit(f"no {style}.bst found (kpsewhich + texmf); install it")
 
 
-def make_paper() -> None:
+def make_paper(engine: str = "pdflatex") -> None:
     ref_bib = (HERE / "refs.bib").read_text(encoding="utf-8")
     spec = BuildSpec(
         diagrams=[
-            DiagramEntry(key="fig-pipeline", caption="The ikat build: three inputs, a template, one decision.", mode="inline"),
+            DiagramEntry(key="fig-pipeline", caption="The ikat build: sources in, assembly, one engine decision.", mode="inline"),
+            DiagramEntry(key="fig-sequence", caption="The same build as a sequence: calls across the PyO3 boundary, engine choice as an alt box.", mode="inline"),
+            DiagramEntry(key="fig-states", caption="The document path as states: fences convert, the body wraps and validates, the engine compiles.", mode="inline"),
             DiagramEntry(key="fig-floats", caption="Float resolution: attrs against policy.", mode="inline"),
         ],
         plots=[
             ("fig-loc", "Rust lines of code by shipped module (wc, HEAD; test-only spike excluded)."),
             ("fig-tests", "Test functions per commit, both suites (grep, no smoothing)."),
         ],
-        plot_attrs={"fig-tests": "pos=bottom"},
+        plot_attrs={"fig-loc": "pos=force width=0.75", "fig-tests": "pos=force width=0.75"},
+        # Order follows the md table blocks: the skeleton table moved
+        # ahead of the engines table (block order = caption order).
         table_captions=[
             "Per-element float attributes.",
             "Test suites and what they guard.",
-            "Compile engines compared.",
             "Skeleton token contract.",
+            "Compile engines compared.",
         ],
-        table_specs={"3": "XXl"},
-        plot_insert_before="\\section{Engines",
+        # Keyed by md block order: the skeleton table is block 2.
+        table_specs={"2": "XXl"},
+        plot_insert_before="\\subsection{Where",
         title_thanks=THANKS,
         author="opticsWolf",
         bib_name="ikat-refs",
@@ -156,15 +161,20 @@ def make_paper() -> None:
     (OUT / "ikat-paper.tex").write_text(r.tex, encoding="utf-8")
     shutil.copy(HERE / "refs.bib", OUT / "ikat-refs.bib")
     stage_bib_style(OUT, spec.bib_style)
-    pdf = compile_pdf(OUT, "ikat-paper.tex")
+    pdf = compile_pdf(OUT, "ikat-paper.tex", engine=engine)
     print(f"paper: {pdf} ({pdf.stat().st_size} bytes, "
           f"diagrams={r.n_diagrams} tables={r.n_tables})")
 
 
 if __name__ == "__main__":
-    if shutil.which("pdflatex") is None:
-        raise SystemExit("pdflatex not on PATH")
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic"])
+    engine = ap.parse_args().engine
+    if shutil.which(engine) is None:
+        raise SystemExit(f"{engine} not on PATH")
     OUT.mkdir(exist_ok=True)
     FIGS.mkdir(exist_ok=True)
     make_plots()
-    make_paper()
+    make_paper(engine)
