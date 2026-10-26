@@ -2,7 +2,7 @@
 
 - physics-pauli-2024: 8 figs (8 PNGs, 0 imageless), 0 tables, 34 refs, 3 authors; engine applied 0, 2 overfull, pdf 2897049B; dropped={} folded=12 leftovers=['U+00E1', 'U+00E9', 'U+00ED', 'U+00FA', 'U+00FC']
 - cs-bodvw-2024: 6 figs (6 PNGs, 0 imageless), 5 tables, 69 refs, 5 authors; engine applied 5, 2 overfull, pdf 6450848B; dropped={} folded=3 leftovers=['U+00E1', 'U+00E9']
-- math-hilfer-2024: 4 figs (4 PNGs, 0 imageless), 4 tables, 38 refs, 4 authors; engine applied 4, 7 overfull, pdf 1649764B; dropped={} folded=1 leftovers=['U+00E1']
+- math-hilfer-2024: 4 figs (4 PNGs, 0 imageless), 4 tables, 38 refs, 4 authors; engine applied 4, 9 overfull, pdf 1651026B; dropped={} folded=1 leftovers=['U+00E1']
 - chem-olive-2024: 7 figs (7 PNGs, 0 imageless), 2 tables, 25 refs, 5 authors; engine applied 2, 0 overfull, pdf 4714393B; dropped={} folded=12 leftovers=['U+00C1', 'U+00C7', 'U+00D6', 'U+00E1', 'U+00E9', 'U+00ED', 'U+00F3', 'U+00F6']
 - eng-disk-2024: 4 figs (5 PNGs, 0 imageless), 3 tables, 24 refs, 7 authors; engine applied 3, 1 overfull, pdf 1788476B; dropped={'supplementary-material': 2} folded=1 leftovers=['U+00FC']
 - bio-medsea-2010: 14 figs (14 PNGs, 0 imageless), 4 tables, 435 refs, 39 authors; engine applied 4, 4 overfull, pdf 7709409B; dropped={'supplementary-material': 2} folded=292 leftovers=['U+00C7', 'U+00C9', 'U+00D6', 'U+00DC', 'U+00E0', 'U+00E1', 'U+00E7', 'U+00E8', 'U+00E9', 'U+00EA', 'U+00EB', 'U+00ED']
