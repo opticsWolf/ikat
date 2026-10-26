@@ -9,15 +9,20 @@ Same operations, three surfaces:
 |----------------|-------------------------|------------------------|---------------------|
 | weave document | build_document /        | ikat build / weave     | weave_document      |
 |                | build_from_paths        |                        |                     |
+| float layout   | suggest_layout          | ikat layout            | suggest_layout      |
 | flowchart      | flowchart_to_tikz       | ikat flowchart         | flowchart_to_tikz   |
 | standalone fig | compile_standalone /    | ikat standalone        | standalone_figure   |
 |                | wrap_standalone         |                        | (returns .tex only) |
-| bar chart      | barchart_to_tikz        | —                      | barchart_to_tikz    |
-| line plot      | lineplot_to_tikz        | —                      | lineplot_to_tikz    |
+| bar chart      | barchart_to_tikz        | ikat barchart          | barchart_to_tikz    |
+| line plot      | lineplot_to_tikz        | ikat lineplot          | lineplot_to_tikz    |
 | check packages | check_tex_env           | ikat check             | check_tex_packages  |
 | install pkgs   | ensure_tex_packages     | ikat check --install   | ensure_tex_packages |
+| float packages | tex_extra_packages      | (in `ikat check`)      | float_packages      |
 | templates      | list_templates /        | ikat templates /       | list_templates /    |
 |                | template_path/preset    | ikat template          | get_template        |
+| skeletons      | list_skeletons          | ikat skeletons /       | list_skeletons /    |
+|                |                         | ikat skeleton          | get_skeleton        |
+| version        | ikat.__version__        | ikat version           | version             |
 
 `compile_pdf` stays out of MCP: it is workdir-bound and slow;
 drive it from the CLI (`ikat build`) instead.

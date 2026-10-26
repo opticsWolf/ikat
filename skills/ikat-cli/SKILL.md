@@ -2,8 +2,8 @@
 name: ikat-cli
 description: >
   ikat Markdown→LaTeX/PDF pipeline via its `ikat` console script
-  (build, weave, check, templates/template, skeletons/skeleton,
-  flowchart, barchart, lineplot, standalone, layout, version). Use when the task needs to
+  (build, weave, layout, check, templates/template, skeletons/skeleton,
+  flowchart, barchart, lineplot, standalone, version). Use when the task needs to
   weave or compile documents, check TeX packages, or emit TikZ/pgfplots
   from the shell with no Python written. For in-process work use the
   ikat-api skill; when an MCP server is wired use the ikat-mcp skill.
@@ -11,7 +11,7 @@ description: >
 
 # ikat skill (CLI)
 
-Fourteen subcommands, each a thin call into the Python API. Needs the
+Thirteen subcommands, each a thin call into the Python API. Needs the
 built module on PATH (`maturin develop` installs the `ikat` script).
 
 ## Commands

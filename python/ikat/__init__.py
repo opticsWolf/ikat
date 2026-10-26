@@ -23,9 +23,8 @@ from ._core import (
 )
 from .compile import compile_pdf
 from .document import BuildResult, BuildSpec, DiagramEntry, build_document
-from .document import build_from_paths, list_skeletons, list_templates, read_skeleton, read_template, template_path
-from .document import spec_from_dict, template_preset
-from .document import template_preset
+from .document import build_from_paths, list_skeletons, list_templates, read_skeleton, read_template, template_path, template_preset
+from .document import spec_from_dict
 from .layout import apply as apply_layout
 from .layout import report as layout_report
 from .layout import suggest as suggest_layout

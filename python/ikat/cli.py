@@ -1,11 +1,17 @@
 """ikat command line: the same operations as the Python API and MCP tools.
 
-    ikat build MD [--toml T] [--outdir D] [--spec S.json] [--bib-style B]
+    ikat build MD [--toml T] [--outdir D] [--spec S.json] [--bib R.bib]
+                 [--engine pdflatex|tectonic] [--bib-style B]
                  [--ensure-packages] [--no-pdf]
-    ikat weave MD [--toml T] [--spec S.json]     # .tex to stdout
-    ikat check FILE.tex [--install]             # missing TeX packages
+    ikat weave MD [--toml T] [--spec S.json] [--bib R.bib]   # .tex to stdout
+    ikat layout MD [--toml T] [--spec S.json] [--json] [--apply]
+    ikat check FILE.tex [--install] [--verbose]   # missing TeX packages
     ikat templates | ikat template NAME [--show-preset]
-    ikat flowchart [FILE|-]                     # mermaid -> tikzpicture
+    ikat skeletons | ikat skeleton NAME
+    ikat flowchart [FILE|-]                       # mermaid -> tikzpicture
+    ikat barchart [FILE|-] [--preset P] [--legend WORD]
+    ikat lineplot [FILE|-] [--preset P] [--legend WORD]
+    ikat standalone MD [--out fig.pdf] [--engine E]
     ikat version
 """
 
