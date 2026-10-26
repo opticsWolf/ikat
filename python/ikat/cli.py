@@ -74,6 +74,9 @@ def _apply_authors(spec, a: argparse.Namespace) -> None:
         while len(spec.author_affils) <= author_i:
             spec.author_affils.append([])
         spec.author_affils[author_i].extend(marks)
+    if a.authors_max < 0:
+        raise ValueError(f"--authors-max must be >= 0, got {a.authors_max}")
+    spec.authors_max = a.authors_max
 
 
 def cmd_build(a: argparse.Namespace) -> int:
@@ -376,6 +379,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="institute in display order; repeatable")
     b.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
                    help="mark author A (1-based) with affiliations N (1-based); repeatable")
+    b.add_argument("--authors-max", type=int, default=0, metavar="N",
+                   help="collapse to the first N names + ', et al.' (0 = never)")
     b.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
@@ -393,6 +398,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="institute in display order; repeatable")
     w.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
                    help="mark author A (1-based) with affiliations N (1-based); repeatable")
+    w.add_argument("--authors-max", type=int, default=0, metavar="N",
+                   help="collapse to the first N names + ', et al.' (0 = never)")
     w.set_defaults(func=cmd_weave)
 
     ly = sub.add_parser("layout", help="measure floats, suggest span/pos/width (no TeX needed)")

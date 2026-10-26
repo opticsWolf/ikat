@@ -65,6 +65,11 @@ pub struct BuildSpec {
     /// `i`; shorter than `authors` = trailing authors unmarked.
     #[serde(default)]
     pub author_affils: Vec<Vec<i64>>,
+    /// Opt-in collapse (M7.10b): when > 0 and the author list is
+    /// longer, compose the first `authors_max` names + ", et al."
+    /// (IEEE style). 0 = never collapse; full list always honest.
+    #[serde(default)]
+    pub authors_max: i64,
     #[serde(default = "default_bib")]
     pub bib_name: String,
     #[serde(default = "default_paths")]
@@ -393,6 +398,12 @@ pub fn author_front(spec: &BuildSpec) -> Result<String, Error> {
     if spec.authors.is_empty() {
         return Ok(spec.author.clone());
     }
+    if spec.authors_max < 0 {
+        return Err(Error::data(
+            format!("authors_max must be >= 0, got {}", spec.authors_max),
+            format!("{}", spec.authors_max),
+        ));
+    }
     const BOX: &str = "0.9\\textwidth";
     let n_affs = spec.affiliations.len();
     let marked = |id: i64| -> Result<i64, Error> {
@@ -424,7 +435,15 @@ pub fn author_front(spec: &BuildSpec) -> Result<String, Error> {
             names.push(format!("{name}\\textsuperscript{{{}}}", nums.join(",")));
         }
     }
-    let names = names.join(", ");
+    // Opt-in collapse (M7.10b): first N composed names + ", et al."
+    // (IEEE style); marks stay on the retained authors and the full
+    // affiliation block remains — everything shown is still true.
+    let mut shown = names;
+    if spec.authors_max > 0 && (shown.len() as i64) > spec.authors_max {
+        shown.truncate(spec.authors_max as usize);
+        shown.push("et al.".to_string());
+    }
+    let names = shown.join(", ");
     if n_affs == 0 {
         return Ok(format!("\\parbox{{{BOX}}}{{\\centering {names}}}"));
     }
@@ -1354,6 +1373,7 @@ mod tests {
             authors: vec![],
             affiliations: vec![],
             author_affils: vec![],
+            authors_max: 0,
             bib_name: "refs-paper".into(),
             graphicspaths: vec!["./".into()],
             bib_keys: HashSet::new(),
@@ -1908,5 +1928,32 @@ mod tests {
         assert!(r
             .tex
             .contains("\\author{\\parbox{0.9\\textwidth}{\\centering Marta Coll\\textsuperscript{1}, Second Author\\textsuperscript{1}\\par\\vspace{0.4em}{\\footnotesize \\textsuperscript{1}Inst One\\par}}}"));
+    }
+
+    #[test]
+    fn author_front_collapse_opt_in() {
+        let mut s = spec();
+        s.authors = vec!["A".into(), "B".into(), "C".into()];
+        s.affiliations = vec!["I".into()];
+        s.author_affils = vec![vec![0], vec![0], vec![0]];
+        s.authors_max = 2;
+        let got = author_front(&s).unwrap();
+        assert!(got.contains("\\centering A\\textsuperscript{1}, B\\textsuperscript{1}, et al."), "{got}");
+        assert!(!got.contains("C"), "{got}");
+        // off by default: 0 never collapses
+        let mut s0 = spec();
+        s0.authors = vec!["A".into(), "B".into(), "C".into()];
+        assert!(author_front(&s0).unwrap().contains("A, B, C"));
+        // max >= len: no-op
+        let mut s2 = spec();
+        s2.authors = vec!["A".into(), "B".into()];
+        s2.authors_max = 5;
+        assert!(author_front(&s2).unwrap().contains("A, B"));
+        // negative fails fast
+        let mut s3 = spec();
+        s3.authors = vec!["A".into()];
+        s3.authors_max = -1;
+        let err = author_front(&s3).unwrap_err();
+        assert!(err.msg.contains("authors_max must be >= 0"), "got: {}", err.msg);
     }
 }

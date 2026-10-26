@@ -295,6 +295,16 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.10b — Opt-in author collapse (`authors_max`) → 0.10.15
+
+The deliberate "first N + et al." form, previously unavailable:
+`BuildSpec.authors_max` (CLI `--authors-max N` on `build`/`weave`)
+composes the first N marked names + ", et al." (IEEE style) when the
+list is longer; the full affiliation block stays, so everything
+shown remains true. 0 (default) never collapses; negative fails
+fast; `max >= len` is a no-op. The exporter does NOT use it — the
+bench corpus keeps complete front matter.
+
 ## M7.10 — Full author front matter → 0.10.14
 
 The 10-paper exports showed "Coll et al." with no institutes while

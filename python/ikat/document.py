@@ -80,6 +80,8 @@ class BuildSpec:
     authors: list[str] = field(default_factory=list)
     affiliations: list[str] = field(default_factory=list)
     author_affils: list[list[int]] = field(default_factory=list)
+    # opt-in collapse: > 0 composes the first N names + ", et al."
+    authors_max: int = 0
     bib_name: str = "refs-paper"
     graphicspaths: tuple[str, ...] = ("./", "figs/", "figs/tikz/")
     bib_keys: set = field(default_factory=set)

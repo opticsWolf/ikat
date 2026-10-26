@@ -235,7 +235,7 @@ TOOL_REGISTRY = (
         (
             ToolParam("md_text", str, description="Markdown manuscript (whole document; display math as $$…$$ paragraphs)"),
             ToolParam("toml_text", str, description="ikat.toml source (class, columns, spans, floats); empty = defaults"),
-            ToolParam("spec_json", str, description="BuildSpec JSON (same shape as CLI --spec): diagrams/plots/table captions/bib_style, plus authors/affiliations/author_affils (full author front matter; author_affils[i] = 0-based affiliation indices per author); unknown keys ignored"),
+            ToolParam("spec_json", str, description="BuildSpec JSON (same shape as CLI --spec): diagrams/plots/table captions/bib_style, plus authors/affiliations/author_affils (full author front matter; author_affils[i] = 0-based affiliation indices per author) and authors_max (opt-in: first N names + ', et al.', 0 = never); unknown keys ignored"),
         ),
         returns=dict,
     ),

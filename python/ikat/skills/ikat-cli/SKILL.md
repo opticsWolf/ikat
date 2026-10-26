@@ -19,9 +19,10 @@ built module on PATH (`maturin develop` installs the `ikat` script).
 ```bash
 ikat build DOC.md --toml T.toml --outdir OUT [--spec S.json] [--bib R.bib]
      [--author NAME…] [--affiliation INST…] [--author-affil A:N[,N…]]
+     [--authors-max N]
      [--engine pdflatex|tectonic] [--bib-style B] [--ensure-packages] [--no-pdf]
 ikat weave DOC.md --toml T.toml --spec S.json [--bib R.bib] [--author NAME…]
-     [--affiliation INST…] [--author-affil A:N[,N…]] > doc.tex   # stdout, no TeX needed
+     [--affiliation INST…] [--author-affil A:N[,N…]] [--authors-max N] > doc.tex   # stdout, no TeX needed
 ikat check DOC.tex [--install] [--verbose]                # exit 1 if anything missing
 ikat templates | ikat template NAME [--show-preset]
 ikat skeletons | ikat skeleton skeleton-plain

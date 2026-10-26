@@ -361,12 +361,18 @@ def test_cli_author_flags(capsys):
     ns.author = ["A", "B"]
     ns.affiliation = ["I1", "I2"]
     ns.author_affil = ["1:1", "2:1,2"]
+    ns.authors_max = 0
     _apply_authors(spec, ns)
     assert spec.authors == ["A", "B"]
     assert spec.affiliations == ["I1", "I2"]
     assert spec.author_affils == [[0], [0, 1]]
+    assert spec.authors_max == 0
     ns.author_affil = ["bad"]
     with pytest.raises(ValueError, match="1-based"):
+        _apply_authors(BuildSpec(), ns)
+    ns.author_affil = []
+    ns.authors_max = -1
+    with pytest.raises(ValueError, match="--authors-max must be >= 0"):
         _apply_authors(BuildSpec(), ns)
 
 
