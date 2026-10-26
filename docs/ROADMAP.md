@@ -305,8 +305,9 @@ empty-base prescripts, JATS sub/sup merging, three publisher-misencoded
 glyphs mapped by role (time renders as zeta, upright beta, k-index).
 Core weaves whole-paragraph double-dollar spans to display math:
 wider than the column takes a cuted strip; wider than the full measure
-breaks at top-level relations into multline rows (matrix spans take
-one strip per piece instead). A glyph-aware width estimator (TeX glue,
+breaks BEFORE top-level relations into left-aligned rows (matrix
+spans take one strip per piece instead). A glyph-aware width
+estimator (TeX glue,
 script extension, banked matrices, depth-matched envs, nested-aware
 row splits) decides. math-hilfer-2024: 70 to 0 hbox overfulls;
 econ/physics formulas restored from dropped to rendered.

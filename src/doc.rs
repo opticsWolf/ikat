@@ -113,7 +113,7 @@ fn width_to_tex(width: Option<&str>, span_w: &str) -> String {
 
 /// Per-element float options from a `{k=v ...}` attribute string
 /// (fence info lines, `%% table {...}` comments, plot registry).
-/// Unknown keys and bad values are errors â€” strict subset doctrine.
+/// Unknown keys and bad values are errors — strict subset doctrine.
 #[derive(Debug, Clone, Default)]
 pub struct ElemAttrs {
     pub span: Option<Span>,
@@ -141,7 +141,7 @@ fn parse_width(s: &str) -> Result<String, String> {
 
 /// Attribute parser. `line` is the 1-based source line of the attr
 /// string (fence info or directive line); the echo is the attr
-/// string itself â€” short, and it always contains the bad token.
+/// string itself — short, and it always contains the bad token.
 pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bool), crate::error::Error> {
     use crate::error::Error;
     let mut out = ElemAttrs::default();
@@ -152,7 +152,7 @@ pub fn parse_attrs(attr: &str, what: &str, line: usize) -> Result<(ElemAttrs, bo
             continue;
         }
         // Caret column of this token inside the attr string (char
-        // columns; leading whitespace inside braces counts â€” the
+        // columns; leading whitespace inside braces counts — the
         // classic off-by-indent lives here).
         let tok_col = attr.find(tok).map(|b| crate::error::col_of(attr, b));
         let Some((k, v)) = tok.split_once('=') else {
@@ -363,7 +363,7 @@ fn strip_tex_comments(skel: &str) -> String {
 /// `{{title}}/{{author}}/{{thanks}}` fill as level 1;
 /// 1-based line number of the byte index inside a head/skeleton
 /// file (template errors are head-relative; Python attributes the
-/// head file â€” see `document._with_file`).
+/// head file — see `document._with_file`).
 fn head_line(tex: &str, byte_idx: usize) -> usize {
     tex[..byte_idx.min(tex.len())].matches('\n').count() + 1
 }
@@ -388,7 +388,7 @@ fn tok_line(skel: &str, tok: &str) -> (usize, String, Option<usize>) {
 /// required exactly once unless `bib` is empty (biblatex-style
 /// skeletons print refs themselves); `{{abstract}}` is required
 /// exactly once when `abstract_tex` is non-empty, else renders
-/// empty. Unknown `{{word}}` tokens and duplicates are errors â€”
+/// empty. Unknown `{{word}}` tokens and duplicates are errors —
 /// a typo'd token must fail here, not as a silent blank page.
 pub fn render_skeleton(
     skel: &str,
@@ -481,7 +481,7 @@ pub fn render_skeleton(
 /// `titlesec` breaks `IEEEtran` sectioning (notably
 /// `[nobottomtitles]`): reject the combination naming both, and
 /// point at the built-in `[typography]` guards as the replacement.
-/// Do NOT re-propose titlesec here â€” this error is the record.
+/// Do NOT re-propose titlesec here — this error is the record.
 pub fn check_titlesec(preamble_tex: &str, class: Option<&str>) -> Result<(), crate::error::Error> {
     let uses_titlesec = crate::texenv::used_packages(preamble_tex).iter().any(|p| p == "titlesec");
     if uses_titlesec && class.map(|c| c.starts_with("IEEE")).unwrap_or(false) {
@@ -569,7 +569,7 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
 /// the document size. `\tag` is right-margin furniture (excluded);
 /// `\frac`/`\sqrt` take their widest part; accents and sub/supers
 /// add nothing; matrices take their widest row. Unknown commands
-/// contribute nothing â€” the estimate only needs the glyph bulk that
+/// contribute nothing — the estimate only needs the glyph bulk that
 /// decides column-vs-strip. Same 0.16 cm/char factor as the table
 /// ruler, so the err direction (strip when unsure) is benign: a
 /// full-width display is always legal, a column overflow is not.
@@ -765,7 +765,7 @@ fn math_row_width_cm(row: &str) -> f64 {
         } else if c == '_' || c == '^' {
             // Scripts ride above/below but extend RIGHTWARD past
             // the base (x^{gamma+alpha-1} is wider than x): add the
-            // script width. Stacked sub+sup overcounts slightly â€”
+            // script width. Stacked sub+sup overcounts slightly —
             // conservative, strip-biased, exactly the safe side.
             if cs.peek() == Some(&'{') {
                 let g = take_group(&mut cs);
@@ -805,8 +805,38 @@ fn math_row_width_cm(row: &str) -> f64 {
 /// brace-depth 0 and outside `\\left..\\right` pairs (which may not
 /// span `\\\\`). Prefer `=` (operator closes the row); else binary
 /// `+`/`-` (operator opens the continuation). Never invent breaks
-/// inside fractions, scripts, or matrices â€” unbreakable rows stay
+/// inside fractions, scripts, or matrices — unbreakable rows stay
 /// whole and keep their residual overfull honestly.
+/// Split a trailing tag off a display span (the emitter puts it
+/// there); returns (body, tag-or-empty). Only a tag that closes at
+/// the very end counts.
+fn split_trailing_tag(tex: &str) -> (&str, &str) {
+    let t = tex.trim_end();
+    let Some(i) = t.rfind("\\tag{") else { return (t, ""); };
+    let mut depth = 1usize;
+    let mut j = i + 5;
+    let bytes = t.as_bytes();
+    while j < bytes.len() {
+        match bytes[j] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    j += 1;
+                    break;
+                }
+            }
+            _ => {}
+        }
+        j += 1;
+    }
+    if depth == 0 && j >= t.len() {
+        (&t[..i], &t[i..])
+    } else {
+        (t, "")
+    }
+}
+
 pub(crate) fn break_display_rows(tex: &str) -> Vec<String> {
     let mut rows = vec![tex.to_string()];
     for _ in 0..6 {
@@ -898,9 +928,13 @@ fn split_row_once(row: &str) -> Option<(String, String)> {
         i += 1;
     }
     // Latest `=` keeps rows longest-first; else latest binary op.
+    // Both split BEFORE the operator so it opens the continuation
+    // (original style: `A` / `= B` / `+ C`). A leading `=` is a
+    // continuation head from an earlier split, not a split point.
     if let Some(p) = eq_at {
-        // Operator closes the row: `A =` / `B =` / `C`.
-        return Some((format!("{}", row[..p + 1].trim_end()), row[p + 1..].trim_start().to_string()));
+        if p > 0 {
+            return Some((row[..p].trim_end().to_string(), row[p..].trim_start().to_string()));
+        }
     }
     if let Some(p) = bin_at {
         // Operator opens the continuation: `A` / `+ B`.
@@ -1005,7 +1039,7 @@ pub fn convert(
         Ok(())
     };
 
-    // E.1 (M5.4): the line walk is gone â€” `crate::md::blocks()`
+    // E.1 (M5.4): the line walk is gone — `crate::md::blocks()`
     // owns boundaries (pulldown-cmark) with raw-slice content, and
     // every arm below is the old branch body verbatim on the same
     // inputs. `lines` is rejoined because offsets need one source.
@@ -1063,7 +1097,7 @@ pub fn convert(
             MdKind::Directive(a) => {
                 // Same stash rule, parsed with the same `table #N`
                 // context; the Table arm below takes it. (A
-                // dangling `%% table` never becomes a Directive â€”
+                // dangling `%% table` never becomes a Directive —
                 // the pre-pass leaves it as paragraph text.)
                 let (attrs, _) = parse_attrs(&a, &format!("table #{table_idx}"), line)?;
                 if attrs.span.is_some()
@@ -1152,7 +1186,7 @@ pub fn convert(
             MdKind::Para(ls) => {
                 // Consecutive Para blocks are always blank-separated
                 // (`blocks()` splits there), so a pending para must
-                // flush first â€” the old scanner flushed on the blank
+                // flush first — the old scanner flushed on the blank
                 // line itself. Lines WITHIN one block join safely.
                 if !para.is_empty() {
                     flush(&mut out, &mut para, para_line)?;
@@ -1165,7 +1199,7 @@ pub fn convert(
                 // M7.8 honest math: structured spans break at
                 // relations inside the column; a span wider than the
                 // column takes a full-width `strip` (cuted) instead
-                // of overflowing. Weaver-side and deterministic â€” no
+                // of overflowing. Weaver-side and deterministic — no
                 // advisory needed, the width is intrinsic.
                 flush(&mut out, &mut para, para_line)?;
                 if t.contains("$$") {
@@ -1250,15 +1284,23 @@ pub fn convert(
                         // multline* inside the strip; matrix spans
                         // keep `&` tabs, which multline forbids, so
                         // each piece takes its own strip instead.
-                        let rows = break_display_rows(&t);
+                        let (dbody, dtag) = split_trailing_tag(&t);
+                        let rows = break_display_rows(dbody);
                         if t.contains("\\begin{matrix}") {
-                            for r in rows {
-                                out.push(format!("\\begin{{strip}}\n\\[{r}\\]\n\\end{{strip}}\n"));
+                            let last = rows.len().saturating_sub(1);
+                            for (i, r) in rows.iter().enumerate() {
+                                let tag_here = if i == last { dtag } else { "" };
+                                out.push(format!("\\begin{{strip}}\n\\[{r}{t}\\]\n\\end{{strip}}\n", r = r, t = tag_here));
                             }
                         } else {
+                            let aligned = rows
+                                .iter()
+                                .map(|r| format!("& {}", r))
+                                .collect::<Vec<_>>()
+                                .join(" \\\\\n");
                             out.push(format!(
-                                "\\begin{{strip}}\n\\begin{{multline*}}\n{}\n\\end{{multline*}}\n\\end{{strip}}\n",
-                                rows.join(" \\\\\n")
+                                "\\begin{{strip}}\n\\[\\begin{{aligned}}\n{}\n\\end{{aligned}}{}\\]\n\\end{{strip}}\n",
+                                aligned, dtag
                             ));
                         }
                     } else {
@@ -1295,7 +1337,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         let mut figs = Vec::new();
         for (key, cap) in &spec.plots {
             // Plot attrs ride the spec dict (JSON/Python), not the
-            // manuscript: line 0 (data class â€” no manuscript line).
+            // manuscript: line 0 (data class — no manuscript line).
             let pattrs = match spec.plot_attrs.get(key) {
                 Some(a) => parse_attrs(a, &format!("plot {key}"), 0)?.0,
                 None => ElemAttrs::default(),
@@ -1337,7 +1379,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
     let has_plots = body.contains("\\begin{axis}");
     let mut head: Vec<String> = if !spec.skeleton.is_empty() {
         // Level 3: the skeleton IS the document. No generated
-        // head/tail at all â€” render tokens, splice appends, done.
+        // head/tail at all — render tokens, splice appends, done.
         if !spec.preamble_override.is_empty() || !cfg.template.preamble_file.is_empty() {
             return Err(crate::error::Error::data(
                 "[template] skeleton is mutually exclusive with preamble_file",
@@ -1674,7 +1716,7 @@ mod tests {
     #[test]
     fn error_attr_caret_counts_leading_whitespace() {
         // The attr string keeps its inner leading space (`{ ...}`)
-        // â€” the caret must count it, not the trimmed token.
+        // — the caret must count it, not the trimmed token.
         let err = parse_attrs("  span=wide bogus=1", "t", 9).unwrap_err();
         assert_eq!(err.line, 9, "got: {err}");
         assert_eq!(err.col, Some(13), "bogus starts char 13, got: {err}");
@@ -1763,7 +1805,7 @@ mod tests {
         let pos_r = r.tex.find("\\bibliography{refs-paper}").unwrap();
         assert!(pos_b < pos_r, "barrier flushes before the refs");
         assert!(r.tex.contains("\\usepackage{placeins}"));
-        // No bib: knob on but nothing to guard â€” no stray barrier.
+        // No bib: knob on but nothing to guard — no stray barrier.
         let mut s = spec();
         s.bib_name.clear();
         s.diagrams.clear();
@@ -1849,10 +1891,15 @@ mod tests {
         s.diagrams.clear();
         s.table_captions.clear();
         let r = build_document(&md, "", &s).unwrap();
-        assert!(r.tex.contains("\\begin{multline*}"), "breaks");
-        assert!(r.tex.contains("\\\\\n"), "rows split");
+        // Split BEFORE `=`: the lead stands alone, continuations
+        // left-align under it (no dangling `A =` over a centered body).
+        assert!(r.tex.contains("\\begin{aligned}"), "breaks left");
+        assert!(r.tex.contains("& G\\vartheta"), "lead row kept");
+        assert!(r.tex.contains("& ="), "relation opens continuation");
+        assert!(!r.tex.contains("multline"), "no centering");
     }
 
+    #[test]
     #[test]
     fn display_math_no_split_inside_frac_or_matrix() {
         // No top-level operator: one row, however wide.

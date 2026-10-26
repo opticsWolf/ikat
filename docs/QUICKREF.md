@@ -81,9 +81,10 @@ Display math fills its own paragraph as one `$$...$$` span (M7.8):
 the weaver emits `\[...\]` (`\tag{N}` rides inside, from the
 exporter's `$$tex \tag{N}$$`). A span wider than the column
 takes a full-width `strip` (cuted); wider than the full measure
-breaks at top-level `=`/`+`/`-` into `multline*` rows (matrix
+breaks BEFORE top-level `=`/`+`/`-` into left-aligned `aligned`
+rows (the relation opens the continuation, original style; matrix
 spans split into one strip per piece instead — `&` is illegal in
-multline). Whole-paragraph only: stray `$$`, empty spans, alien
+`aligned`). Whole-paragraph only: stray `$$`, empty spans, alien
 environments, and unbalanced braces are hard errors.
 Fraction `width` scales TikZ coordinates, not text (no `transform
 shape`): labels stay full-size, so leave air around them.

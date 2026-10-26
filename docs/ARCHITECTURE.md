@@ -187,8 +187,9 @@ argument structs.
   `FloatNeeds` upward, enforces the citation keyset (a dangling
   key fails the build instead of printing raw). Whole-paragraph
   `$$...$$` display math (M7.8) emits `\[...\]`, widening to a
-  cuted `strip` past the column and to `multline*` row-breaks past
-  the full measure (matrix spans take one strip per piece); a
+  cuted `strip` past the column and to left-aligned `aligned`
+  row-breaks past the full measure (matrix spans take one strip
+  per piece); a
   glyph-aware estimator (TeX glue, rightward scripts, banked
   matrices) decides. The golden test rebuilds the frozen paper
   `.tex` byte-identical — the paper is the test suite.
