@@ -1,15 +1,16 @@
 # ikat roadmap
 
-Status 2026-10-26 (M7.2 top-fit, 0.10.2): Phases 1, 2 (plots),
-3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
-heading guards), E (parser switch), F (line-numbered errors),
-G (tectonic hardening), H (auto-layout) done — 141 cargo + 88
-pytest green (84 passed, 4 skipped),
-showcase (10 pages, 4 diagrams) + regen + standalone + heads
-proofs build under pdflatex AND tectonic, golden paper
-byte-identical (`ebe698db`), 0 undefined citations both
-engines. Open: tectonic crate embedding (Linux-CI exercise,
-by design — not a milestone).
+Status 2026-10-26 (0.11.0, merged to `main`): through M7.10b done —
+TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
+annotations + instructions + bundled skills + installer + registry
+(M7.9/M7.9b), help verb + registry JSON + bare-invocation help
+(M7.9c), full author front matter + opt-in collapse (M7.10/M7.10b),
+POSIX load_preset fix — 173 cargo + 104 pytest green (104 passed,
+4 skipped), hand and auto showcases byte-identical (7 pages,
+0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
+site asset = the auto-layout build. Open: PyPI/crates publish (needs
+Trusted-Publisher registration; tag `v0.11.0` when ready), tectonic
+crate embedding (Linux-CI exercise, by design).
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.

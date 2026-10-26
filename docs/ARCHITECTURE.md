@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.2.0 · 2026-10-07 · 59 cargo + 45 pytest green.
+Version 0.11.0 · 2026-10-26 · 173 cargo + 104 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -449,7 +449,7 @@ spike diffs), pytest (end-to-end weaves, surface pinning, float/
 skeleton/template suites), compile proofs (`plotproof`,
 `floatsproof`, `headsproof`, `skelproof`, `tectproof` — each
 compiles real TeX and verifies PDF content, not just exit codes),
-and the showcase paper (`examples/ikat-paper/`, a 6-page paper
+and the showcase paper (`examples/ikat-paper/`, a 7-page paper
 about ikat built by ikat: the release demo and the composition
 proof). `.github/workflows/ci.yml` runs cargo + pytest on
 ubuntu/windows/macos and rebuilds the demo + showcase on real

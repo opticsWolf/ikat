@@ -66,6 +66,7 @@ ikat/
   src/            Rust core (pyo3): mermaid.rs (flowcharts), plot.rs
                   (pgfplots + legend auto-placement), table.rs, doc.rs,
                   esc.rs (unicode/citations), config.rs (ikat.toml),
+                  mathwidth.rs (TeX-calibrated display-math width),
                   autolayout.rs (float measuring + policy),
                   texenv.rs (package scan), tectonic.rs (engine),
                   md_spike.rs (parser-spike harness, tests only)
@@ -74,13 +75,17 @@ ikat/
                   driver), texenv.py (kpsewhich/tlmgr), cli.py (`ikat`
                   script), mcp_server.py (FastMCP stdio), layout.py
                   (suggest/apply/report for auto-layout),
+                  registry.py (one source of truth for CLI/MCP/API
+                  tools + skill installer),
                   templates/ (9 heads + skeleton-plain)
   tests/          pytest suite (runs against maturin develop build)
   docs/           ARCHITECTURE.md, QUICKREF.md, RESEARCH.md, ROADMAP.md, FORMAT-DRAFT.md
   python/ikat/skills/  Agent Skills (bundled in the wheel, served as MCP
                   resources): ikat guide, ikat-api, ikat-cli, ikat-mcp
-  examples/       mini.md starter + ikat-paper/ showcase (6-page paper
-                  built by ikat itself), plot/float/skeleton proofs
+  examples/       mini.md starter + ikat-paper/ showcase (7-page paper
+                  built by ikat itself), plot/float/skeleton proofs,
+                  auto-proof/ (layout-bench corpus + the auto-layout
+                  showcase), bench_fetch.py (downloads the bench cache)
 ```
 
 ## Develop
@@ -117,10 +122,13 @@ printf 'graph TD\na[x]-->b[y]\n' | ikat flowchart -
 echo '{"title":"t",...}' | ikat barchart - [--legend top-left]
 ikat standalone fig.md --out fig.pdf   # one mermaid|chart fence → PDF
 ikat layout doc.md --toml ikat.toml [--apply]  # suggest span/pos/width, no TeX
+ikat skills install [--dest DIR…] [--force]    # bundle the agent skills
+ikat help [--json] [COMMAND]           # command list / flags / registry JSON
 ikat version
 ```
 
-`--spec` is BuildSpec JSON (diagrams/plots/table_captions/bib_style/…;
+`--spec` is BuildSpec JSON (diagrams/plots/table_captions/authors/
+affiliations/author_affils + opt-in authors_max collapse, bib_style/…;
 unknown keys ignored). MCP server over stdio:
 
 ```bash
