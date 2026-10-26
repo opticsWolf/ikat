@@ -18,6 +18,20 @@ def test_file_and_string_agree():
     assert load_preset(LOC) == load_preset(raw)
 
 
+def test_long_json_string_is_source_not_path():
+    """POSIX CI regression: a >255-char JSON probes as a path longer
+    than NAME_MAX and `is_file()` raises ENAMETOOLONG there (Windows
+    just answers False). load_preset must treat it as source."""
+    from ikat.preset import load_preset
+
+    raw = (
+        '{"kind": "bar", "title": "' + "t" * 300 + '", "ylabel": "y", '
+        '"group_labels": ["a", "b"], "series_names": ["s"], '
+        '"values": [[1, 2]], "mins": [[1, 2]], "maxs": [[1, 2]]}'
+    )
+    assert "tikzpicture" in load_preset(raw)
+
+
 def test_error_names_origin():
     # raw string: origin is <preset>, kind set is named
     with pytest.raises(ValueError, match=r"preset <preset>.*bar\|line"):
