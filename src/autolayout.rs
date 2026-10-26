@@ -724,23 +724,25 @@ pub fn suggest_layout(
                     let raw_worst = worst_token_cm(&data);
                     let cur_wide = span == "wide";
                     let on = cfg.tables.compact_tables;
-                    let (eff_wide, level, out) = decide_table(
+                    let (eff_wide, level, out, tall) = decide_table(
                         p.column_cm,
                         p.textwidth_cm,
                         cur_wide,
                         ncols,
                         data.clone(),
                         on,
+                        p.here_max_cm,
                     );
                     // Advisory twin with the knob forced on: names the
                     // opt-in when the manuscript leaves it off.
-                    let (adv_wide, adv_level, adv_out) = decide_table(
+                    let (adv_wide, adv_level, adv_out, _) = decide_table(
                         p.column_cm,
                         p.textwidth_cm,
                         cur_wide,
                         ncols,
                         data,
                         true,
+                        p.here_max_cm,
                     );
                     let stacked = worst_stacked_cm(&out) < raw_worst;
                     let share =
@@ -760,6 +762,17 @@ pub fn suggest_layout(
                             reason.push_str("; in-flow pin illegal on wide floats: floats top");
                         }
                     }
+                    // A height-promoted table cannot keep its pin
+                    // either (same fail-soft, same destination).
+                    if tall && (pos == "force" || pos == "here") {
+                        use crate::table::table_pin_height;
+                        let h = table_pin_height(&out, level);
+                        pos = "top".to_string();
+                        reason.push_str(&format!(
+                            "; too tall to pin in-flow (est {h:.1}cm over the {bm:.1}cm budget): promoted wide, floats top",
+                            bm = p.here_max_cm
+                        ));
+                    }
                     let stack_note = if stacked { ", stacked estimate/SE cells" } else { "" };
                     match level {
                         TableLevel::Fit => {
@@ -771,6 +784,9 @@ pub fn suggest_layout(
                         }
                         TableLevel::Compact => reason.push_str(&format!(
                             "; portrait is tight (worst token {worst:.2}cm vs {share:.2}cm share{stack_note}): weaver compacts to footnotesize + 3pt padding"
+                        )),
+                        TableLevel::Tiny => reason.push_str(&format!(
+                            "; portrait is very tight (worst token {worst:.2}cm vs {share:.2}cm share{stack_note}): weaver sets scriptsize portrait + 2pt padding (PLOS-original density)"
                         )),
                         TableLevel::Rotate => {
                             pos = "page".to_string();
@@ -787,6 +803,7 @@ pub fn suggest_layout(
                         let adv_stacked = adv_worst < raw_worst;
                         let adv_kind = match adv_level {
                             TableLevel::Compact => "compact to footnotesize",
+                            TableLevel::Tiny => "set in scriptsize portrait",
                             _ => "rotate (sidewaystable)",
                         };
                         reason.push_str(&format!(

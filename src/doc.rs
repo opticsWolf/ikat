@@ -713,6 +713,7 @@ pub fn convert(
                     cfg.layout.column_cm,
                     cfg.layout.textwidth_cm,
                     cfg.tables.compact_tables,
+                    cfg.layout.here_max_cm,
                     line,
                 )
                 .map_err(|e| Error {

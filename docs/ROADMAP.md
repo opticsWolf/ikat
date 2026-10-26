@@ -295,6 +295,30 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.7 — Honest portrait limits (Tiny rung + pin height) → 0.10.7
+
+`Tiny`: a fourth ladder rung — `\scriptsize` + 2pt padding but
+still portrait — for dense regression tables between `Compact`
+and `Rotate` (relative type size matches the originals' 7.5pt on
+their wider measure). A narrow-aware token ruler (digits/punct at
+0.85) replaces the flat 0.16/char. A hyphenation discount was tried
+and reverted the same session: isolation renders proved TeX never
+breaks the words (IEEEtran sets `\hyphenpenalty=750` — measured
+750 in the class), and the discount printed 16 overlapping tables;
+every whitespace run binds.
+Pin-height promotion: stacked rows double a table's height, so a
+column table taller than the in-flow budget now floats wide + top
+instead of overflowing (`\vbox too high`) — the width ladder
+approves the column, the height vetoes the pin. Tail threshold
+recalibrated 10 → 6 paragraphs (a column of downstream text; the
+paragraph unit had made 10 three times stricter than the JATS-line
+calibration) and the exporter's tail counter counts paragraphs,
+fixing chem Fig 5's lone float page (10pp → 8pp). Corpus: econ
+0 overfulls with 8/10 tables portrait; the two true 13-col tables stay
+rotated — `globalization`-class words need 2.08cm against a
+1.37cm share, mathematically unportraitable at IEEE widths (the
+originals need 19cm + 7.5pt for the same).
+
 ## M7.6 — Cell stacking (PLOS-original style) → 0.10.6
 
 Stacks estimate/SE cells before deciding: `0.080***(0.015)`

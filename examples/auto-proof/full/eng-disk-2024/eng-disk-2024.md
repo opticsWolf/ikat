@@ -258,7 +258,7 @@ In section 2.2, The *Z* world coordinate *Z*$_{0}$ of the point on lower end fac
 
 To verify accuracy of the online measurement method for the sizes of disk parts, a pulley, a flange, and a gear are selected for testing. The flowchart for executing the experiment steps is shown in Fig 4. The reference dimensions of three disk parts are obtained by a micrometer with an accuracy of $\pm$0.001mm, the values are average of measuring 3 times, as shown in Table 1.
 
-```mermaid {span=wide pos=page width=0.71}
+```mermaid {span=wide pos=top width=0.71}
 info:doi/10.1371/journal.pone.0307525.g004
 ```
 

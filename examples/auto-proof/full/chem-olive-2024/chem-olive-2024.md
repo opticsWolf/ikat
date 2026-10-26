@@ -113,7 +113,7 @@ info:doi/10.1371/journal.pone.0306040.g004
 
 The X-ray diffraction (XRD) pattern of the manufactured Cd nanoparticles sample was obtained and shown in **Fig** 5 using CuK radiation ($\lambda$ = 1.5406), 40 kV- 40mA, and 2$\theta$ scanning mode. This analysis aimed to confirm the crystallinity of the Cd-nano compound. The data collection range was between 10 and 80 degrees. A comparison was made between the experimental diffractogram (**Fig** 5), Cd file No. 04–0783, and the JCPDS standard powder diffraction card. Four peaks at 2$\theta$ values of 45.30$^{\circ}$, 55.50$^{\circ}$, 68.70$^{\circ}$, and 79.80$^{\circ}$ in the experimental diffractogram were identified as originating from Cd metal.
 
-```mermaid {span=wide pos=page width=0.91}
+```mermaid {span=wide pos=top width=0.91}
 info:doi/10.1371/journal.pone.0306040.g005
 ```
 

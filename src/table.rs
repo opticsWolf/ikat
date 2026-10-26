@@ -40,8 +40,10 @@ pub fn is_sep(line: &str) -> bool {
 /// single point `table_compact` (autolayout shares it for notes):
 /// - `Fit`: current output, byte-identical (`\small`, all-`X`).
 /// - `Compact`: `\footnotesize` + 3pt `\tabcolsep`.
-///   (`Rotate` additionally packs to 2pt padding: at 13 columns
-///   the padding itself is the overflow.)
+/// - `Tiny`: `\scriptsize` + 2pt padding but still portrait — the
+///   PLOS-original density for dense regression tables.
+///   (`Rotate` keeps the same 2pt packing: at 13 columns the
+///   padding itself is the overflow.)
 /// - `Rotate`: `sidewaystable(*)` — portrait cannot hold the table
 ///   at any readable size, so the text height becomes the width.
 /// A `width=` fraction scales against `\textheight` under rotation
@@ -56,8 +58,10 @@ pub fn is_sep(line: &str) -> bool {
 /// numeric overflow, and prose overestimates only compact early.
 const TABLE_TOKEN_CM: f64 = 0.16;
 const FOOT_FACTOR: f64 = 0.89;
+const SCRIPT_FACTOR: f64 = 0.78;
 const TABCOLSEP_CM: f64 = 0.21;
 const TABCOLSEP_SMALL_CM: f64 = 0.11;
+const TABCOLSEP_TINY_CM: f64 = 0.07; // 2pt, like rotated tables
 
 /// Compaction level for a table: column `share` vs the widest
 /// unbreakable token. Shared with autolayout's reason notes.
@@ -65,6 +69,7 @@ const TABCOLSEP_SMALL_CM: f64 = 0.11;
 pub(crate) enum TableLevel {
     Fit,
     Compact,
+    Tiny,
     Rotate,
 }
 
@@ -74,9 +79,56 @@ pub(crate) fn table_compact(span_cm: f64, ncols: usize, worst_cm: f64) -> TableL
         TableLevel::Fit
     } else if worst_cm * FOOT_FACTOR <= share - 2.0 * TABCOLSEP_SMALL_CM {
         TableLevel::Compact
+    } else if worst_cm * SCRIPT_FACTOR <= share - 2.0 * TABCOLSEP_TINY_CM {
+        // Portrait at `\scriptsize`: the PLOS-original density for
+        // dense regression tables (7pt type, relative to the span,
+        // matches the originals' 7.5pt on their wider measure).
+        TableLevel::Tiny
     } else {
         TableLevel::Rotate
     }
+}
+
+/// Narrow glyph class: digits and numeric punctuation run well
+/// under the 0.5em average the base ruler assumes (`-`/`.`/`(`/`)`
+/// are 0.28-0.33em, `*` 0.39em). Weighted 0.85 — still above the
+/// class mean fraction, so the estimate stays conservative.
+fn narrow_glyph(c: char) -> bool {
+    matches!(
+        c,
+        '0'..='9' | '.' | ',' | '+' | '-' | '*' | '(' | ')' | '%' | '/' | ':'
+    )
+}
+
+/// Effective token length for tables: `label_len` folding for math
+/// (`$..$` -> one glyph) and escapes (`\X` -> one glyph), with
+/// narrow glyphs at 0.85 weight. Digit-heavy regression cells
+/// shrink toward their true width; prose keeps full weight.
+/// (No hyphenation discount: IEEEtran sets `\hyphenpenalty=750`,
+/// so plain words effectively never break in X columns — every
+/// whitespace-delimited run binds, exactly as measured.) Diagrams
+/// keep `label_len`.
+pub(crate) fn table_token_len(tok: &str) -> f64 {
+    let mut eff = 0.0;
+    let mut cs = tok.chars();
+    while let Some(c) = cs.next() {
+        if c == '$' {
+            eff += 1.0;
+            for d in cs.by_ref() {
+                if d == '$' {
+                    break;
+                }
+            }
+        } else if c == '\\' {
+            eff += 1.0;
+            cs.next();
+        } else if narrow_glyph(c) {
+            eff += 0.85;
+        } else {
+            eff += 1.0;
+        }
+    }
+    eff
 }
 
 /// Widest unbreakable token (whitespace-delimited run) across raw
@@ -86,9 +138,9 @@ pub(crate) fn worst_token_cm(rows: &[Vec<String>]) -> f64 {
     rows.iter()
         .flat_map(|r| r.iter())
         .flat_map(|c| c.split_whitespace())
-        .map(crate::autolayout::label_len)
-        .max()
-        .unwrap_or(0) as f64
+        .map(table_token_len)
+        .reduce(f64::max)
+        .unwrap_or(0.0)
         * TABLE_TOKEN_CM
 }
 
@@ -128,17 +180,17 @@ pub(crate) fn worst_stacked_cm(rows: &[Vec<String>]) -> f64 {
             Some(stacked) => stacked
                 .split(STACK_MARK)
                 .flat_map(|line| line.split_whitespace())
-                .map(crate::autolayout::label_len)
-                .max()
-                .unwrap_or(0),
+                .map(table_token_len)
+                .reduce(f64::max)
+                .unwrap_or(0.0),
             None => c
                 .split_whitespace()
-                .map(crate::autolayout::label_len)
-                .max()
-                .unwrap_or(0),
+                .map(table_token_len)
+                .reduce(f64::max)
+                .unwrap_or(0.0),
         })
-        .max()
-        .unwrap_or(0) as f64
+        .reduce(f64::max)
+        .unwrap_or(0.0)
         * TABLE_TOKEN_CM
 }
 
@@ -148,6 +200,32 @@ pub(crate) fn worst_stacked_cm(rows: &[Vec<String>]) -> f64 {
 /// table the column cannot hold promotes to `wide`), the level,
 /// and the rows to emit (stacked when stacking changed the worst
 /// token). With the knob off every table stays `Fit` in its span.
+/// Pinned-table height: stacked rows count double (two text
+/// lines), plus header/rules, plus the caption. Pitches are
+/// leading-order line heights per level (small 14.4pt, footnotesize
+/// 12pt, scriptsize 10.5pt). Conservative — a pin that fits under
+/// the in-flow budget always compiles; one over it strands a
+/// half-empty column.
+pub(crate) fn table_pin_height(rows: &[Vec<String>], level: TableLevel) -> f64 {
+    let pitch = match level {
+        TableLevel::Fit => 0.5,
+        TableLevel::Compact => 0.45,
+        TableLevel::Tiny => 0.4,
+        TableLevel::Rotate => 0.37,
+    };
+    let lines: usize = rows
+        .iter()
+        .map(|r| {
+            if r.iter().any(|c| c.contains(STACK_MARK)) {
+                2
+            } else {
+                1
+            }
+        })
+        .sum();
+    lines as f64 * pitch + 1.0
+}
+
 pub(crate) fn decide_table(
     col_cm: f64,
     text_cm: f64,
@@ -155,13 +233,14 @@ pub(crate) fn decide_table(
     ncols: usize,
     data: Vec<Vec<String>>,
     compact: bool,
-) -> (bool, TableLevel, Vec<Vec<String>>) {
+    here_max_cm: f64,
+) -> (bool, TableLevel, Vec<Vec<String>>, bool) {
     if !compact {
-        return (wide, TableLevel::Fit, data);
+        return (wide, TableLevel::Fit, data, false);
     }
     let span_cm = if wide { text_cm } else { col_cm };
     if table_compact(span_cm, ncols, worst_token_cm(&data)) == TableLevel::Fit {
-        return (wide, TableLevel::Fit, data);
+        return (wide, TableLevel::Fit, data, false);
     }
     // Stacking attempt (M7.6): estimate/SE cells break over two
     // lines like the PLOS originals, halving the longest token.
@@ -171,11 +250,29 @@ pub(crate) fn decide_table(
         .collect();
     let data = if stacked != data { stacked } else { data };
     let worst = worst_stacked_cm(&data);
+    let mut eff_wide = wide;
+    let mut tall = false;
     if !wide && table_compact(col_cm, ncols, worst) == TableLevel::Rotate {
-        return (true, table_compact(text_cm, ncols, worst), data);
+        eff_wide = true;
+    } else if !wide {
+        // Pin-height promotion: a stacked table too tall to pin
+        // in-flow floats wide instead of overflowing the column
+        // (`\vbox too high` — econ's 4-col interaction table
+        // pinned 10 stacked rows `[H]`). Width alone approves the
+        // column; height vetoes the pin.
+        let col_level = table_compact(col_cm, ncols, worst);
+        if table_pin_height(&data, col_level) > here_max_cm {
+            eff_wide = true;
+            tall = true;
+        }
     }
-    let span_cm = if wide { text_cm } else { col_cm };
-    (wide, table_compact(span_cm, ncols, worst), data)
+    let span_cm = if eff_wide { text_cm } else { col_cm };
+    (
+        eff_wide,
+        table_compact(span_cm, ncols, worst),
+        data,
+        tall,
+    )
 }
 
 /// Full `table` float. First row is bolded; `spec` overrides the
@@ -194,6 +291,7 @@ pub fn table_block(
     col_cm: f64,
     text_cm: f64,
     compact: bool,
+    here_max_cm: f64,
     line: usize,
 ) -> Result<(String, FloatNeeds), crate::error::Error> {
     use crate::error::Error;
@@ -219,7 +317,16 @@ pub fn table_block(
     // Single decision point (M7.5/M7.6): the engine mirrors this
     // exact call on the same inputs, so suggestions and output
     // agree before and after `--apply`.
-    let (wide, level, out) = decide_table(col_cm, text_cm, wide, n, data, compact);
+    let (wide, level, out, tall) =
+        decide_table(col_cm, text_cm, wide, n, data, compact, here_max_cm);
+    // A height-promoted table cannot keep an in-flow pin: `here`
+    // and `force` are column pins, illegal and unphysical on the
+    // wide float — it floats top (same fail-soft as `here` -> `ht`).
+    let pos = if tall && matches!(pos, Pos::Here | Pos::Force) {
+        Pos::Top
+    } else {
+        pos
+    };
     let rotated = matches!(level, TableLevel::Rotate);
     if rotated {
         needs.rotating = true;
@@ -279,14 +386,15 @@ pub fn table_block(
     if caption_top {
         lines.push(caption.clone());
     }
-    // `Compact` steps one size down; `Rotate` steps two — a table
-    // that fails portrait even compacted needs the smaller glyphs
-    // to use the 23cm rotated width without print-on-print.
+    // `Compact` steps one size down; `Tiny` steps two but stays
+    // portrait (PLOS-original density); `Rotate` steps two and turns
+    // sideways — a table that fails portrait even tiny needs the
+    // 23cm rotated width to avoid print-on-print.
     lines.extend([
         (match level {
             TableLevel::Fit => "\\small",
             TableLevel::Compact => "\\footnotesize",
-            TableLevel::Rotate => "\\scriptsize",
+            TableLevel::Tiny | TableLevel::Rotate => "\\scriptsize",
         })
         .to_string(),
         format!("\\begin{{tabularx}}{{{w}}}{{{}}}", spec.unwrap_or(&"X".repeat(n))),
@@ -295,9 +403,13 @@ pub fn table_block(
     if !matches!(level, TableLevel::Fit) {
         // Ahead of the `tabularx` line: the preamble parses the
         // padding when the environment opens, so a later setting
-        // would miss this table. Rotated tables pack tighter (2pt):
-        // at 13 columns the padding itself is the overflow.
-        let pad = if matches!(level, TableLevel::Rotate) { "2pt" } else { "3pt" };
+        // would miss this table. `Tiny` and rotated tables pack
+        // tighter (2pt): at 13 columns the padding itself overflows.
+        let pad = if matches!(level, TableLevel::Tiny | TableLevel::Rotate) {
+            "2pt"
+        } else {
+            "3pt"
+        };
         lines.insert(lines.len() - 2, format!("\\setlength{{\\tabcolsep}}{{{pad}}}"));
     }
     let mut first = true;
@@ -389,7 +501,7 @@ mod tests {
     #[test]
     fn block_shape() {
         let rows = ["| A | B |".to_string(), "|--|--|".to_string(), "| `x_y` | 3 |".to_string()];
-        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 4).unwrap();
+        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
         assert!(got.contains("\\begin{table}[t]"));
         assert!(got.contains("\\begin{tabularx}{\\columnwidth}{XX}"));
         assert!(got.contains("\\textbf{A} & \\textbf{B} \\\\"));
@@ -401,7 +513,7 @@ mod tests {
     fn wide_barrier_table() {
         let rows = ["| A |".to_string()];
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8"), 8.9, 17.8, false, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8"), 8.9, 17.8, false, 7.0, 4).unwrap();
         assert!(got.contains("\\FloatBarrier\n\\begin{table*}[t]"));
         assert!(got.contains("\\begin{tabularx}{0.8\\textwidth}{X}"));
         assert!(needs.barrier);
@@ -410,13 +522,13 @@ mod tests {
     #[test]
     fn wide_force_table_is_an_error() {
         let rows = ["| A |".to_string()];
-        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None, 8.9, 17.8, false, 4).is_err());
+        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None, 8.9, 17.8, false, 7.0, 4).is_err());
     }
 
     #[test]
     fn appendix_spec() {
         let rows = ["| A | B | C |".to_string(), "| 1 | 2 | 3 |".to_string()];
-        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 4).unwrap();
+        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
         assert!(got.contains("{Xcl}"));
     }
 
@@ -450,9 +562,16 @@ mod tests {
     #[test]
     fn worst_token_ignores_wrappable_prose() {
         let rows = vec![vec!["government expenditure".to_string()], vec!["-0.234**(0.096)".to_string()]];
-        // "government" is the longest prose token (10); the number
-        // token (15 incl. stars) binds: 15*0.16 = 2.4.
-        assert!((worst_token_cm(&rows) - 2.4).abs() < 1e-9, "got {}", worst_token_cm(&rows));
+        // token binds: 15 narrow glyphs at 0.85 -> 12.75 eff chars,
+        // 12.75*0.16 = 2.04. (IEEEtran sets `\hyphenpenalty=750`,
+        // so `government` (10) binds whole at 1.6 — no hyphenation
+        // discount; the prose row binds, the number row binds
+        // harder.)
+        assert!((worst_token_cm(&rows) - 2.04).abs() < 1e-9, "got {}", worst_token_cm(&rows));
+        // Long single words bind: `globalization` (13) overflows a
+        // 13-col share whole — measured, not discounted.
+        let rows = vec![vec!["globalization".to_string()]];
+        assert!((worst_token_cm(&rows) - 13.0 * 0.16).abs() < 1e-9, "got {}", worst_token_cm(&rows));
         // Math folds: `$\\rho$` counts one glyph, not seven chars.
         let rows = vec![vec!["$\\rho$".to_string()]];
         assert!((worst_token_cm(&rows) - 0.16).abs() < 1e-9, "got {}", worst_token_cm(&rows));
@@ -465,7 +584,7 @@ mod tests {
         rows.insert(0, "| H |".to_string() + &"| (1) |".repeat(12));
         rows.insert(1, "|---|".to_string() + &"|---|".repeat(12));
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
         assert!(got.contains("\\begin{sidewaystable*}[p]"), "rotates: {got}");
         assert!(got.contains("\\scriptsize"), "shrinks two steps");
         assert!(got.contains("\\setlength{\\tabcolsep}{2pt}"), "packs padding");
@@ -475,10 +594,10 @@ mod tests {
         // compacted (2.56*0.89 = 2.28 <= 2.54-0.22). No parens, so no
         // stacking involved — pure compaction.
         let rows7 = vec![
-            "| L | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 |".to_string(),
+            "| L | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 |".to_string(),
         ];
         let (got, needs) =
-            table_block(&rows7, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 4).unwrap();
+            table_block(&rows7, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait: {got}");
         assert!(got.contains("\\footnotesize"), "compacts");
         assert!(!got.contains(STACK_MARK), "no split without parens");
@@ -491,13 +610,46 @@ mod tests {
         // 2.4cm) stacks estimate over error, longest line 9 chars
         // (1.44cm) — fits a 7-col share (2.12cm) at full size.
         let rows = vec![
-            "| L | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) |".to_string(),
+            "| L | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) |".to_string(),
         ];
         let (got, _) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait");
         assert!(got.contains("\\small"), "full size kept");
         assert!(got.contains("\\newline "), "break emitted");
+    }
+
+    #[test]
+    fn tiny_sets_scriptsize_portrait() {
+        // 13 cols with 10-char stacked heads, all narrow -> 8.5 eff
+        // = 1.36cm: too wide for Compact (1.36*0.89 = 1.21 > 1.37
+        // -0.22) but fits Tiny (1.36*0.78 = 1.06 <= 1.37-0.14):
+        // portrait scriptsize, no sideways turn.
+        let mut rows = vec!["| L".to_string() + &" | -0.1234567(0.12)".repeat(12) + " |"];
+        rows.insert(0, "| H".to_string() + &" | (1)".repeat(12) + " |");
+        rows.insert(1, "|---".to_string() + &"|---".repeat(12) + "|");
+        let (got, needs) =
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+        assert!(got.contains("\\begin{table*}[t]"), "stays portrait: {got}");
+        assert!(got.contains("\\scriptsize"), "two steps down");
+        assert!(got.contains("\\setlength{\\tabcolsep}{2pt}"), "packs like rotated");
+        assert!(!got.contains("sideways"), "never turns: {got}");
+        assert!(!needs.rotating);
+    }
+
+    #[test]
+    fn tall_stacked_column_promotes_to_wide_top() {
+        // A 4-col table that fits the column portrait (Compact)
+        // but stacks 10 rows tall (~10cm over the 7cm in-flow
+        // budget): pinning `[H]` would overflow the column, so it
+        // promotes wide and the pin degrades to top.
+        let mut rows = vec!["| L | (1) | (2) | (3) |".to_string()];
+        rows.extend((0..10).map(|_| "| Laboratory | 0.086***(0.016) |  |  |".to_string()));
+        let (got, needs) =
+            table_block(&rows, "C.", None, None, Span::Column, Pos::Force, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+        assert!(got.contains("\\begin{table*}[t]"), "floats wide top: {got}");
+        assert!(!needs.float_h, "no in-flow pin kept");
+        assert!(!needs.rotating);
     }
 
     #[test]
@@ -508,7 +660,7 @@ mod tests {
         rows.insert(0, "| H |".to_string() + &"| (1) |".repeat(12));
         rows.insert(1, "|---|".to_string() + &"|---|".repeat(12));
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, false, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "untouched: {got}");
         assert!(got.contains("\\small"), "full size");
         assert!(!got.contains("sideways"), "no rotation");

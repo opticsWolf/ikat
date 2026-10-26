@@ -81,12 +81,18 @@ shape`): labels stay full-size, so leave air around them.
 `[floats]` tuning (fractions, counters, `barrier_sections`,
 `barrier_before_refs`) emits only when non-default.
 `[tables] compact_tables` (default off) runs the portrait-fit
-ladder: the widest *unbreakable* token per table decides — prose
-labels wrap in `X` columns, but numeric cells cannot break. `Fit`
-keeps `\small`; `Compact` steps to `\footnotesize` + 3pt
-`\tabcolsep`; `Rotate` emits `sidewaystable(*)` (own page) in
-`\scriptsize` + 2pt padding, sized against `\textheight`. A
-column table the column cannot hold promotes to `wide` first.
+ladder: the widest whitespace-delimited token per table decides.
+`Fit` keeps `\small`; `Compact` steps to `\footnotesize` + 3pt
+`\tabcolsep`; `Tiny` steps to `\scriptsize` + 2pt padding but stays
+portrait (PLOS-original density for dense regression tables);
+`Rotate` emits `sidewaystable(*)` (own page) in `\scriptsize` +
+2pt, sized against `\textheight`. A column table the portrait
+column cannot hold promotes to `wide` first; a stacked table too
+tall to pin in-flow promotes wide + top instead of overflowing
+the column. Tokens measure narrow-aware (digits/punctuation at
+0.85 weight). No hyphenation discount: IEEEtran sets
+`\hyphenpenalty=750`, so plain words effectively never break —
+every run binds, exactly as measured.
 Before deciding, the ladder stacks estimate/SE cells
 (`0.080***(0.015)` → estimate over `(0.015)` via `\newline`,
 PLOS-original style): the break halves the longest token, so 7-col
@@ -135,7 +141,7 @@ same-rank pairs) and capped at 15% over the fit (flagged when
 capped). A `wide` float declared after `late_wide_lines` (15)
 prose lines earns a move-the-fence note — page-top floats declared
 late strand trailing pages; the engine advises, never reorders.
-A `wide`+`top` float with fewer than `tail_lines` (10) body prose
+A `wide`+`top` float with fewer than `tail_lines` (6) body prose
 lines remaining takes a dedicated `page`: no downstream tops are
 left (it would pile at the end), and a still-pending float meeting
 `\FloatBarrier` ejects the column — the placeins eject strands a
@@ -147,7 +153,7 @@ hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 `column_cm` 8.9, `textwidth_cm` 17.8, `caption_cm` 1.0,
 `here_max_cm` 7.0 (showcase-calibrated), `page_frac` 0.6,
 `min_width` 0.4, `late_wide_lines` 15, `top_frac` 0.7 (the LaTeX
-`topfraction`/`dbltopfraction` default), `tail_lines` 10.
+`topfraction`/`dbltopfraction` default), `tail_lines` 6.
 
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are

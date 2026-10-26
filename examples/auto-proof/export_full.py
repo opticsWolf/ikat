@@ -323,7 +323,7 @@ def extract_images(pdf_path: Path, figdir: Path) -> list:
 
 TEXT_H_CM = 23.0
 TOP_MAX_CM = 0.7 * TEXT_H_CM  # mirrors engine [layout] top_frac
-TAIL_LINES = 10  # mirrors engine [layout] tail_lines
+TAIL_LINES = 6  # mirrors engine [layout] tail_lines
 
 
 def pic_attrs(w: float, h: float, tail: bool = False) -> str:
@@ -437,7 +437,10 @@ def export_one(pid: str) -> dict:
         else:
             n_unmatched += 1
 
-    total_prose = sum(len([l for l in pay.splitlines() if l.strip()]) for k, _, pay in blocks if k == "p")
+    # Paragraph-based: a JATS paragraph is one prose unit however its
+    # source newlines fall (line-counting undercounts folded text and
+    # fires the tail rule pages early — chem Fig 5 stood alone).
+    total_prose = sum(1 for k, _, pay in blocks if k == "p" and pay.strip())
     seen_prose = 0
     for bkind, depth, payload in blocks:
         if bkind == "h":
@@ -448,7 +451,7 @@ def export_one(pid: str) -> dict:
             else:
                 md.append(f"**{payload}.**\n")
         elif bkind == "p":
-            seen_prose += len([l for l in payload.splitlines() if l.strip()])
+            seen_prose += 1 if payload.strip() else 0
             payload = clean_prose(payload, ctx, "para")
             if payload:
                 md.append(payload + "\n")

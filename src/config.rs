@@ -467,7 +467,7 @@ impl Floats {
 /// lead_bonus_cm = 1.0
 /// late_wide_lines = 15
 /// top_frac = 0.7
-/// tail_lines = 10
+/// tail_lines = 6
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutPolicy {
@@ -562,7 +562,11 @@ fn layout_late_wide() -> usize {
     15
 }
 fn layout_tail_lines() -> usize {
-    10
+    // A top float needs about a column of downstream text to anchor
+    // against (~6 paragraphs); less takes a dedicated page. (Was 10
+    // prose *lines* under JATS-newline counting — the paragraph unit
+    // made that three times stricter than calibrated.)
+    6
 }
 fn layout_top_frac() -> f64 {
     0.7
