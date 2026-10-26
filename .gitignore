@@ -41,3 +41,7 @@ examples/auto-proof/full/*/*.bst
 examples/auto-proof/probe-w/
 # Session check rasters (visual QA only)
 examples/auto-proof/full/chk-*.png
+
+# Layout-bench fetch cache: third-party publisher content (CC-BY),
+# rebuilt by examples/bench_fetch.py — never committed.
+examples/bench-layout/

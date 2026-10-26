@@ -16,8 +16,9 @@ figures):
   (regenerable proof intermediates; git-ignored).
 - `out/<id>.pdf` — compiled weave proof, 10 for 10 (binaries; ignored).
 
-Regenerate: `python examples/auto-proof/export_full.py [paper-id...]`
-(needs the bench-layout fetch cache + TinyTeX on PATH).
+Regenerate: `python examples/bench_fetch.py` (cache) then
+`python examples/auto-proof/export_full.py [paper-id...]`
+(needs the cache + TinyTeX on PATH).
 
 ## Fidelity notes (honest limits)
 

@@ -2,8 +2,11 @@
 
 Reads the bench fetch cache (../bench-layout/<id>.xml JATS for
 structure/captions/tables/refs + ../bench-layout/<id>.pdf for raster
-figures via PyMuPDF, AGPL bench-only like fetch.py) and writes, per
-paper, full/<id>/<id>.md + <id>.bib + figs/*.png. Then each md runs
+figures via PyMuPDF, AGPL bench-only) and writes, per
+paper, full/<id>/<id>.md + <id>.bib + figs/*.png.
+(Build the cache first: `python examples/bench_fetch.py` — the
+third-party content itself is git-ignored, only the manifest +
+fetcher are tracked.) Then each md runs
 the engine (suggest -> apply) and weaves + compiles to full/out/
 as a weave proof.
 
