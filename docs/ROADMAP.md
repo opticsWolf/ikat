@@ -295,6 +295,21 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.6 — Cell stacking (PLOS-original style) → 0.10.6
+
+Stacks estimate/SE cells before deciding: `0.080***(0.015)`
+renders as estimate over `(0.015)` (`\newline` in the `X` cell,
+via a split mark that survives `inline()` escaping). Only
+trailing digit-bearing paren groups split — stars stay with the
+estimate, empty heads and prose notes stay single-line. The
+shared `decide_table` (weaver + engine notes) stacks first, then
+re-decides: econ's 7-col tables drop from `Compact` to `Fit` at
+full size, the 13-col tables rotate roomy. Result: econ 25 → **0**
+overfulls (was 441), corpus total 441 → 47 with all remainders
+in prose (flattened formulas) or ≤3pt. Prose labels never trigger
+(they wrap); the knob stays default-off so the frozen paper and
+all default weaves hold byte-identical.
+
 ## M7.5 — Table compaction ladder (opt-in) → 0.10.5
 
 `[tables] compact_tables` (default off, so the frozen paper and

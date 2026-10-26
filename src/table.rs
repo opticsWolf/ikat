@@ -92,6 +92,92 @@ pub(crate) fn worst_token_cm(rows: &[Vec<String>]) -> f64 {
         * TABLE_TOKEN_CM
 }
 
+/// Split marker: survives `inline()` (`esc_text` would destroy a
+/// literal `\newline`, emphasis/math slicing could split a plain
+/// space) and is replaced with the real break after rendering. A
+/// leak would fail loudly in TeX rather than print silently.
+const STACK_MARK: &str = "\x00STACK\x00";
+
+/// Estimate/SE split (M7.6): a cell ending in a digit-bearing
+/// parenthesized group (`0.080***(0.015)`) stacks like the PLOS
+/// originals — estimate above, error below — halving the longest
+/// token. Returns the stacked cell with `STACK_MARK` at the break
+/// (`inline()` runs after; the mark becomes `\newline`). Only
+/// the trailing group splits; stars stay with the estimate, empty
+/// heads and digit-free notes (`value (high)`) stay single-line.
+pub(crate) fn split_est_se(cell: &str) -> Option<String> {
+    let core = cell.trim_end_matches('*');
+    let stars = &cell[core.len()..];
+    let open = core.rfind('(')?;
+    let (head, paren) = (&core[..open], &core[open..]);
+    if !paren.ends_with(')') || head.trim().is_empty() {
+        return None;
+    }
+    if !paren.chars().any(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    Some(format!("{head}{stars}{STACK_MARK}{paren}"))
+}
+
+/// Stacked worst token: splittable cells measure per line (the
+/// break halves them); other cells measure whole as before.
+pub(crate) fn worst_stacked_cm(rows: &[Vec<String>]) -> f64 {
+    rows.iter()
+        .flat_map(|r| r.iter())
+        .map(|c| match split_est_se(c) {
+            Some(stacked) => stacked
+                .split(STACK_MARK)
+                .flat_map(|line| line.split_whitespace())
+                .map(crate::autolayout::label_len)
+                .max()
+                .unwrap_or(0),
+            None => c
+                .split_whitespace()
+                .map(crate::autolayout::label_len)
+                .max()
+                .unwrap_or(0),
+        })
+        .max()
+        .unwrap_or(0) as f64
+        * TABLE_TOKEN_CM
+}
+
+/// Single decision point for the ladder, shared by the weaver and
+/// the auto-layout notes (same inputs, same gate — suggestions and
+/// output cannot disagree). Returns the effective span (a column
+/// table the column cannot hold promotes to `wide`), the level,
+/// and the rows to emit (stacked when stacking changed the worst
+/// token). With the knob off every table stays `Fit` in its span.
+pub(crate) fn decide_table(
+    col_cm: f64,
+    text_cm: f64,
+    wide: bool,
+    ncols: usize,
+    data: Vec<Vec<String>>,
+    compact: bool,
+) -> (bool, TableLevel, Vec<Vec<String>>) {
+    if !compact {
+        return (wide, TableLevel::Fit, data);
+    }
+    let span_cm = if wide { text_cm } else { col_cm };
+    if table_compact(span_cm, ncols, worst_token_cm(&data)) == TableLevel::Fit {
+        return (wide, TableLevel::Fit, data);
+    }
+    // Stacking attempt (M7.6): estimate/SE cells break over two
+    // lines like the PLOS originals, halving the longest token.
+    let stacked: Vec<Vec<String>> = data
+        .iter()
+        .map(|r| r.iter().map(|c| split_est_se(c).unwrap_or_else(|| c.clone())).collect())
+        .collect();
+    let data = if stacked != data { stacked } else { data };
+    let worst = worst_stacked_cm(&data);
+    if !wide && table_compact(col_cm, ncols, worst) == TableLevel::Rotate {
+        return (true, table_compact(text_cm, ncols, worst), data);
+    }
+    let span_cm = if wide { text_cm } else { col_cm };
+    (wide, table_compact(span_cm, ncols, worst), data)
+}
+
 /// Full `table` float. First row is bolded; `spec` overrides the
 /// default all-`X` column string (e.g. the appendix `Xcl`).
 /// `line` is the 1-based original line of the first row; rows are
@@ -121,28 +207,19 @@ pub fn table_block(
         ));
     }
     let n = rows.iter().map(|r| split_row(r).len()).max().unwrap_or(0);
-    // Compaction ladder (M7.5): the widest unbreakable token
-    // decides; wrappable prose never triggers it.
-    let data: Vec<Vec<String>> = rows
+    // Row order survives (headers stay first): parallel line numbers
+    // for per-row error carets.
+    let raws: Vec<(usize, Vec<String>)> = rows
         .iter()
-        .filter(|r| !is_sep(r))
-        .map(|r| split_row(r))
+        .enumerate()
+        .filter(|(_, r)| !is_sep(r))
+        .map(|(i, r)| (line + i, split_row(r)))
         .collect();
-    // Span promotion (M7.5): a column table the portrait column
-    // cannot hold is re-decided against the full text width — the
-    // engine mirrors this exactly (same inputs), so suggestions and
-    // output never disagree. The `[tables]` gate covers promotion
-    // too: with the knob off every table stays `Fit` in its span.
-    let span_cm = if wide { text_cm } else { col_cm };
-    let worst = worst_token_cm(&data);
-    let (ewide, level) = if !wide && compact && table_compact(span_cm, n, worst) == TableLevel::Rotate {
-        (true, table_compact(text_cm, n, worst))
-    } else if compact {
-        (wide, table_compact(span_cm, n, worst))
-    } else {
-        (wide, TableLevel::Fit)
-    };
-    let wide = ewide;
+    let data: Vec<Vec<String>> = raws.iter().map(|(_, c)| c.clone()).collect();
+    // Single decision point (M7.5/M7.6): the engine mirrors this
+    // exact call on the same inputs, so suggestions and output
+    // agree before and after `--apply`.
+    let (wide, level, out) = decide_table(col_cm, text_cm, wide, n, data, compact);
     let rotated = matches!(level, TableLevel::Rotate);
     if rotated {
         needs.rotating = true;
@@ -224,15 +301,16 @@ pub fn table_block(
         lines.insert(lines.len() - 2, format!("\\setlength{{\\tabcolsep}}{{{pad}}}"));
     }
     let mut first = true;
-    for (ri, r) in rows.iter().enumerate() {
-        if is_sep(r) {
-            continue;
-        }
-        let mut cells = split_row(r);
+    for ((ln, _), cells) in raws.iter().zip(out.iter()) {
+        let mut cells = cells.clone();
         cells.resize(n, String::new());
         let mut rendered = Vec::new();
         for c in &cells {
-            let mut cell = inline(c, keys, line + ri)?;
+            // Stack cells carry the split mark through `inline()`
+            // (a literal `\\newline` would not survive escaping)
+            // and it becomes the real break afterwards.
+            let mut cell = inline(c, keys, *ln)?;
+            cell = cell.replace(STACK_MARK, "\\newline ");
             if first {
                 cell = format!("\\textbf{{{cell}}}");
             }
@@ -355,6 +433,21 @@ mod tests {
     }
 
     #[test]
+    fn est_se_split_rules() {
+        // Stars stay with the estimate, break before the paren group.
+        let s = split_est_se("0.080***(0.015)").unwrap();
+        assert!(s.starts_with("0.080***"), "stars ride up: {s}");
+        assert!(s.contains(STACK_MARK), "mark: {s}");
+        assert!(s.ends_with("(0.015)"), "paren intact: {s}");
+        // No parens, empty head, digit-free note: no split.
+        assert!(split_est_se("Yes").is_none());
+        assert!(split_est_se("(0.015)").is_none());
+        assert!(split_est_se("value (high)").is_none());
+        // Digit-free even with stars: still no split.
+        assert!(split_est_se("est (se)**").is_none());
+    }
+
+    #[test]
     fn worst_token_ignores_wrappable_prose() {
         let rows = vec![vec!["government expenditure".to_string()], vec!["-0.234**(0.096)".to_string()]];
         // "government" is the longest prose token (10); the number
@@ -378,16 +471,33 @@ mod tests {
         assert!(got.contains("\\setlength{\\tabcolsep}{2pt}"), "packs padding");
         assert!(!got.contains("\\small") && !got.contains("footnotesize"), "no larger size");
         assert!(needs.rotating);
-        // 7 cols of 16-char tokens (2.56cm): portrait fits compacted
-        // (2.56*0.89 = 2.28 <= 2.54-0.22) but not full-size.
+        // 7 cols of 16-char paren-free tokens (2.56cm): portrait fits
+        // compacted (2.56*0.89 = 2.28 <= 2.54-0.22). No parens, so no
+        // stacking involved — pure compaction.
         let rows7 = vec![
-            "| L | -0.123456(0.12) | -0.123456(0.12) | -0.123456(0.12) | -0.123456(0.12) | -0.123456(0.12) | -0.123456(0.12) |".to_string(),
+            "| L | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 | -0.123456789012 |".to_string(),
         ];
         let (got, needs) =
             table_block(&rows7, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait: {got}");
         assert!(got.contains("\\footnotesize"), "compacts");
+        assert!(!got.contains(STACK_MARK), "no split without parens");
         assert!(!needs.rotating);
+    }
+
+    #[test]
+    fn stacked_cells_fit_portrait_at_full_size() {
+        // The PLOS-original trick: `0.080***(0.015)` (15 raw chars,
+        // 2.4cm) stacks estimate over error, longest line 9 chars
+        // (1.44cm) — fits a 7-col share (2.12cm) at full size.
+        let rows = vec![
+            "| L | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) | 0.080***(0.015) |".to_string(),
+        ];
+        let (got, _) =
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 4).unwrap();
+        assert!(got.contains("\\begin{table*}[t]"), "stays portrait");
+        assert!(got.contains("\\small"), "full size kept");
+        assert!(got.contains("\\newline "), "break emitted");
     }
 
     #[test]

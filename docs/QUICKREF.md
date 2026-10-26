@@ -87,6 +87,12 @@ keeps `\small`; `Compact` steps to `\footnotesize` + 3pt
 `\tabcolsep`; `Rotate` emits `sidewaystable(*)` (own page) in
 `\scriptsize` + 2pt padding, sized against `\textheight`. A
 column table the column cannot hold promotes to `wide` first.
+Before deciding, the ladder stacks estimate/SE cells
+(`0.080***(0.015)` → estimate over `(0.015)` via `\newline`,
+PLOS-original style): the break halves the longest token, so 7-col
+regression tables fit portrait at full size and rotated 13-col
+tables gain headroom. Only trailing digit-bearing paren groups
+split; stars stay with the estimate, prose notes stay single-line.
 Off keeps every table byte-identical (the frozen paper track
 carries accepted mild overfulls); the auto-layout notes always
 measure the ladder and name the opt-in when it is off.

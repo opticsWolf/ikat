@@ -708,41 +708,48 @@ pub fn suggest_layout(
                 let cur_span = tattrs.span.map(|s| span_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let cur_pos = tattrs.pos.map(|s| pos_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let (mut span, mut pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
-                // Portrait-fit ladder, mirroring the weaver exactly:
-                // same rows, same widths, same `[tables]` gate — the
-                // weaver promotes column rotators to `wide` on these
-                // very inputs, so the suggestion and the output agree
-                // before and after `--apply`.
+                // Portrait-fit ladder via the shared decision: same
+                // inputs, same gate as the weaver, so the suggestion
+                // and the output agree before and after `--apply`.
+                // `stacked` reports whether estimate/SE stacking
+                // changed the worst token (the PLOS-original trick).
                 {
-                    use crate::table::{is_sep, split_row, table_compact, worst_token_cm, TableLevel};
+                    use crate::table::{decide_table, is_sep, split_row, worst_stacked_cm, worst_token_cm, TableLevel};
                     let data: Vec<Vec<String>> = rows
                         .iter()
                         .filter(|r| !is_sep(r))
                         .map(|r| split_row(r))
                         .collect();
                     let ncols = data.iter().map(|r| r.len()).max().unwrap_or(1);
-                    let worst = worst_token_cm(&data);
-                    let col_level = if cfg.tables.compact_tables {
-                        table_compact(p.column_cm, ncols, worst)
-                    } else {
-                        TableLevel::Fit
-                    };
-                    let (eff_span, level) = if span == "wide" {
-                        ("wide", if cfg.tables.compact_tables {
-                            table_compact(p.textwidth_cm, ncols, worst)
-                        } else {
-                            TableLevel::Fit
-                        })
-                    } else if col_level == TableLevel::Rotate {
-                        ("wide", table_compact(p.textwidth_cm, ncols, worst))
-                    } else {
-                        ("column", col_level)
-                    };
-                    let share = (if eff_span == "wide" { p.textwidth_cm } else { p.column_cm }) / ncols as f64;
-                    if eff_span == "wide" && span == "column" {
+                    let raw_worst = worst_token_cm(&data);
+                    let cur_wide = span == "wide";
+                    let on = cfg.tables.compact_tables;
+                    let (eff_wide, level, out) = decide_table(
+                        p.column_cm,
+                        p.textwidth_cm,
+                        cur_wide,
+                        ncols,
+                        data.clone(),
+                        on,
+                    );
+                    // Advisory twin with the knob forced on: names the
+                    // opt-in when the manuscript leaves it off.
+                    let (adv_wide, adv_level, adv_out) = decide_table(
+                        p.column_cm,
+                        p.textwidth_cm,
+                        cur_wide,
+                        ncols,
+                        data,
+                        true,
+                    );
+                    let stacked = worst_stacked_cm(&out) < raw_worst;
+                    let share =
+                        (if eff_wide { p.textwidth_cm } else { p.column_cm }) / ncols as f64;
+                    let worst = worst_stacked_cm(&out);
+                    if eff_wide && !cur_wide {
                         span = "wide".to_string();
                         reason.push_str(&format!(
-                            "; column cannot hold it (worst token {worst:.2}cm vs {:.2}cm column share): promoted to wide",
+                            "; column cannot hold it (worst token {raw_worst:.2}cm vs {:.2}cm column share): promoted to wide",
                             p.column_cm / ncols as f64
                         ));
                         // `force`/`here` are illegal on `table*`: the
@@ -753,20 +760,39 @@ pub fn suggest_layout(
                             reason.push_str("; in-flow pin illegal on wide floats: floats top");
                         }
                     }
+                    let stack_note = if stacked { ", stacked estimate/SE cells" } else { "" };
                     match level {
-                        TableLevel::Fit => {}
-                        TableLevel::Compact if cfg.tables.compact_tables => reason.push_str(&format!(
-                            "; portrait is tight (worst token {worst:.2}cm vs {share:.2}cm share): weaver compacts to footnotesize + 3pt padding"
+                        TableLevel::Fit => {
+                            if stacked {
+                                reason.push_str(&format!(
+                                    "; stacked estimate/SE cells (worst {raw_worst:.2}cm -> {worst:.2}cm): fits portrait at full size"
+                                ));
+                            }
+                        }
+                        TableLevel::Compact => reason.push_str(&format!(
+                            "; portrait is tight (worst token {worst:.2}cm vs {share:.2}cm share{stack_note}): weaver compacts to footnotesize + 3pt padding"
                         )),
-                        TableLevel::Rotate if cfg.tables.compact_tables => {
+                        TableLevel::Rotate => {
                             pos = "page".to_string();
                             reason.push_str(&format!(
-                                "; portrait cannot hold it compacted (worst token {worst:.2}cm vs {share:.2}cm share): weaver rotates (sidewaystable)"
+                                "; portrait cannot hold it compacted (worst token {worst:.2}cm vs {share:.2}cm share{stack_note}): weaver rotates (sidewaystable)"
                             ));
                         }
-                        TableLevel::Compact | TableLevel::Rotate => reason.push_str(&format!(
-                            "; portrait cannot hold it (worst token {worst:.2}cm vs {share:.2}cm share): set [tables] compact_tables = true to compact/rotate automatically"
-                        )),
+                    }
+                    // Knob off but the ladder would fire: name the opt-in.
+                    if !on && adv_level != TableLevel::Fit {
+                        let adv_share = (if adv_wide { p.textwidth_cm } else { p.column_cm })
+                            / ncols as f64;
+                        let adv_worst = worst_stacked_cm(&adv_out);
+                        let adv_stacked = adv_worst < raw_worst;
+                        let adv_kind = match adv_level {
+                            TableLevel::Compact => "compact to footnotesize",
+                            _ => "rotate (sidewaystable)",
+                        };
+                        reason.push_str(&format!(
+                            "; portrait cannot hold it (worst token {adv_worst:.2}cm vs {adv_share:.2}cm share{}): set [tables] compact_tables = true to {adv_kind} automatically",
+                            if adv_stacked { ", stacked estimate/SE cells" } else { "" }
+                        ));
                     }
                 }
                 tail_page(p, &mut span, &mut pos, &mut reason, total_prose, seen_prose);
