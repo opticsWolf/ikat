@@ -47,6 +47,9 @@ descriptions; `legend` is an enum.
 
 ## Results and errors
 
+- Every tool is GENERATED from `ikat.registry.TOOL_REGISTRY` (the
+  single source of truth): schemas, docstrings, and annotations come
+  from the spec, and the drift tests pin the skill files to it.
 - Tools return values directly (no okf-style envelope): strings,
   dicts, lists. Failures raise with the multi-line rendering a
   CLI user would see (`path:line: message` + echo + `^` caret

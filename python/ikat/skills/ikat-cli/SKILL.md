@@ -30,6 +30,8 @@ ikat barchart --preset fig.json [--legend WORD]         # preset file (or - for 
 ikat lineplot --preset fig.json [--legend WORD]
 ikat standalone FIG.md --out fig.pdf [--engine ...]        # one mermaid|chart fence → PDF
 ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # suggest span/pos/width, no TeX
+ikat skills list | show NAME | install [--dest DIR…] [--project]
+     [--skill NAME…] [--force]      # bundled agent skills (SKILL.md packs)
 ikat version
 ```
 
@@ -45,6 +47,13 @@ ikat version
   `FILE` + `--preset` together is an error naming both;
   `--legend` overrides the preset's `legend` key.
 - `check` covers float packages too (`placeins/float/dblfloatfix`).
+- `skills` manages the bundled agent skill packs: `list` shows names
+  and triggers, `show NAME` prints the SKILL.md verbatim, `install`
+  copies them into agent skill directories (`~/.claude/skills`,
+  `~/.config/opencode/skills`, `~/.pi/agent/skills`, `~/.agents/skills`
+  by default; `--project` for project-local; `--dest DIR` repeatable
+  for anything else). Existing directories are skipped unless
+  `--force`; `--skill NAME` narrows the set.
 
 ## Errors
 

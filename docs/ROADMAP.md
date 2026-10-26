@@ -295,6 +295,25 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.9b — Tool registry + skill installer (gossamer transfer, tranche 2) → 0.10.12
+
+The second gossamer-learning tranche: the 14 MCP tools became DATA.
+`python/ikat/registry.py` holds `TOOL_REGISTRY` — name, description,
+callable, parameter specs (type, default, description, legend enum),
+return type, and the annotation flags — and generates all three
+consumptions from it: the FastMCP server (schemas/docstrings/
+annotations are built from the spec, so the MCP surface cannot drift),
+`llm_tool_definitions()` (OpenAI-style function-calling definitions,
+full fidelity), and `execute_tool(name, arguments)` (drive the whole
+surface from a dict, no MCP installed). The composites
+(`weave_document`, `standalone_figure`, `suggest_layout`, …) moved
+into the registry; `mcp_server.py` is now a thin renderer. And ikat
+gained gossamer's skill installer: `ikat skills list | show NAME |
+install [--dest DIR…] [--project] [--skill NAME…] [--force]` copies
+the bundled packs into Claude Code, OpenCode, pi, and Agent Skills
+directories (skip-unless-`--force`; the drift tests exercise the
+whole lifecycle).
+
 ## M7.9 — MCP schema fidelity + bundled skills (gossamer-audit transfer) → 0.10.11
 
 An audit of the gossamer MCP surface (registry-driven, drift-tested,

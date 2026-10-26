@@ -335,22 +335,27 @@ CLI, MCP, and headsproof alike.
   (minimal `[tikz,border=5pt]{standalone}` + detected libraries),
   `compile_standalone` (writes `fig.tex`, drives `compile_pdf`).
   MCP gets the source only (`standalone_figure`), never the binary.
-- `cli.py`: thirteen subcommands (`build weave layout check templates
+- `cli.py`: fourteen subcommands (`build weave layout check templates
   template skeletons skeleton flowchart barchart lineplot
-  standalone version`), each a thin call into the API. Plot commands take a
+  standalone skills version`), each a thin call into the API. Plot commands take a
   JSON payload (file or stdin) with an optional `--legend`
   override. Stdio is reconfigured to UTF-8 so unicode error
-  echoes survive a cp1252 console.
-- `mcp_server.py`: FastMCP stdio, fourteen tools mirroring the
-  CLI/API map one-to-one (minus `compile_pdf`). Schemas carry
-  per-parameter descriptions and `legend` enum constraints;
-  every tool declares MCP annotations (all pure/local except
-  `ensure_tex_packages`, the one tlmgr-mutating tool); server
-  instructions state the weave-here-compile-via-CLI rule. The
-  four bundled skill packs (`ikat`, `ikat-api`, `ikat-cli`,
-  `ikat-mcp`) ship in the wheel under `ikat.skills` and serve
-  as `skill://…` resources. The surface tests pin the tool
-  list, the schema fidelity, the annotations, and every
+  echoes survive a cp1252 console. `skills` manages the bundled
+  skill packs (list/show/install into agent skill directories).
+- `registry.py`: `TOOL_REGISTRY` — the 14 agent tools as data
+  (name, description, callable, parameter specs with
+  descriptions/enums/defaults, return type, annotation flags).
+  `execute_tool(name, arguments)` dispatches the whole surface
+  without MCP; `llm_tool_definitions()` renders OpenAI-style
+  function-calling definitions. One source of truth; the MCP
+  server is generated from it and the drift tests pin the
+  skills to it.
+- `mcp_server.py`: thin FastMCP renderer over `TOOL_REGISTRY`:
+  schemas (per-parameter descriptions, `legend` enum),
+  docstrings, return types, and annotations are generated per
+  spec; the four bundled skill packs serve as `skill://…`
+  resources. The surface tests pin the tool list, the schema
+  fidelity, the annotations, and every
   command/tool/API name the skills teach — the skill files
   cannot rot.
 

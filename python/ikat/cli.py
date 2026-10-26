@@ -12,6 +12,8 @@
     ikat barchart [FILE|-] [--preset P] [--legend WORD]
     ikat lineplot [FILE|-] [--preset P] [--legend WORD]
     ikat standalone MD [--out fig.pdf] [--engine E]
+    ikat skills list | show NAME | install [--dest DIR…] [--project]
+                                     [--skill NAME…] [--force]
     ikat version
 """
 
@@ -404,6 +406,25 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("name")
     n.set_defaults(func=cmd_skeleton)
 
+    k = sub.add_parser("skills", help="Bundled agent skill packs (list/show/install)")
+    skills_sub = k.add_subparsers(dest="skills_command", required=True)
+    skills_sub.add_parser("list", help="List the bundled skills and what triggers them")
+    sp = skills_sub.add_parser("show", help="Print one bundled SKILL.md verbatim")
+    sp.add_argument("name", help="Bundled skill name (see `ikat skills list`)")
+    sp = skills_sub.add_parser(
+        "install", help="Copy the bundled skills into agent skill directories")
+    sp.add_argument("--dest", action="append", default=None, metavar="DIR",
+                    help="Skills directory to install into (repeatable). Default: "
+                         "~/.claude/skills, ~/.config/opencode/skills, "
+                         "~/.pi/agent/skills, ~/.agents/skills")
+    sp.add_argument("--project", action="store_true",
+                    help="Install into ./.claude/skills, ./.opencode/skills and "
+                         "./.agents/skills instead")
+    sp.add_argument("--skill", action="append", default=None, metavar="NAME",
+                    help="Only this skill (repeatable). Default: every bundled skill")
+    sp.add_argument("--force", action="store_true",
+                    help="Overwrite existing skill directories")
+
     v = sub.add_parser("version", help="print ikat version")
     v.set_defaults(func=lambda a: (print(ikat.__version__), 0)[1])
     return p
@@ -427,9 +448,61 @@ def _configure_utf8_stdio() -> None:
             continue
 
 
+def _run_skills(args: argparse.Namespace) -> int:
+    """Handle `ikat skills …` (plain-text output; no toolbox needed)."""
+    from ikat.skills import (
+        SkillNotFound,
+        default_destinations,
+        install as install_skills,
+        iter_skills,
+        skill_text,
+    )
+
+    if args.skills_command == "list":
+        for name, description in iter_skills():
+            print(f"{name}\n    {description}")
+        print("Install with `ikat skills install`.")
+        return 0
+    if args.skills_command == "show":
+        try:
+            text = skill_text(args.name)
+        except SkillNotFound as e:
+            print(f"ikat skills: {e.args[0]}", file=sys.stderr)
+            return 1
+        print(text, end="")
+        return 0
+    # install
+    if args.dest and args.project:
+        print("ikat skills: --dest and --project are mutually exclusive",
+              file=sys.stderr)
+        return 1
+    targets = (
+        [Path(d) for d in args.dest] if args.dest
+        else list(default_destinations(project=args.project))
+    )
+    try:
+        results = [
+            result
+            for target in targets
+            for result in install_skills(target, names=args.skill, force=args.force)
+        ]
+    except SkillNotFound as e:
+        print(f"ikat skills: {e.args[0]}", file=sys.stderr)
+        return 1
+    for result in results:
+        print(f"{result.status:<9} {result.path}")
+    skipped = sum(result.status == "skipped" for result in results)
+    if skipped:
+        print(f"{skipped} skill(s) already present; use --force to overwrite.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     _configure_utf8_stdio()
     a = build_parser().parse_args(argv)
+    if a.cmd == "skills":
+        # Skill management needs no toolbox (no cache/config side effects).
+        return _run_skills(a)
     try:
         return a.func(a)
     except (ValueError, FileNotFoundError, TypeError) as e:

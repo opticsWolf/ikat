@@ -29,6 +29,7 @@ echo '{...}' | ikat barchart - [--legend WORD]    # JSON payload, stdout tikzpic
 echo '{...}' | ikat lineplot - [--legend WORD]
 ikat standalone FIG.md --out fig.pdf             # one mermaid|chart fence → PDF
 ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # no TeX needed
+ikat skills list | show ikat-cli | install [--dest DIR…] [--project] [--skill N…] [--force]
 ikat version
 ```
 
@@ -214,9 +215,9 @@ bib_style + toml snippet).
 The same Rust-backed operations are available through four entry points:
 
 - **Python API:** build documents and emit TikZ/pgfplots in process.
-- **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, `standalone`, templates, and skeletons.
+- **CLI:** script `ikat build`, `weave`, `check`, chart and flowchart emitters, `standalone`, templates, skeletons, and `ikat skills install` (copies the bundled skill packs into agent skill directories).
 - **MCP:** optional stdio tools for connected agents; install `mcp>=1,<2` and run `python -m ikat.mcp_server`.
-- **Skills:** focused [Python API](../python/ikat/skills/ikat-api/SKILL.md), [CLI](../python/ikat/skills/ikat-cli/SKILL.md), and [MCP](../python/ikat/skills/ikat-mcp/SKILL.md) guides, plus a general [ikat guide](../python/ikat/skills/ikat/SKILL.md). Install a chosen skill directory in the agent's configured skill location.
+- **Skills:** focused [Python API](../python/ikat/skills/ikat-api/SKILL.md), [CLI](../python/ikat/skills/ikat-cli/SKILL.md), and [MCP](../python/ikat/skills/ikat-mcp/SKILL.md) guides, plus a general [ikat guide](../python/ikat/skills/ikat/SKILL.md). Install with `ikat skills install` (Claude Code, OpenCode, pi, and Agent Skills directories by default; `--dest DIR` for anything else), or read them from a wired MCP server as `skill://…` resources.
 
 ## Python API
 

@@ -186,6 +186,120 @@ def test_mcp_preset_param():
     assert "\\addlegendentry{Rust tests}" in r
 
 
+# ──── Registry: one source of truth for every surface ────
+
+
+def test_registry_round_trip_and_dispatch_errors():
+    from ikat.registry import TOOL_REGISTRY, execute_tool
+
+    assert len(TOOL_REGISTRY) == 14
+    names = [spec.name for spec in TOOL_REGISTRY]
+    assert len(set(names)) == 14
+    # dispatch with defaults + explicit args
+    tikz = execute_tool("flowchart_to_tikz", {"src": "graph TD\na[x]-->b[y]\n"})
+    assert "\\begin{tikzpicture}" in tikz
+    tikz2 = execute_tool("lineplot_to_tikz", {
+        "title": "t", "xlabel": "x", "ylabel": "y", "xs": [1.0],
+        "names": ["s"], "yss": [[1.0]], "errs": [[0.0]], "legend": "below"})
+    assert "anchor=north" in tikz2
+    # unknown tool names the valid set
+    with pytest.raises(ValueError) as e:
+        execute_tool("nope")
+    assert "weave_document" in str(e.value)
+    # every required param of every spec is first (valid signatures)
+    for spec in TOOL_REGISTRY:
+        req = [p.required for p in spec.params]
+        assert req == sorted(req, key=lambda v: not v), f"{spec.name}: required params must precede optional"
+
+
+def test_registry_llm_definitions_are_wellformed():
+    from ikat.registry import TOOL_REGISTRY, llm_tool_definitions
+
+    defs = llm_tool_definitions()
+    assert len(defs) == len(TOOL_REGISTRY)
+    by_name = {d["function"]["name"]: d for d in defs}
+    legend = by_name["barchart_to_tikz"]["function"]["parameters"]["properties"]["legend"]
+    assert legend["enum"][0] == "auto" and "outside-right" in legend["enum"]
+    assert legend["description"]
+    for d in defs:
+        fn = d["function"]
+        assert d["type"] == "function" and fn["description"]
+        params = fn["parameters"]
+        assert set(params["required"]) <= set(params["properties"])
+        for prop in params["properties"].values():
+            assert prop.get("description"), f"{fn['name']} param lacks description"
+
+
+@needs_mcp
+def test_mcp_server_is_registry_generated():
+    import asyncio
+
+    from ikat import mcp_server
+    from ikat.registry import TOOL_REGISTRY
+
+    tools = {t.name: t for t in asyncio.run(mcp_server.mcp.list_tools())}
+    assert set(tools) == {s.name for s in TOOL_REGISTRY}
+    for spec in TOOL_REGISTRY:
+        t = tools[spec.name]
+        ann = t.annotations
+        assert ann.readOnlyHint is spec.readonly
+        assert ann.destructiveHint is spec.destructive
+        assert ann.openWorldHint is spec.openworld
+        assert ann.idempotentHint is spec.idempotent
+        schema_props = set((t.inputSchema or {}).get("properties", {}))
+        assert schema_props == {p.name for p in spec.params}, f"{spec.name}: schema params drifted"
+
+
+# ──── Skill installer ────
+
+
+def test_skills_installer_lifecycle(tmp_path, capsys, monkeypatch):
+    from ikat import skills as sk
+
+    dest = tmp_path / "agent-skills"
+    monkeypatch.setattr(sk, "default_destinations", lambda *, project=False: (dest,))
+    assert cli_main(["skills", "install"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("installed ") == 4
+    assert (dest / "ikat" / "SKILL.md").is_file()
+    assert cli_main(["skills", "install"]) == 0  # re-run skips, hint printed
+    out = capsys.readouterr().out
+    assert out.count("skipped ") == 4 and "--force" in out
+
+
+def test_skills_install_statuses(tmp_path):
+    from ikat.skills import install
+
+    dest = tmp_path / "skills"
+    first = install(dest)
+    assert [r.status for r in first] == ["installed"] * 4
+    again = install(dest)
+    assert [r.status for r in again] == ["skipped"] * 4
+    forced = install(dest, force=True)
+    assert [r.status for r in forced] == ["updated"] * 4
+    one = install(dest, names=["ikat-cli"], force=True)
+    assert [r.status for r in one] == ["updated"] and one[0].path.name == "ikat-cli"
+    # content is verbatim
+    from ikat.skills import skill_text
+    assert (dest / "ikat-cli" / "SKILL.md").read_text(encoding="utf-8") == skill_text("ikat-cli")
+
+
+def test_skills_cli_paths(tmp_path, capsys):
+    dest = tmp_path / "d"
+    assert cli_main(["skills", "install", "--dest", str(dest)]) == 0
+    assert (dest / "ikat-api" / "SKILL.md").is_file()
+    capsys.readouterr()  # drain the install output
+    assert cli_main(["skills", "show", "ikat-mcp"]) == 0
+    assert capsys.readouterr().out.startswith("---")
+    assert cli_main(["skills", "show", "nope"]) == 1
+    assert "unknown skill" in capsys.readouterr().err
+    assert cli_main(["skills", "install", "--dest", str(tmp_path / "x"), "--skill", "nope"]) == 1
+    assert "unknown skill" in capsys.readouterr().err
+    # --dest + --project conflict names both
+    assert cli_main(["skills", "install", "--dest", str(dest), "--project"]) == 1
+    assert "mutually exclusive" in capsys.readouterr().err
+
+
 def test_version(capsys):
     assert cli_main(["version"]) == 0
     assert capsys.readouterr().out.strip() == __version__
@@ -312,12 +426,14 @@ def test_api_skill_names_real_exports():
     import re
 
     import ikat
-    from ikat.skills import skill_text
+    from ikat.registry import __all__ as registry_exports
+    from ikat.skills import __all__ as skills_exports, skill_text
 
     text = skill_text("ikat-api")
     named = set(re.findall(r"\b([a-z][a-z_]{3,})\(", text))
+    valid = set(ikat.__all__) | set(registry_exports) | set(skills_exports)
     phantom = {n for n in named
-               if n not in ikat.__all__ and not hasattr(builtins, n)}
+               if n not in valid and not hasattr(builtins, n)}
     assert not phantom, f"ikat-api SKILL.md names phantom calls: {sorted(phantom)}"
 
 
