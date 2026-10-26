@@ -165,12 +165,6 @@ def make_paper(engine: str = "pdflatex") -> None:
     pdf = compile_pdf(OUT, "ikat-paper.tex", engine=engine)
     print(f"paper: {pdf} ({pdf.stat().st_size} bytes, "
           f"diagrams={r.n_diagrams} tables={r.n_tables})")
-    # README/QUICKREF link the SITE copy as the showcase PDF — keep it
-    # in lockstep whenever the site tree exists (no-op in bare checkouts).
-    site_assets = ROOT / "site" / "assets"
-    if site_assets.is_dir():
-        shutil.copy(pdf, site_assets / "ikat-paper.pdf")
-        print(f"site: {site_assets / 'ikat-paper.pdf'}")
 
 
 if __name__ == "__main__":
