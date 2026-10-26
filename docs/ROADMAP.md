@@ -1,10 +1,10 @@
 # ikat roadmap
 
-Status 2026-10-25 (Phase H gate, 0.10.0): Phases 1, 2 (plots),
+Status 2026-10-26 (M7.2 top-fit, 0.10.2): Phases 1, 2 (plots),
 3 (standalone, sequence, state), 4 (core), 5, 6, D (layout +
 heading guards), E (parser switch), F (line-numbered errors),
-G (tectonic hardening), H (auto-layout) done — 136 cargo + 86
-pytest green,
+G (tectonic hardening), H (auto-layout) done — 141 cargo + 88
+pytest green (84 passed, 4 skipped),
 showcase (10 pages, 4 diagrams) + regen + standalone + heads
 proofs build under pdflatex AND tectonic, golden paper
 byte-identical (`ebe698db`), 0 undefined citations both
@@ -294,6 +294,21 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 (135 + 86), demo + showcase + regen + standalone + heads proofs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
+
+## M7.2 — Top-fit + queue pressure → 0.10.2
+
+Wide floats taller than the page-top budget (`top_frac` 0.7 ×
+text height, the LaTeX `topfraction`/`dbltopfraction` default)
+take `wide`+`page` instead of `wide`+`top`: `[t]` cannot legally
+hold them, so they (and the queue behind them) pile at the
+document end. Column tables taller than the text height go
+`page` (`[H]` would blast through). The third and later `wide`
+floats since a section heading earn a spread-the-fences note.
+Proven on the full-export corpus: psych-maia's 41-row table left
+the p24–26 end pile for an in-section float page (9 tables now
+p9–p21 beside their prose, 26pp→25pp), 0 stranded headings
+across all 10 papers (D.2 needspace guards hold). Exporter
+`pic_attrs` mirrors the budget for precompiled pictures.
 
 ## Tracked elsewhere (not ikat work)
 

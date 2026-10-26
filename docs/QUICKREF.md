@@ -98,7 +98,15 @@ take a dedicated `page` — non-lead content taller than
 any other test. A section's lead diagram is exempt and gets
 `lead_bonus_cm` (1.0) extra in-flow budget instead — section
 starts land near fresh columns. Tables wider than `wide_ratio`
-(1.25) × the column go `wide`+`top`. `width=` shrinks for column
+(1.25) × the column go `wide`+`top` — unless taller than the
+page-top budget (`top_frac` (0.7) × text height): `[t]` cannot
+legally hold those, so they take a dedicated `wide`+`page`
+instead of queueing toward the document end (a 41-row table
+piled three pages at the end until this rule). Column tables
+taller than the text height go `page` too (`[H]` would blast
+through the page bottom). The third and later `wide` floats
+since a section heading earn a spread-the-fences note — page
+tops queue behind each other. `width=` shrinks for column
 overflow only, never for height (coordinates scale, text does
 not: shrinking tall content crowds labels), floored by a crowding
 floor measured from placed node labels (`NODE_CHAR_CM` 0.21,
@@ -110,7 +118,8 @@ External graphics (precompiled diagrams, plot PDFs) keep
 hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 `column_cm` 8.9, `textwidth_cm` 17.8, `caption_cm` 1.0,
 `here_max_cm` 7.0 (showcase-calibrated), `page_frac` 0.6,
-`min_width` 0.4, `late_wide_lines` 15.
+`min_width` 0.4, `late_wide_lines` 15, `top_frac` 0.7 (the LaTeX
+`topfraction`/`dbltopfraction` default).
 
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are

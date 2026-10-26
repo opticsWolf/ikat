@@ -321,9 +321,17 @@ def extract_images(pdf_path: Path, figdir: Path) -> list:
     return got
 
 
+TEXT_H_CM = 23.0
+TOP_MAX_CM = 0.7 * TEXT_H_CM  # mirrors engine [layout] top_frac
+
+
 def pic_attrs(w: float, h: float) -> str:
-    """Measured-size pinning, mirroring the engine thresholds."""
+    """Measured-size pinning, mirroring the engine thresholds.
+    Wide floats taller than the page-top budget take a dedicated
+    page: [t] cannot hold them and the queue strands at the end."""
     if w >= COL_CM * 1.25:
+        if h + 1.0 > TOP_MAX_CM:
+            return f"{{span=wide pos=page width={min(1.0, round(w / TEXT_CM, 2))}}}"
         return f"{{span=wide pos=top width={min(1.0, round(w / TEXT_CM, 2))}}}"
     if h > 14.0:
         return "{span=column pos=page}"

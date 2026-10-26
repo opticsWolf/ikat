@@ -449,6 +449,7 @@ impl Floats {
 /// wide_ratio = 1.25
 /// lead_bonus_cm = 1.0
 /// late_wide_lines = 15
+/// top_frac = 0.7
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutPolicy {
@@ -492,6 +493,14 @@ pub struct LayoutPolicy {
     /// has the best room odds; later floats face consumed columns.
     #[serde(default = "layout_lead_bonus")]
     pub lead_bonus_cm: f64,
+    /// Page-top budget: a `wide` float taller than this fraction
+    /// of the text height cannot take a page top (LaTeX `topfraction`
+    /// / `dbltopfraction`, both 0.7 by default) — `[t]` would refuse
+    /// it and the queue behind it strands toward the document end
+    /// (psych-maia's 41-row table piled on p25 until this rule
+    /// sent it to a dedicated page instead).
+    #[serde(default = "layout_top_frac")]
+    pub top_frac: f64,
 }
 
 fn layout_textheight() -> f64 {
@@ -524,6 +533,9 @@ fn layout_lead_bonus() -> f64 {
 fn layout_late_wide() -> usize {
     15
 }
+fn layout_top_frac() -> f64 {
+    0.7
+}
 
 impl Default for LayoutPolicy {
     fn default() -> Self {
@@ -538,6 +550,7 @@ impl Default for LayoutPolicy {
             wide_ratio: layout_wide_ratio(),
             lead_bonus_cm: layout_lead_bonus(),
             late_wide_lines: layout_late_wide(),
+            top_frac: layout_top_frac(),
         }
     }
 }

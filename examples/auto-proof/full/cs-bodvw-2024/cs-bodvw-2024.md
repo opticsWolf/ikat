@@ -211,7 +211,7 @@ In the investigation of these factors, the accuracies achieved by all pre-traine
 
 In this subsection, we investigate the feature encoding method. Fig 2 presents the comparative results of five feature encoding methods, obtained using the average pooling layer of ResNext-50(FT(part)) to generate deep features. It's important to note that the conclusions drawn here are not exclusive to this model, similar conclusions can also be observed with other DL models.
 
-```mermaid {span=wide pos=top width=0.83}
+```mermaid {span=wide pos=page width=0.83}
 info:doi/10.1371/journal.pone.0298228.g002
 ```
 
@@ -233,7 +233,7 @@ In summary, FV consistently outperforms other methods across all datasets. SVC a
 
 Another factor we investigated here is the feature extraction method. Fig 4 compares Ext-DFs(CP) and Ext-DFs(FC) under different dictionary sizes using three encoding methods when ResNext-50(FT(all)) is used to generate deep features, and Fig 5 shows the comparison results of these two feature extraction methods with different feature extractors when FV is used.
 
-```mermaid {span=wide pos=top width=0.83}
+```mermaid {span=wide pos=page width=0.83}
 info:doi/10.1371/journal.pone.0298228.g004
 ```
 
@@ -263,7 +263,7 @@ In conclusion, while using pre-trained DL models fine-tuned by FT(all) as featur
 
 In this subsection, we investigate the accuracy gains brought by using the pre-trained SwinTransformer as a feature extractor when the number of training images (the fifth factor) is insufficient. The pre-trained SwinTransformer is fine-tuned using different numbers of training samples (5, 10, 15, 20, 25 and 30 images per category). Fig 6 shows the experimental results obtained on six datasets when Ext-DFs(CP) is used for feature extraction and FV for feature encoding.
 
-```mermaid {span=wide pos=top width=0.83}
+```mermaid {span=wide pos=page width=0.83}
 info:doi/10.1371/journal.pone.0298228.g006
 ```
 

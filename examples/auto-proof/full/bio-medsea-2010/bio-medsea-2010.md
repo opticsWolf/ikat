@@ -270,7 +270,7 @@ Therefore, there were similarities and differences between expert-drawn maps (Fi
 
 Latitudinal transects corresponding to cross sections through the species richness map (Figure 5a) highlighted the importance of coastal habitats for fishes and invertebrates. These habitats were represented by peaks in species numbers in areas corresponding to shelf waters (Figure 6a). Cross-section gradients followed a similar pattern for fishes and invertebrates; large variations were mostly determined by depth changes along the respective transects. There was also an overarching trend of decreasing species richness from western to eastern waters, a trend that became particularly pronounced in the southern transects. Marine mammal transects diverged from the general trend in that species richness was less directly linked to depth variation. Changes in fish and invertebrate species richness along three different longitudinal cross sections again followed similar depth contours (Figure 6b). Marine mammal longitudinal biodiversity patterns in the Western Mediterranean followed a different trend with highest numbers predicted to occur in deeper waters, such as the southern Tyrrhenian Sea. There appeared to be a general decrease of diversity from northern to southern regions.
 
-```mermaid {span=wide pos=top width=0.74}
+```mermaid {span=wide pos=page width=0.74}
 info:doi/10.1371/journal.pone.0011842.g006
 ```
 
@@ -280,11 +280,11 @@ Because seaweeds and seagrasses are photosynthetic organisms, their development 
 
 The pattern of a generally decreasing diversity with increasing depth was also documented here for invertebrate and fish species (Figures 3, 4, 7, and 8) and is consistent with previous studies [e.g., [`ref31`], [`ref228`]]. Diversity was concentrated in coastal areas and continental shelves, mainly above 200 m depth. However, patterns did not necessarily show a monotonic decrease with depth. For example, more polychaete species inhabited shallow waters than deep waters, particularly below 1,000 m deep, but this pattern was less clear when looking at maximum ranges of depth (Figure 7a, File S2). It is not clear whether this is a real pattern of lower deep-sea diversity or a result of the lack of proper faunistic studies in the Mediterranean at those depths. Larger numbers of cumacean species were found in shallow waters of 0–99 m depth (48 species) and between 200 m and 1,400 m depth, but species richness decreased below this depth (Figure 7b, references in File S2). The highest endemism (43.8%) was found between 0 and 99 m depth. The largest number of mysidaceans (54 species) was also found in shallow waters less than100 m deep. At depths between 100 m and 1,000 m, 27 species were found, and below 1,000 m, 21 species. The level of endemism was also higher in the 0–100 m depth interval (29 species, 78.4% of total endemism) than in the 100–1,000 m interval (3 species, 8.1%) or below 1,000 m (5 species, 13.5%), in line with results obtained for cumaceans. The circalittoral zone was the region with highest anthozoan species richness (61.8% by numbers of species) followed by the infralittoral (57.6%) and bathyal (40%) zones (File S2). Half of the total number of species were restricted to one of the infra-, circa-, or bathyal zones, and 9.7% were eurybathic, while the remaining species (40%) were intermediate in depth distribution. We also found exceptions to the pattern of decreasing diversity with depth. The bathymetric range of Mediterranean sipunculans was generally quite wide [`ref229`]. Most of the Mediterranean records were bathyal, whereas there were few sublittoral records (File S2).
 
-```mermaid {span=wide pos=top width=0.64}
+```mermaid {span=wide pos=page width=0.64}
 info:doi/10.1371/journal.pone.0011842.g007
 ```
 
-```mermaid {span=wide pos=top width=0.64}
+```mermaid {span=wide pos=page width=0.64}
 info:doi/10.1371/journal.pone.0011842.g008
 ```
 
@@ -475,7 +475,7 @@ The shortage of taxonomists for many groups is a particularly serious problem wo
 
 Sampling biases are another source of uncertainty in the estimation of marine biodiversity. In particular, the three-dimensional character of marine ecosystems requires much more study at depths where light penetration is perceived as important but is poorly understood. Light intensity decreases with increasing depth and species perform extensive migrations within the water column or along the seabed. Endobenthic species display rhythms of emergence, including burying or burrowing within the substrate and sheltering in natural holes [`ref425`]. Marine species react to light intensity cycles, which may include movements in and out of our sampling windows [`ref426`]. Information gathered without attention to such rhythmicity will affect perceived population distribution, biomass, and estimated biodiversity [`ref425`]. These issues have been integral to land ecology since the early twentieth century [`ref427`] but have been rarely considered in the marine environment. In the Mediterranean, Sarda et al. [`ref428`] considered this problem during day-night sampling at and below the end of the twilight zone (1,000 m depth) and observed day-night fluctuations in their catches. Midday and midnight trawl catches at different depths during October showed great differences in fish, cephalopod, and crustacean species composition and relative abundance in the deeper areas (see Figure 14a). Waveform analysis of crustacean catches showed behavioral rhythms that affected presence or absence from catches made at different times during a 24-hour cycle (Figure 14b). Because trawl surveying is one of the commonest methods of sampling in marine waters [`ref429`], and is one of the most used in the Mediterranean Sea, future biodiversity studies should correct for the practice of sampling only during daytime. In addition, observations of important diel variation in the fauna associated with seagrasses include a notable increase of species richness and abundance in nighttime samples [`ref430`], [`ref431`]. This issue brings together the problem of biodiversity and climate change due to expected changes in species migrations and rhythmicity.
 
-```mermaid {span=wide pos=top width=0.98}
+```mermaid {span=wide pos=page width=0.98}
 info:doi/10.1371/journal.pone.0011842.g014
 ```
 

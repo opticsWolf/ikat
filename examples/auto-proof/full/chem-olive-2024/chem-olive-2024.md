@@ -74,7 +74,7 @@ Elemental analysis results for the synthesized ligand and its nano Cd complex ma
 
 The $^{1}$H NMR spectrum of the nano complex showed singlet signals at 9.48 and 8.29 ppm from NH and CH = N protons, and multiplet signals at 7.55–7.96 ppm induced from aromatic protons. A new peak appeared due to the enolization of the sulphonamide group(-SO$_{2}$NH groups to the (S(O)OH = N)), indicating complexation. Comparison with the free ligand confirmed coordination with the metal atom. The OH group peak shifted to 10.79 ppm, indicating coordination and the azomethine group peak shifted to 8.90 ppm. Aromatic protons showed multiplet signals between 7.79 and 7.94 ppm, while OH protons remained unchanged (**Fig 2A and 2B**).
 
-```mermaid {span=wide pos=top width=0.74}
+```mermaid {span=wide pos=page width=0.74}
 info:doi/10.1371/journal.pone.0306040.g002
 ```
 

@@ -26,7 +26,7 @@ Overall, the patterns of pH recorded at each of the 15 deployment sites (shown i
 info:doi/10.1371/journal.pone.0028983.g001
 ```
 
-```mermaid {span=wide pos=top width=0.94}
+```mermaid {span=wide pos=page width=0.94}
 info:doi/10.1371/journal.pone.0028983.g002
 ```
 

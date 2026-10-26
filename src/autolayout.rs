@@ -42,7 +42,13 @@
 //! capped at 15% over the fit (flagged when capped). A `wide`
 //! float declared after `late_wide_lines` prose lines earns a
 //! move-the-fence note (page-top floats declared late strand
-//! trailing pages) — advisory, the engine never reorders.
+//! trailing pages) — advisory, the engine never reorders. A `wide`
+//! float taller than the page-top budget (`top_frac` of the text
+//! height) takes a dedicated `page` instead of `top`: `[t]` cannot
+//! legally hold it, so it (and the queue behind it) would pile at
+//! the document end. The third and later `wide` floats since a
+//! section heading earn a spread-the-fences note for the same
+//! queue reason.
 
 use crate::config::{LayoutPolicy, Pos, Span};
 use crate::doc::{fence_attr_str, parse_attrs, BuildSpec};
@@ -372,8 +378,34 @@ pub(crate) fn suggest_for(
 ) -> (String, String, Option<f64>, String) {
     let col = p.column_cm;
     let cap = p.caption_cm;
+    // Page-top budget: content + caption taller than this cannot
+    // take a `[t]` top (topfraction/dbltopfraction) — LaTeX refuses
+    // the float and defers it (and its queue) toward the end.
+    let top_max = p.top_frac * p.textheight_cm;
     if kind == "table" {
         let span = if w1 > p.wide_ratio * col { "wide" } else { "column" };
+        let tall = h1 + cap;
+        if span == "wide" && tall > top_max {
+            return (
+                "wide".to_string(),
+                "page".to_string(),
+                None,
+                format!(
+                    "table est {w1:.1}cm wide, {tall:.1}cm tall: overflows the {col}cm column and exceeds the {top_max:.1}cm page-top budget -> dedicated page ([t] cannot hold it, the queue would strand at the document end)"
+                ),
+            );
+        }
+        if span == "column" && tall > p.textheight_cm {
+            return (
+                "column".to_string(),
+                "page".to_string(),
+                None,
+                format!(
+                    "table est {tall:.1}cm tall: taller than the {:.1}cm text height, [H] would blast through the page bottom -> dedicated page",
+                    p.textheight_cm
+                ),
+            );
+        }
         let pos = if span == "wide" { "top" } else { "force" };
         let reason = format!(
             "table est {w1:.1}cm wide: {} -> {span}+{pos}",
@@ -474,10 +506,20 @@ pub(crate) fn suggest_for(
     let width = if w < 0.995 { Some(w) } else { None };
     let h = h1 * w + cap;
     // Escape hatch: content that cannot fit a column at all goes
-    // wide+top instead of overflowing a page float.
+    // wide instead of overflowing a page float — `page` when too
+    // tall for a top (same budget as tables), `top` otherwise.
     if w1 * p.min_width > col {
         let ww = fit_width(p.textwidth_cm, w1).min(1.0);
         let width = if ww < 0.995 { Some(ww) } else { None };
+        let tall = h1 * ww + cap;
+        if tall > top_max {
+            return (
+                "wide".to_string(),
+                "page".to_string(),
+                width,
+                format!("content est {w1:.1}cm overflows a {col}cm column at any readable width and {tall:.1}cm exceeds the {top_max:.1}cm page-top budget -> dedicated page"),
+            );
+        }
         return (
             "wide".to_string(),
             "top".to_string(),
@@ -556,12 +598,18 @@ pub fn suggest_layout(
     // Non-empty prose lines since the last float or section start:
     // a `wide` float declared after a wall of prose strands pages.
     let mut prose_lines = 0usize;
+    // `wide` floats declared since the last `##` heading: page tops
+    // queue behind each other, so the third and later in one stretch
+    // earn a spread-the-fences note (same strand mechanism as late
+    // declaration, cumulative instead of positional).
+    let mut wides = 0usize;
     for b in blocks(md_text)? {
         let line = b.line;
         match b.kind {
             MdKind::H2(_) => {
                 section_diagrams = 0;
                 prose_lines = 0;
+                wides = 0;
             }
             MdKind::Para(para) => {
                 prose_lines += para.iter().filter(|l| !l.trim().is_empty()).count();
@@ -604,6 +652,7 @@ pub fn suggest_layout(
                     suggest_for(p, "diagram", w1, h1, &cur_span, &cur_pos, lead, floor)
                 };
                 reason.push_str(&late_note(p, &span, prose_lines));
+                reason.push_str(&queue_note(&span, &mut wides));
                 prose_lines = 0;
                 let same_width = match (attrs.width.as_deref(), width) {
                     (None, None) => true,
@@ -646,6 +695,7 @@ pub fn suggest_layout(
                 let cur_pos = tattrs.pos.map(|s| pos_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let (span, pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
                 reason.push_str(&late_note(p, &span, prose_lines));
+                reason.push_str(&queue_note(&span, &mut wides));
                 prose_lines = 0;
                 let action = if cur_span == span && cur_pos == pos { "keep" } else { "change" };
                 out.push(Suggestion {
@@ -736,6 +786,22 @@ fn parse_loose_attrs(cur: &str) -> (String, String, Option<f64>) {
     (span, pos, width)
 }
 
+/// Spread-the-fences note: the third and later `wide` floats since
+/// the section heading queue behind each other on scarce page tops
+/// and pile toward the document end. Counts through `wides` (the
+/// caller resets it per section); advisory like `late_note`.
+fn queue_note(span: &str, wides: &mut usize) -> String {
+    if span == "wide" {
+        *wides += 1;
+        if *wides >= 3 {
+            return format!(
+                "; wide float #{wides} since the section heading — page tops queue behind each other: spread the fences across sections (move above section prose)"
+            );
+        }
+    }
+    String::new()
+}
+
 /// Move-the-fence note: a `wide` float declared after a wall of
 /// prose strands a trailing page (page-top floats need a top at or
 /// after their declaration). Advisory — the engine never reorders,
@@ -772,6 +838,7 @@ mod tests {
             wide_ratio: 1.25,
             lead_bonus_cm: 1.0,
             late_wide_lines: 15,
+            top_frac: 0.7,
         }
     }
 
@@ -835,6 +902,52 @@ mod tests {
         let (span, pos, _, reason) = suggest_for(&pol(), "table", 13.8, 5.0, "default", "default", false, 0.0);
         assert_eq!((span.as_str(), pos.as_str()), ("wide", "top"));
         assert!(reason.contains("13.8"), "numbers in reason: {reason}");
+    }
+
+    #[test]
+    fn tall_wide_table_takes_page_not_top() {
+        // 24 rows ≈ 13.9cm + caption: fits the 16.1cm top budget.
+        let (span, pos, _, _) = suggest_for(&pol(), "table", 14.0, 13.9, "default", "default", false, 0.0);
+        assert_eq!((span.as_str(), pos.as_str()), ("wide", "top"));
+        // 41 rows ≈ 23.2cm + caption: [t] cannot hold it — [t]
+        // would strand it (and its queue) at the document end.
+        let (span, pos, _, reason) = suggest_for(&pol(), "table", 14.0, 23.2, "default", "default", false, 0.0);
+        assert_eq!((span.as_str(), pos.as_str()), ("wide", "page"));
+        assert!(reason.contains("page-top budget"), "names the trap: {reason}");
+    }
+
+    #[test]
+    fn overtall_column_table_takes_page_not_force() {
+        // Taller than the text height: [H] would blast through.
+        let (span, pos, _, reason) = suggest_for(&pol(), "table", 6.0, 24.0, "default", "default", false, 0.0);
+        assert_eq!((span.as_str(), pos.as_str()), ("column", "page"));
+        assert!(reason.contains("[H]"), "names the breakage: {reason}");
+        // A normal tall-but-fitting column table still pins.
+        let (span, pos, _, _) = suggest_for(&pol(), "table", 6.0, 12.0, "default", "default", false, 0.0);
+        assert_eq!((span.as_str(), pos.as_str()), ("column", "force"));
+    }
+
+    #[test]
+    fn lead_wide_tall_diagram_escapes_to_page() {
+        // Lead 30cm-wide, 28cm-tall diagram: pre-empt skips leads,
+        // the width escape shrinks to 0.58 but 17.2cm still exceeds
+        // the top budget — dedicated page, not an unholdable top.
+        let (span, pos, _, reason) =
+            suggest_for(&pol(), "diagram", 30.0, 28.0, "default", "default", true, 0.0);
+        assert_eq!((span.as_str(), pos.as_str()), ("wide", "page"));
+        assert!(reason.contains("page-top budget"), "named: {reason}");
+    }
+
+    #[test]
+    fn queue_note_fires_on_third_wide() {
+        let mut wides = 0usize;
+        assert!(queue_note("column", &mut wides).is_empty());
+        assert_eq!(wides, 0, "non-wide does not count");
+        assert!(queue_note("wide", &mut wides).is_empty());
+        assert!(queue_note("wide", &mut wides).is_empty());
+        let third = queue_note("wide", &mut wides);
+        assert!(third.contains("#3"), "counts: {third}");
+        assert!(third.contains("spread the fences"), "names the fix: {third}");
     }
 
     #[test]

@@ -32,7 +32,7 @@ A recent review of existing body awareness questionnaires and their psychometric
 
 Therefore, we used a mixed methods approach to systematically develop a self-report instrument for experimental interoception research and for assessment of mind-body therapies. The study and all procedures were approved by the university's Institutional Review Board. The paper is organized into six main parts: (a) Concept and Item Development, (b) Field Test, (c, d, and e) three Construct Validity sections, and (f) Overall Discussion. A figure depicting the sequence is provided for ease of understanding the complexity of the approach (Figure 1). Because of our iterative mixed-methods approach [`ref69`], the concepts evolved during scale development. Thus this paper describes modifications to the conceptual framework throughout the process.
 
-```mermaid {span=wide pos=top width=0.77}
+```mermaid {span=wide pos=page width=0.77}
 info:doi/10.1371/journal.pone.0048230.g001
 ```
 
