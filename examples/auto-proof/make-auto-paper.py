@@ -88,6 +88,13 @@ def main() -> None:
     shutil.copy(SRC / "out" / "IEEEtran.bst", WORK / "IEEEtran.bst")
     pdf = compile_pdf(WORK, "ikat-paper.tex", engine="pdflatex")
     print(f"auto paper: {pdf} ({pdf.stat().st_size} bytes, diagrams={r.n_diagrams} tables={r.n_tables})")
+    # The SITE showcase asset carries the auto-layout rendering — the
+    # engine outpacks the hand build (7 vs 8 pages, 0 overfulls), so
+    # README/QUICKREF link this one. No-op in bare checkouts.
+    site_assets = HERE.parent.parent / "site" / "assets"
+    if site_assets.is_dir():
+        shutil.copy(pdf, site_assets / "ikat-paper.pdf")
+        print(f"site: {site_assets / 'ikat-paper.pdf'}")
 
 
 main()
