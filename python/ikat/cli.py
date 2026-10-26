@@ -14,6 +14,8 @@
     ikat standalone MD [--out fig.pdf] [--engine E]
     ikat skills list | show NAME | install [--dest DIR…] [--project]
                                      [--skill NAME…] [--force]
+    ikat help [--json] [COMMAND]     # command list / one command's flags /
+                                     # agent-tool registry as JSON
     ikat version
 """
 
@@ -324,8 +326,10 @@ def cmd_skeleton(a: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ikat", description="Weave Markdown into camera-ready LaTeX.")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    parser = argparse.ArgumentParser(
+        prog="ikat", description="Weave Markdown into camera-ready LaTeX.")
+    # Bare `ikat` prints help (exit 0) instead of an argparse error.
+    sub = parser.add_subparsers(dest="cmd")
 
     b = sub.add_parser("build", help="md -> .tex -> .pdf in one go")
     b.add_argument("md")
@@ -427,7 +431,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     v = sub.add_parser("version", help="print ikat version")
     v.set_defaults(func=lambda a: (print(ikat.__version__), 0)[1])
-    return p
+
+    h = sub.add_parser("help", help="list commands, or one command's flags (`ikat help CMD`)")
+    h.add_argument("command", nargs="?", default=None,
+                   help="a subcommand to explain (default: list every command)")
+    h.add_argument("--json", action="store_true",
+                   help="dump the agent-tool registry (the MCP tool surface) as "
+                        "JSON instead of CLI help; overrides COMMAND")
+    h.set_defaults(func=None)
+    return parser
+
+
+def _run_help(args: argparse.Namespace) -> int:
+    """`ikat help` / `ikat help CMD` / `ikat help --json`."""
+    if args.json:
+        import json
+
+        from ikat.registry import llm_tool_definitions
+
+        print(json.dumps(llm_tool_definitions(), indent=1))
+        return 0
+    parser = build_parser()
+    subs = parser._subparsers._group_actions[0].choices
+    if args.command is None:
+        parser.print_help()
+        return 0
+    target = subs.get(args.command)
+    if target is None:
+        print(f"ikat help: unknown command {args.command!r}; valid: "
+              + ", ".join(sorted(subs)), file=sys.stderr)
+        return 1
+    target.print_help()
+    return 0
 
 
 def _configure_utf8_stdio() -> None:
@@ -500,9 +535,15 @@ def _run_skills(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     _configure_utf8_stdio()
     a = build_parser().parse_args(argv)
+    if a.cmd is None:
+        # Bare `ikat`: help, not an argparse error.
+        build_parser().print_help()
+        return 0
     if a.cmd == "skills":
         # Skill management needs no toolbox (no cache/config side effects).
         return _run_skills(a)
+    if a.cmd == "help":
+        return _run_help(a)
     try:
         return a.func(a)
     except (ValueError, FileNotFoundError, TypeError) as e:

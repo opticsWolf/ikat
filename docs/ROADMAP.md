@@ -295,6 +295,18 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.9c — `ikat help [COMMAND]` + bare-invocation help → 0.10.13
+
+Argparse help as a verb: `ikat help` prints the command list (the
+fifteenth subcommand), `ikat help CMD` prints that command's flags —
+the git convention, so agents can discover the surface without the
+`--help` global-flag form. Unknown command names name the valid set.
+`ikat help --json` dumps the agent-tool registry (all 14 MCP tools,
+full schemas via `llm_tool_definitions()`) — the MCP surface is
+discoverable from the CLI too. And bare `ikat` prints help with exit
+0 instead of an argparse error (gossamer errors on both; ikat
+previously errored on bare).
+
 ## M7.9b — Tool registry + skill installer (gossamer transfer, tranche 2) → 0.10.12
 
 The second gossamer-learning tranche: the 14 MCP tools became DATA.

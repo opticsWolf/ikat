@@ -32,6 +32,7 @@ ikat standalone FIG.md --out fig.pdf [--engine ...]        # one mermaid|chart f
 ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # suggest span/pos/width, no TeX
 ikat skills list | show NAME | install [--dest DIR…] [--project]
      [--skill NAME…] [--force]      # bundled agent skills (SKILL.md packs)
+ikat help [--json] [COMMAND]      # command list / one command's flags / registry JSON
 ikat version
 ```
 

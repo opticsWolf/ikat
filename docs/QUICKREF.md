@@ -30,6 +30,7 @@ echo '{...}' | ikat lineplot - [--legend WORD]
 ikat standalone FIG.md --out fig.pdf             # one mermaid|chart fence → PDF
 ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # no TeX needed
 ikat skills list | show ikat-cli | install [--dest DIR…] [--project] [--skill N…] [--force]
+ikat help [--json] [COMMAND]          # command list, or one command's flags
 ikat version
 ```
 

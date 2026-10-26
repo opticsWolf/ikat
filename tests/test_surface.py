@@ -300,6 +300,32 @@ def test_skills_cli_paths(tmp_path, capsys):
     assert "mutually exclusive" in capsys.readouterr().err
 
 
+# ──── `ikat help` — argparse help as a verb ────
+
+
+def test_help_verb_lists_and_details(capsys):
+    assert cli_main(["help"]) == 0
+    out = capsys.readouterr().out
+    for cmd in ("build", "weave", "layout", "check", "flowchart", "skills",
+                "standalone", "version", "help"):
+        assert cmd in out, f"`ikat help` never lists {cmd}"
+    assert cli_main(["help", "build"]) == 0
+    assert "--no-pdf" in capsys.readouterr().out
+    assert cli_main(["help", "nope"]) == 1
+    assert "unknown command" in capsys.readouterr().err
+    # bare `ikat`: help, not an argparse error
+    assert cli_main([]) == 0
+    assert "build" in capsys.readouterr().out
+    # --json dumps the agent-tool registry
+    assert cli_main(["help", "--json"]) == 0
+    defs = json.loads(capsys.readouterr().out)
+    assert len(defs) == 14
+    legend = [d for d in defs
+              if d["function"]["name"] == "barchart_to_tikz"
+              ][0]["function"]["parameters"]["properties"]["legend"]
+    assert legend["enum"][0] == "auto"
+
+
 def test_version(capsys):
     assert cli_main(["version"]) == 0
     assert capsys.readouterr().out.strip() == __version__
