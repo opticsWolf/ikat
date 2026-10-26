@@ -27,5 +27,12 @@ examples/standalone/out/
 PRODUCT.md
 .impeccable/
 
+# Full-paper export intermediates: pictures + weave proofs regenerate
+# via examples/auto-proof/export_full.py; only .md/.bib/REPORT stay tracked.
+examples/auto-proof/full/*/figs/
+examples/auto-proof/full/*/*-auto.md
+examples/auto-proof/full/*/*.tex
+examples/auto-proof/full/*/*.bst
+
 # Local-only scratch (tectonic binary, downloads)
 .cache-tex/
