@@ -308,7 +308,11 @@ to each other by shared test vectors.
 (keyed caption registry), `plots` (keyed captions) + `plot_dir` +
 `plot_insert_before` + `plot_attrs` (per-plot span/pos tuning),
 `table_captions` + `table_specs` (per-table colspecs),
-`title_thanks`/`author`, `bib_name`/`bib_style`/`bib_keys`
+`title_thanks`/`author`, plus the full author front matter
+`authors`/`affiliations`/`author_affils` (M7.10: composed in
+doc.rs into one wrapped `\parbox` with numeric superscript marks;
+legacy scalar author keeps byte parity when `authors` is empty),
+`bib_name`/`bib_style`/`bib_keys`
 (derived from the `.bib` via `--bib`, never frozen),
 `graphicspaths`, `preamble_override`/`preamble_append`/`skeleton`.
 `spec_from_dict` is the one constructor; `to_json` round-trips
@@ -335,9 +339,9 @@ CLI, MCP, and headsproof alike.
   (minimal `[tikz,border=5pt]{standalone}` + detected libraries),
   `compile_standalone` (writes `fig.tex`, drives `compile_pdf`).
   MCP gets the source only (`standalone_figure`), never the binary.
-- `cli.py`: fourteen subcommands (`build weave layout check templates
+- `cli.py`: fifteen subcommands (`build weave layout check templates
   template skeletons skeleton flowchart barchart lineplot
-  standalone skills version`), each a thin call into the API. Plot commands take a
+  standalone skills version help`), each a thin call into the API. Plot commands take a
   JSON payload (file or stdin) with an optional `--legend`
   override. Stdio is reconfigured to UTF-8 so unicode error
   echoes survive a cp1252 console. `skills` manages the bundled

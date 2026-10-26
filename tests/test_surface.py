@@ -326,6 +326,50 @@ def test_help_verb_lists_and_details(capsys):
     assert legend["enum"][0] == "auto"
 
 
+def test_buildspec_authors_roundtrip_and_weave():
+    """M7.10: full author front matter rides the spec JSON."""
+    from ikat import BuildSpec, build_document
+
+    spec = BuildSpec(
+        authors=["Marta Coll", "Other Author"],
+        affiliations=["Inst One", "Inst Two"],
+        author_affils=[[0], [0, 1]],
+    )
+    spec2 = BuildSpec()
+    spec2.__dict__.update(json.loads(spec.to_json()))
+    assert spec2.authors == ["Marta Coll", "Other Author"]
+    assert spec2.author_affils == [[0], [0, 1]]
+    r = build_document("# T\n\nPara.\n", "", spec)
+    assert "\\parbox{0.9\\textwidth}{\\centering Marta Coll\\textsuperscript{1}" in r.tex
+    assert "\\textsuperscript{2}Inst Two" in r.tex
+    # legacy scalar author: byte-identical legacy line
+    r0 = build_document("# T\n\nPara.\n", "", BuildSpec())
+    assert "\\author{\\IEEEauthorblockN{opticsWolf}}" in r0.tex
+    # out-of-range mark fails fast with the count named
+    with pytest.raises(ValueError, match="only 1 affiliations"):
+        build_document("# T\n\nPara.\n", "", BuildSpec(
+            authors=["A"], affiliations=["I"], author_affils=[[3]]))
+
+
+def test_cli_author_flags(capsys):
+    """`--author` / `--affiliation` / `--author-affil` accumulate."""
+    from ikat import BuildSpec
+    from ikat.cli import _apply_authors
+
+    spec = BuildSpec()
+    ns = type("NS", (), {})()
+    ns.author = ["A", "B"]
+    ns.affiliation = ["I1", "I2"]
+    ns.author_affil = ["1:1", "2:1,2"]
+    _apply_authors(spec, ns)
+    assert spec.authors == ["A", "B"]
+    assert spec.affiliations == ["I1", "I2"]
+    assert spec.author_affils == [[0], [0, 1]]
+    ns.author_affil = ["bad"]
+    with pytest.raises(ValueError, match="1-based"):
+        _apply_authors(BuildSpec(), ns)
+
+
 def test_version(capsys):
     assert cli_main(["version"]) == 0
     assert capsys.readouterr().out.strip() == __version__

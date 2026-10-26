@@ -74,6 +74,12 @@ class BuildSpec:
     plot_insert_before: str = ""
     title_thanks: str = ""
     author: str = "opticsWolf"
+    # M7.10 full author front matter: non-empty `authors` replaces the
+    # scalar above in the woven head; `author_affils[i]` are 0-based
+    # indices into `affiliations` (shorter = trailing authors unmarked).
+    authors: list[str] = field(default_factory=list)
+    affiliations: list[str] = field(default_factory=list)
+    author_affils: list[list[int]] = field(default_factory=list)
     bib_name: str = "refs-paper"
     graphicspaths: tuple[str, ...] = ("./", "figs/", "figs/tikz/")
     bib_keys: set = field(default_factory=set)

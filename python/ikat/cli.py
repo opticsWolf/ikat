@@ -53,6 +53,29 @@ def _apply_bib(spec, bib_path: str | None) -> None:
         spec.bib_keys = bib_keys(Path(bib_path).read_text(encoding="utf-8"))
 
 
+def _apply_authors(spec, a: argparse.Namespace) -> None:
+    """`--author` / `--affiliation` / `--author-affil` accumulate onto
+    the spec's front-matter lists (M7.10). Marks are 1-based and
+    human-shaped: `--author-affil 1:1,2` marks author 1 with
+    affiliations 1 and 2; association may also live in `--spec`."""
+    spec.authors.extend(a.author or [])
+    spec.affiliations.extend(a.affiliation or [])
+    for pair in a.author_affil or []:
+        try:
+            head, tail = pair.split(":", 1)
+            author_i = int(head) - 1
+            marks = [int(x) - 1 for x in tail.split(",")]
+        except ValueError:
+            raise ValueError(
+                f"--author-affil wants 'AUTHOR:AFF[,AFF…]' (1-based), got {pair!r}"
+            ) from None
+        if author_i < 0:
+            raise ValueError(f"--author-affil author number must be >= 1, got {pair!r}")
+        while len(spec.author_affils) <= author_i:
+            spec.author_affils.append([])
+        spec.author_affils[author_i].extend(marks)
+
+
 def cmd_build(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths, compile_pdf
     from ikat.document import with_file
@@ -61,6 +84,11 @@ def cmd_build(a: argparse.Namespace) -> int:
     if a.bib_style:
         spec.bib_style = a.bib_style
     _apply_bib(spec, a.bib)
+    try:
+        _apply_authors(spec, a)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     outdir = Path(a.outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
     stem = Path(a.md).stem
@@ -93,6 +121,11 @@ def cmd_weave(a: argparse.Namespace) -> int:
 
     spec = _spec_from_json(a.spec)
     _apply_bib(spec, a.bib)
+    try:
+        _apply_authors(spec, a)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
     try:
         if a.toml:
             r = build_from_paths(a.md, a.toml, spec)
@@ -337,6 +370,12 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--outdir", default=None)
     b.add_argument("--spec", default=None, help="BuildSpec JSON (diagrams/plots/captions/...)")
     b.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
+    b.add_argument("--author", action="append", default=[], metavar="NAME",
+                   help="full author name; repeatable (replaces the scalar author)")
+    b.add_argument("--affiliation", action="append", default=[], metavar="INST",
+                   help="institute in display order; repeatable")
+    b.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
+                   help="mark author A (1-based) with affiliations N (1-based); repeatable")
     b.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
@@ -348,6 +387,12 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--toml", default=None)
     w.add_argument("--spec", default=None)
     w.add_argument("--bib", default=None, help=".bib file: cite only its keys (else all keys pass)")
+    w.add_argument("--author", action="append", default=[], metavar="NAME",
+                   help="full author name; repeatable (replaces the scalar author)")
+    w.add_argument("--affiliation", action="append", default=[], metavar="INST",
+                   help="institute in display order; repeatable")
+    w.add_argument("--author-affil", action="append", default=[], metavar="A:N[,N…]",
+                   help="mark author A (1-based) with affiliations N (1-based); repeatable")
     w.set_defaults(func=cmd_weave)
 
     ly = sub.add_parser("layout", help="measure floats, suggest span/pos/width (no TeX needed)")

@@ -42,6 +42,9 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 `plot_attrs={key: "pos=bottom"}`,
 `table_captions=[...]` + `table_specs={index: "XXl"}`,
 `title_thanks/author/bib_name/bib_style/bib_keys`,
+`authors=[...]`/`affiliations=[...]`/`author_affils=[[...]]`
+(full author front matter: names + numeric superscript marks,
+`author_affils[i]` = 0-based affiliation indices per author),
 `preamble_override/preamble_append/skeleton` (level-1 vs level-3,
 mutually exclusive), `graphicspaths`. Renaming a caption cannot
 desynchronize the document — the spec names it, not the markdown.

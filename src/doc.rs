@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use crate::config::{CaptionPos, Config, FloatNeeds, Pos, Span};
+use crate::error::Error;
 use crate::esc::inline;
 use crate::mathwidth::display_math_width_cm;
 use crate::md::MdKind;
@@ -52,6 +53,18 @@ pub struct BuildSpec {
     pub title_thanks: String,
     #[serde(default = "default_author")]
     pub author: String,
+    /// Full author display names in order; non-empty replaces the
+    /// legacy scalar `author` in the front matter (M7.10).
+    #[serde(default)]
+    pub authors: Vec<String>,
+    /// Institutes in display order; 1-based rendered marks index
+    /// into this list.
+    #[serde(default)]
+    pub affiliations: Vec<String>,
+    /// `author_affils[i]` = 0-based affiliation indices for author
+    /// `i`; shorter than `authors` = trailing authors unmarked.
+    #[serde(default)]
+    pub author_affils: Vec<Vec<i64>>,
     #[serde(default = "default_bib")]
     pub bib_name: String,
     #[serde(default = "default_paths")]
@@ -361,6 +374,72 @@ fn strip_tex_comments(skel: &str) -> String {
 }
 
 /// Fill a LEVEL-3 skeleton: complete `.tex` with `{{tokens}}`.
+/// Front-matter author composition (M7.10).
+///
+/// When `spec.authors` is empty this returns the legacy scalar
+/// `author` verbatim — byte parity for every spec that predates
+/// the field. Otherwise the full author list is composed inside
+/// one `\parbox`: numeric affiliation marks (`\textsuperscript{n}`,
+/// matching the original journal style — IEEEtran's
+/// `\IEEEauthorrefmark` symbol alphabet exhausts past ~10 marks),
+/// then the institute rows. The parbox is load-bearing: the class
+/// author blocks (`IEEEauthorblockN/A`) are tabular rows that
+/// never wrap, so a 39-name list clips at the margin, and a
+/// parbox nested inside them breaks the row alignment at
+/// `\maketitle`. Publisher heads fill `{{author}}` through
+/// `render_override` (acm/aps classes with per-author `\author`
+/// commands are out of scope and composed flat).
+pub fn author_front(spec: &BuildSpec) -> Result<String, Error> {
+    if spec.authors.is_empty() {
+        return Ok(spec.author.clone());
+    }
+    const BOX: &str = "0.9\\textwidth";
+    let n_affs = spec.affiliations.len();
+    let marked = |id: i64| -> Result<i64, Error> {
+        if id < 0 || id as usize >= n_affs {
+            Err(Error::data(
+                format!(
+                    "author_affils references affiliation {}, but only {n_affs} affiliations are given",
+                    id + 1
+                ),
+                format!("{:?}", spec.author_affils),
+            ))
+        } else {
+            Ok(id + 1)
+        }
+    };
+    let mut names: Vec<String> = Vec::new();
+    for (i, name) in spec.authors.iter().enumerate() {
+        // Arbitrary text: institute names carry `&`, names carry
+        // unicode — the escaper owns both (same as table cells).
+        let name = crate::esc::esc_text(name);
+        let ids = spec.author_affils.get(i).cloned().unwrap_or_default();
+        if ids.is_empty() || n_affs == 0 {
+            names.push(name);
+        } else {
+            let mut nums: Vec<String> = Vec::new();
+            for id in ids {
+                nums.push(marked(id)?.to_string());
+            }
+            names.push(format!("{name}\\textsuperscript{{{}}}", nums.join(",")));
+        }
+    }
+    let names = names.join(", ");
+    if n_affs == 0 {
+        return Ok(format!("\\parbox{{{BOX}}}{{\\centering {names}}}"));
+    }
+    let rows: Vec<String> = spec
+        .affiliations
+        .iter()
+        .enumerate()
+        .map(|(k, a)| format!("\\textsuperscript{{{}}}{}", k + 1, crate::esc::esc_text(a)))
+        .collect();
+    Ok(format!(
+        "\\parbox{{{BOX}}}{{\\centering {names}\\par\\vspace{{0.4em}}{{\\footnotesize {}\\par}}}}",
+        rows.join("\\\\ ")
+    ))
+}
+
 /// `{{title}}/{{author}}/{{thanks}}` fill as level 1;
 /// 1-based line number of the byte index inside a head/skeleton
 /// file (template errors are head-relative; Python attributes the
@@ -1134,7 +1213,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         let mut rendered = render_skeleton(
             &spec.skeleton,
             &title,
-            &spec.author,
+            &author_front(spec)?,
             &spec.title_thanks,
             &abs,
             &rest,
@@ -1194,12 +1273,17 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             } else {
                 format!("\\title{{{title}\\thanks{{{}}}}}", spec.title_thanks)
             },
-            format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author),
+            if spec.authors.is_empty() {
+                format!("\\author{{\\IEEEauthorblockN{{{}}}}}", spec.author)
+            } else {
+                format!("\\author{{{}}}", author_front(spec)?)
+            },
         ]);
         generated
     } else {
         validate_template(&spec.preamble_override, &body, &needs)?;
-        let mut over = vec![render_override(&spec.preamble_override, &title, &spec.author, &spec.title_thanks)];
+        let author = author_front(spec)?;
+        let mut over = vec![render_override(&spec.preamble_override, &title, &author, &spec.title_thanks)];
         over.extend(cfg.floats.setup_lines());
         over.extend(cfg.typography.setup_lines());
         if body.contains("\\needspace")
@@ -1267,6 +1351,9 @@ mod tests {
             plot_insert_before: String::new(),
             title_thanks: "th".into(),
             author: "opticsWolf".into(),
+            authors: vec![],
+            affiliations: vec![],
+            author_affils: vec![],
             bib_name: "refs-paper".into(),
             graphicspaths: vec!["./".into()],
             bib_keys: HashSet::new(),
@@ -1758,4 +1845,68 @@ mod tests {
         assert!(build_document("```mermaid\ngraph TD\na[x]\n```\n", "", &s).is_err());
     }
 
+    #[test]
+    fn author_front_empty_authors_keeps_legacy_scalar() {
+        let s = spec();
+        assert_eq!(author_front(&s).unwrap(), "opticsWolf");
+    }
+
+    #[test]
+    fn author_front_parbox_with_numeric_marks() {
+        let mut s = spec();
+        s.authors = vec!["Marta Coll".into(), "Other Author".into()];
+        s.affiliations = vec!["Inst One".into(), "Inst Two".into()];
+        s.author_affils = vec![vec![0], vec![0, 1]];
+        let want = concat!(
+            "\\parbox{0.9\\textwidth}{\\centering ",
+            "Marta Coll\\textsuperscript{1}, Other Author\\textsuperscript{1,2}",
+            "\\par\\vspace{0.4em}{\\footnotesize ",
+            "\\textsuperscript{1}Inst One\\\\ \\textsuperscript{2}Inst Two\\par}}",
+        );
+        assert_eq!(author_front(&s).unwrap(), want);
+    }
+
+    #[test]
+    fn author_front_names_only_without_affils() {
+        let mut s = spec();
+        s.authors = vec!["A".into(), "B".into()];
+        assert_eq!(
+            author_front(&s).unwrap(),
+            "\\parbox{0.9\\textwidth}{\\centering A, B}"
+        );
+    }
+
+    #[test]
+    fn author_front_mark_out_of_range_fails_fast() {
+        let mut s = spec();
+        s.authors = vec!["A".into()];
+        s.affiliations = vec!["Inst One".into()];
+        s.author_affils = vec![vec![3]];
+        let err = author_front(&s).unwrap_err();
+        assert!(err.msg.contains("affiliation 4"), "got: {}", err.msg);
+        assert!(err.msg.contains("only 1 affiliations"), "got: {}", err.msg);
+    }
+
+    #[test]
+    fn generated_path_keeps_legacy_scalar_blockn() {
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document("# T\n\nPara.\n", "", &s).unwrap();
+        assert!(r.tex.contains("\\author{\\IEEEauthorblockN{opticsWolf}}"));
+    }
+
+    #[test]
+    fn build_with_authors_emits_parbox_front_matter() {
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        s.authors = vec!["Marta Coll".into(), "Second Author".into()];
+        s.affiliations = vec!["Inst One".into()];
+        s.author_affils = vec![vec![0], vec![0]];
+        let r = build_document("# T\n\nPara.\n", "", &s).unwrap();
+        assert!(r
+            .tex
+            .contains("\\author{\\parbox{0.9\\textwidth}{\\centering Marta Coll\\textsuperscript{1}, Second Author\\textsuperscript{1}\\par\\vspace{0.4em}{\\footnotesize \\textsuperscript{1}Inst One\\par}}}"));
+    }
 }

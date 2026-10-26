@@ -444,10 +444,34 @@ def export_one(pid: str) -> dict:
     if title_el is None:
         title_el = ET.Element("nil")
     title = mathsafe(merge_math(re.sub(r"\s+", " ", rich_text(title_el, ctx)).strip()), ctx.stats, "title") or pid
-    surnames = [c.findtext("name/surname") or "" for c in front.findall(".//contrib")]
-    surnames = [s for s in surnames if s]
-    author = f"{surnames[0]} et al." if surnames else "PLOS ONE"
-    n_authors = len(surnames)
+    # M7.10 full front matter: every contributor with given names, every
+    # affiliation in document order, and the contrib->aff marks from the
+    # JATS xrefs (no et-al collapse; the engine composes the head).
+    affs = front.findall(".//aff") if front is not None else []
+    aff_index = {a.get("id"): k for k, a in enumerate(affs)}
+    affiliations = []
+    for a_el in affs:
+        parts = []
+        for tag in ("institution", "addr_line", "addr-line", "country"):
+            for sub in a_el.findall(tag):
+                t = re.sub(r"\s+", " ", "".join(sub.itertext())).strip()
+                if t and t not in parts:
+                    parts.append(t)
+        affiliations.append(fold("; ".join(parts) or re.sub(r"\s+", " ", "".join(a_el.itertext())).strip(), ctx.stats))
+    authors, author_affils = [], []
+    for c in front.findall(".//contrib") if front is not None else []:
+        nm = c.find("name")
+        if nm is None:
+            continue  # contrib groups / collab without a name element
+        full = " ".join(x for x in (nm.findtext("given-names"), nm.findtext("surname")) if x)
+        authors.append(fold(re.sub(r"\s+", " ", full).strip(), ctx.stats))
+        marks = sorted({
+            aff_index[x.get("rid")]
+            for x in c.findall("xref")
+            if x.get("ref-type") == "aff" and x.get("rid") in aff_index
+        })
+        author_affils.append(marks)
+    n_authors = len(authors)
 
     md = [f"# {title}\n"]
     diagrams, captions = [], []
@@ -578,7 +602,9 @@ def export_one(pid: str) -> dict:
     spec = BuildSpec(
         diagrams=diagrams,
         table_captions=captions,
-        author=author,
+        authors=authors,
+        affiliations=affiliations,
+        author_affils=author_affils,
         bib_name=pid,
         bib_keys={f"ref{n:02d}" for n in range(1, len(refs) + 1)},
     )

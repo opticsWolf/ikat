@@ -29,6 +29,10 @@ Regenerate: `python examples/auto-proof/export_full.py [paper-id...]`
   math 219 overfulls): real JATS content, tabularx limits, kept full.
 - `med-ioannidis-2005` tables live in JATS as graphics, not text:
   exported as honest prose placeholders, not invented cells.
+- Front matter is complete: every contrib (given names + surnames)
+  and every affiliation with its contrib→aff xref marks rides the
+  spec (`authors`/`affiliations`/`author_affils`); the woven head
+  wraps them in a parbox with numeric superscript marks (M7.10).
 - Inline/displayed math flattens to linear `$..$` text (sub/sup kept);
   `dropped.formula` + `folded`/`leftovers` in REPORT.md audit every loss.
 - Non-ASCII folds to ASCII/TeX math deterministically (`FOLD` table in

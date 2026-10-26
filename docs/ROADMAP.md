@@ -295,6 +295,31 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.10 — Full author front matter → 0.10.14
+
+The 10-paper exports showed "Coll et al." with no institutes while
+the originals carry 39 authors + 26 affiliations: the bench exporter
+collapsed JATS front matter to one surname (its md had no channel
+for authors), and the engine modeled authors as one scalar.
+Amended end to end:
+
+- `BuildSpec` gains `authors` / `affiliations` / `author_affils`
+  (0-based affiliation indices per author); when `authors` is empty
+  every spec is byte-identical to before.
+- `author_front` (doc.rs) composes one wrapped `\parbox` — names
+  with numeric `\textsuperscript` marks over the institute rows —
+  because the IEEEtran author blocks are tabular rows that never
+  wrap (a 39-name list clips at the margin) and a parbox nested
+  inside them breaks the row alignment; raw `&` in institute names
+  is escaped via `esc_text`. Out-of-range marks fail fast naming
+  the count.
+- CLI: repeatable `--author` / `--affiliation` / `--author-affil
+  A:N[,N…]` (1-based) on `build`/`weave`; MCP/API ride the existing
+  `spec_json`.
+- The bench exporter reads every contrib + aff with xref marks —
+  the re-exported corpus now shows the complete front matter
+  (verified against the originals on page 1).
+
 ## M7.9c — `ikat help [COMMAND]` + bare-invocation help → 0.10.13
 
 Argparse help as a verb: `ikat help` prints the command list (the
