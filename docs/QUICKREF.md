@@ -79,7 +79,11 @@ Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 
 Display math fills its own paragraph as one `$$...$$` span (M7.8):
 the weaver emits `\[...\]` (`\tag{N}` rides inside, from the
-exporter's `$$tex \tag{N}$$`). A span wider than the column
+exporter's `$$tex \tag{N}$$`). Width is decided by a TeX-calibrated
+estimator (`src/mathwidth.rs`: glyph widths probed at 10/7/5 pt,
+the class-glue table with previous-atom tracking, zero glue in
+script styles, stacked script max, column-aligned matrices). A span
+wider than the column
 takes a full-width `strip` (cuted); wider than the full measure
 breaks BEFORE top-level `=`/`+`/`-` into left-aligned `aligned`
 rows (the relation opens the continuation, original style; matrix

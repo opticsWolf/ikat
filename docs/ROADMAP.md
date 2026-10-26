@@ -295,6 +295,27 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.8b — Calibrated display-math width (probe, don't guess) → 0.10.10
+
+The M7.8 estimator's guessed constants (0.16–0.35 cm/char) mis-sized
+caligraphic, big-operator, and script-heavy spans: the median
+estimate ran 1.26× TeX truth (range 1.09–1.50), classifying 6 of
+math-hilfer's 100 display spans into full-width strips that TeX
+fits in one column. The replacement (`src/mathwidth.rs`) is probed,
+not guessed: glyph widths at the three math styles (10/7/5 pt) come
+from TeX `\sbox` measurements (examples/auto-proof/
+math_probe_widths.py → `glyphs_raw.json` → math_emit_table.py
+generates the Rust table); the structural rules are measured too —
+class glue per the TeXbook table with previous-atom tracking (thin
+before Open/Close, thick both sides of a relation, none in script
+styles), stacked sub/sup = max + one `\scriptspace`, fraction
+children descending display→text→script, column-aligned matrix
+width (sum of per-column maxima + 10pt gaps + bracket pairs), and
+one thin pad inside radicals set over an Inner. Unit tests pin ~40
+TeX-measured composites within 0.01 cm. Result: math-hilfer 0
+disagreements, 0 hbox + 0 vbox overfulls, strips 66 → 59, aligned
+24 → 15, golden byte-parity and all regen snapshots hold.
+
 ## M7.8 — Honest math (MathML rebuild + auto-stretch) → 0.10.8
 
 The bench exporter flattened 511 real MathML equations into symbol soup

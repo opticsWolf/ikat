@@ -11,7 +11,7 @@ mod error;
 mod md;
 mod emit;
 mod esc;
-#[cfg(test)]
+mod mathwidth;
 mod md_spike;
 mod mermaid;
 mod plot;

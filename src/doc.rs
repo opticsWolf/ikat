@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config::{CaptionPos, Config, FloatNeeds, Pos, Span};
 use crate::esc::inline;
+use crate::mathwidth::display_math_width_cm;
 use crate::md::MdKind;
 use crate::mermaid::flowchart_to_tikz;
 use crate::table::table_block;
@@ -565,247 +566,10 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     out
 }
 
-/// Width estimate for display math (M7.8): bare-LaTeX span in cm at
-/// the document size. `\tag` is right-margin furniture (excluded);
-/// `\frac`/`\sqrt` take their widest part; accents and sub/supers
-/// add nothing; matrices take their widest row. Unknown commands
-/// contribute nothing — the estimate only needs the glyph bulk that
-/// decides column-vs-strip. Same 0.16 cm/char factor as the table
-/// ruler, so the err direction (strip when unsure) is benign: a
-/// full-width display is always legal, a column overflow is not.
-pub(crate) fn display_math_width_cm(tex: &str) -> f64 {
-    // A display holds one equation; `\\` separates its rows.
-    let mut tex = tex.to_string();
-    // Excise the tag: it sits in the margin, never binds the width.
-    while let Some(i) = tex.find("\\tag{") {
-        // Inside the tag's brace already: depth starts at 1.
-        let mut depth = 1usize;
-        let mut j = i + 5;
-        let bytes = tex.as_bytes();
-        while j < bytes.len() {
-            match bytes[j] {
-                b'{' => depth += 1,
-                b'}' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        j += 1;
-                        break;
-                    }
-                }
-                _ => {}
-            }
-            j += 1;
-        }
-        tex.replace_range(i..j.min(tex.len()), "");
-    }
-    split_display_rows(&tex)
-        .iter()
-        .map(|row| math_row_width_cm(row))
-        .reduce(f64::max)
-        .unwrap_or(0.0)
-}
-
-/// Split a display on `\\\\` row breaks, ignoring `\\\\` inside
-/// `matrix` environments (their rows size inside-out via
-/// `math_row_width_cm`; splitting there would measure shards).
-fn split_display_rows(tex: &str) -> Vec<&str> {
-    let mut rows = Vec::new();
-    let mut depth = 0i32;
-    let mut start = 0usize;
-    let mut i = 0usize;
-    while i < tex.len() {
-        if tex[i..].starts_with("\\begin{matrix}") {
-            depth += 1;
-            i += "\\begin{matrix}".len();
-            continue;
-        }
-        if tex[i..].starts_with("\\end{matrix}") {
-            depth = (depth - 1).max(0);
-            i += "\\end{matrix}".len();
-            continue;
-        }
-        if depth == 0 && tex[i..].starts_with("\\\\") {
-            rows.push(&tex[start..i]);
-            i += 2;
-            start = i;
-            continue;
-        }
-        i += 1;
-    }
-    rows.push(&tex[start..]);
-    rows
-}
-
-/// Width of one `\\`-free display row.
-fn math_row_width_cm(row: &str) -> f64 {
-    // Matrices bank their width and leave a zero-width placeholder:
-    // a matrix sits INLINE (text + matrix + text sum on one row),
-    // so max() would undercount side-by-side content.
-    let mut bank = 0.0;
-    let mut s = row.to_string();
-    loop {
-        let Some(mstart) = s.find("\\begin{matrix}") else { break };
-        let inner_start = mstart + "\\begin{matrix}".len();
-        // Depth-matched close: nested matrices (A=(...)) must pair
-        // with their own end, not the first one in the row.
-        let mut mend_opt = None;
-        let mut d = 1i32;
-        let mut k = inner_start;
-        while k < s.len() {
-            if s[k..].starts_with("\\begin{matrix}") {
-                d += 1;
-                k += "\\begin{matrix}".len();
-            } else if s[k..].starts_with("\\end{matrix}") {
-                d -= 1;
-                if d == 0 {
-                    mend_opt = Some(k - inner_start);
-                    break;
-                }
-                k += "\\end{matrix}".len();
-            } else {
-                k += 1;
-            }
-        }
-        let Some(mend) = mend_opt else { break };
-        let inner = s[inner_start..inner_start + mend].to_string();
-        let widest = split_display_rows(&inner)
-            // (row breaks respect nesting: shared splitter)
-            .iter().map(|r| {
-                // Columns share the row: sum like tabular does.
-                let cells: Vec<f64> = r.split('&').map(math_row_width_cm).collect();
-                cells.iter().sum::<f64>() + 0.3 * cells.len().saturating_sub(1) as f64
-            })
-                        .reduce(f64::max)
-            .unwrap_or(0.0);
-        bank += widest;
-        s = format!("{}\u{E000}{}", &s[..mstart], &s[inner_start + mend + "\\end{matrix}".len()..]);
-    }
-    let mut w = bank;
-    let mut cs = s.chars().peekable();
-    while let Some(c) = cs.next() {
-        if c == '\\' {
-            let mut name = String::new();
-            while let Some(&d) = cs.peek() {
-                if d.is_ascii_alphabetic() {
-                    name.push(d);
-                    cs.next();
-                } else {
-                    break;
-                }
-            }
-            if name.is_empty() {
-                // `\{`, `\}`, `\%`, `\,` ... two-char command.
-                match cs.next() {
-                    Some(',') | Some(':') => w += 0.15,
-                    Some(';') => w += 0.25,
-                    Some('!') => {}
-                    Some(' ' | '\\') => {}
-                    Some(_) => w += 0.25,
-                    None => {}
-                }
-                continue;
-            }
-            match name.as_str() {
-                "left" | "right" => {}
-                "frac" => {
-                    let a = take_group(&mut cs);
-                    let b = take_group(&mut cs);
-                    w += math_row_width_cm(&a).max(math_row_width_cm(&b));
-                }
-                "sqrt" => {
-                    // Optional `[n]` root index adds nothing.
-                    if cs.peek() == Some(&'[') {
-                        take_bracket(&mut cs);
-                    }
-                    let a = take_group(&mut cs);
-                    w += math_row_width_cm(&a);
-                }
-                "text" => {
-                    let a = take_group(&mut cs);
-                    w += a.chars().count() as f64 * 0.12;
-                }
-                "sum" | "prod" | "int" | "iint" | "oint" | "bigcup" | "bigcap" | "lim"
-                | "max" | "min" | "sup" | "inf" | "liminf" | "limsup" => w += 0.35,
-                "quad" => w += 0.5,
-                "qquad" => w += 1.0,
-                "langle" | "rangle" => w += 0.16,
-                _ => {
-                    // Wrappers (accents, fonts): the widest braced
-                    // argument decides (sub/superscripts attach).
-                    // BARE commands (alpha, int, in, to, infty) are
-                    // single glyphs: count one at 0.22 (Greek and
-                    // operators run wider than the 0.16 text factor).
-                    let mut best = 0.0f64;
-                    let mut any = false;
-                    while cs.peek() == Some(&'{') {
-                        any = true;
-                        let g = take_group(&mut cs);
-                        best = best.max(math_row_width_cm(&g));
-                    }
-                    if any {
-                        w += best;
-                    } else if matches!(name.as_str(),
-                        "leq" | "geq" | "neq" | "approx" | "equiv" | "sim" | "simeq" | "cong"
-                        | "to" | "leftarrow" | "rightarrow" | "Rightarrow" | "in" | "ni" | "notin"
-                        | "subset" | "supset" | "subseteq" | "supseteq" | "propto" | "angle" | "perp") {
-                        // Relations: glyph plus thick glue.
-                        w += 0.5;
-                    } else if matches!(name.as_str(),
-                        "pm" | "times" | "div" | "cdot" | "circ" | "ast" | "star"
-                        | "cap" | "cup" | "oplus" | "otimes" | "wedge" | "vee") {
-                        // Binary ops: glyph plus medium glue.
-                        w += 0.4;
-                    } else if name.as_str() == "Vert" {
-                        w += 0.4;
-                    } else {
-                        w += 0.22;
-                    }
-                }
-            }
-        } else if c == '_' || c == '^' {
-            // Scripts ride above/below but extend RIGHTWARD past
-            // the base (x^{gamma+alpha-1} is wider than x): add the
-            // script width. Stacked sub+sup overcounts slightly —
-            // conservative, strip-biased, exactly the safe side.
-            if cs.peek() == Some(&'{') {
-                let g = take_group(&mut cs);
-                w += math_row_width_cm(&g);
-            } else {
-                cs.next();
-                w += 0.16;
-            }
-        } else if c == '{' || c == '}' || c == '~' {
-            // Grouping / non-breaking space: no width.
-        } else if c == '&' {
-            w += 0.3;
-        } else if c == '=' {
-            // Relation with thick glue both sides.
-            w += 0.5;
-        } else if c == '+' || c == '-' {
-            // Binary op with medium glue (unary slightly
-            // overcounts: safe side).
-            w += 0.35;
-        } else if c == '<' || c == '>' {
-            w += 0.5;
-        } else if c == ',' {
-            w += 0.2;
-        } else if c == ';' {
-            w += 0.3;
-        } else if c == '\u{E000}' {
-            // Banked matrix placeholder: zero width.
-
-        } else {
-            w += 0.17;
-        }
-    }
-    w
-}
-
-/// Split an over-wide display into breakable rows (M7.8): only at
 /// brace-depth 0 and outside `\\left..\\right` pairs (which may not
 /// span `\\\\`). Prefer `=` (operator closes the row); else binary
 /// `+`/`-` (operator opens the continuation). Never invent breaks
-/// inside fractions, scripts, or matrices — unbreakable rows stay
+/// inside fractions, scripts, or matrices â€” unbreakable rows stay
 /// whole and keep their residual overfull honestly.
 /// Split a trailing tag off a display span (the emitter puts it
 /// there); returns (body, tag-or-empty). Only a tag that closes at
@@ -941,44 +705,6 @@ fn split_row_once(row: &str) -> Option<(String, String)> {
         return Some((row[..p].trim_end().to_string(), row[p..].trim_start().to_string()));
     }
     None
-}
-
-/// Consume one `{...}` group (caller ate the `{`), nested-aware.
-fn take_group(cs: &mut std::iter::Peekable<std::str::Chars>) -> String {
-    let mut out = String::new();
-    if cs.peek() != Some(&'{') {
-        return out;
-    }
-    cs.next();
-    let mut depth = 1usize;
-    for c in cs.by_ref() {
-        match c {
-            '{' => {
-                depth += 1;
-                out.push(c);
-            }
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    break;
-                }
-                out.push(c);
-            }
-            _ => out.push(c),
-        }
-    }
-    out
-}
-
-/// Consume one `[...]` optional argument.
-fn take_bracket(cs: &mut std::iter::Peekable<std::str::Chars>) {
-    if cs.peek() == Some(&'[') {
-        for c in cs.by_ref() {
-            if c == ']' {
-                break;
-            }
-        }
-    }
 }
 
 /// Does this `.tex` fragment need TikZ? (standalone preamble builder)
@@ -1861,11 +1587,12 @@ mod tests {
 
     #[test]
     fn display_math_width_frac_takes_max() {
-        // A fraction is as wide as its widest part, not the sum.
+        // A fraction is as wide as its widest part (plus the nulldelimiter
+        // pair), not the sum: TeX-measured 0.4209 / 0.4887 cm.
         let half = display_math_width_cm("\\frac{ab}{c}");
         let whole = display_math_width_cm("abc");
-        assert!((half - 0.34).abs() < 1e-9, "got {half}");
-        assert!((whole - 0.51).abs() < 1e-9, "got {whole}");
+        assert!((half - 0.4209).abs() < 0.01, "got {half}");
+        assert!((whole - 0.4887).abs() < 0.01, "got {whole}");
         assert!(display_math_width_cm("x \\tag{12}") < 0.5, "tag excluded");
     }
 
@@ -1900,6 +1627,37 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn dump_estimates() {
+        let Ok(path) = std::env::var("IKAT_ESTIMATE_FILE") else {
+            eprintln!("set IKAT_ESTIMATE_FILE");
+            return;
+        };
+        // Two modes: a markdown file of `$$...$$` spans, or a plain
+        // file with one raw body per line (`IKAT_ESTIMATE_RAW=1`).
+        let raw = std::env::var("IKAT_ESTIMATE_RAW").is_ok();
+        let md = std::fs::read_to_string(&path).expect("read md");
+        let mut i = 0usize;
+        for line in md.lines() {
+            let s = line.trim();
+            let body = if raw {
+                if s.is_empty() {
+                    continue;
+                }
+                s
+            } else {
+                if !(s.starts_with("$$") && s.ends_with("$$") && s.len() > 4) {
+                    continue;
+                }
+                &s[2..s.len() - 2]
+            };
+            let w = display_math_width_cm(body);
+            println!("EST\t{}\t{:.3}", i, w);
+            i += 1;
+        }
+        eprintln!("spans: {}", i);
+    }
+
     #[test]
     fn display_math_no_split_inside_frac_or_matrix() {
         // No top-level operator: one row, however wide.

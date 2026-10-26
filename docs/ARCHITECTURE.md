@@ -190,9 +190,12 @@ argument structs.
   cuted `strip` past the column and to left-aligned `aligned`
   row-breaks past the full measure (matrix spans take one strip
   per piece); a
-  glyph-aware estimator (TeX glue, rightward scripts, banked
-  matrices) decides. The golden test rebuilds the frozen paper
-  `.tex` byte-identical — the paper is the test suite.
+  calibrated estimator (`mathwidth.rs`: per-style glyph table
+  probed from the Computer Modern math fonts, the TeX class-glue
+  table with previous-atom tracking, scriptstack and fraction
+  descent rules, column-aligned matrices) decides. The golden test
+  rebuilds the frozen paper `.tex` byte-identical — the paper is
+  the test suite.
 
 ### 3.4 `config.rs` — `ikat.toml`, validated
 
