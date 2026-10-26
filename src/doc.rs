@@ -824,6 +824,13 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             body = format!("{body}\n{plot_figs}\n");
         }
     }
+    // Flush pending floats before the reference list: without a
+    // barrier, end-queued floats spill into/past `References`
+    // (bio-medsea's Figs 7-14 landed after it). Opt-in so default
+    // weaves stay byte-identical.
+    if cfg.floats.barrier_before_refs && !spec.bib_name.is_empty() {
+        needs.barrier = true;
+    }
     let paths: String = spec.graphicspaths.iter().map(|p| format!("{{{p}}}")).collect();
     let opts = cfg.document.class_options.join(",");
     let has_tikz = body.contains("\\begin{tikzpicture}");
@@ -845,6 +852,11 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         };
         let bib = if spec.bib_name.is_empty() {
             String::new()
+        } else if cfg.floats.barrier_before_refs {
+            format!(
+                "\\FloatBarrier\n\\bibliographystyle{{{}}}\n\\bibliography{{{}}}",
+                spec.bib_style, spec.bib_name
+            )
         } else {
             format!(
                 "\\bibliographystyle{{{}}}\n\\bibliography{{{}}}",
@@ -948,6 +960,9 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         rest,
     ]);
     if !spec.bib_name.is_empty() {
+        if cfg.floats.barrier_before_refs {
+            head.push("\\FloatBarrier".to_string());
+        }
         head.extend([
             format!("\\bibliographystyle{{{}}}", spec.bib_style),
             format!("\\bibliography{{{}}}", spec.bib_name),
@@ -1231,6 +1246,30 @@ mod tests {
         assert!(r.tex.contains("\\FloatBarrier\n\\begin{table}[t]"));
         assert!(r.tex.contains("\\usepackage{placeins}"));
         assert!(!r.tex.contains("\\usepackage{float}"));
+    }
+
+    #[test]
+    fn refs_barrier_is_opt_in_and_placed() {
+        let md = "# T\n\n## 1. A\n\nx\n";
+        let mut s = spec();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        // Default off: byte-identical weaves, no barrier line.
+        let r = build_document(md, "", &s).unwrap();
+        assert!(!r.tex.contains("\\FloatBarrier"));
+        // Opt-in: barrier ahead of the bibliography + placeins.
+        let r = build_document(md, "[floats]\nbarrier_before_refs = true\n", &s).unwrap();
+        let pos_b = r.tex.find("\\FloatBarrier").unwrap();
+        let pos_r = r.tex.find("\\bibliography{refs-paper}").unwrap();
+        assert!(pos_b < pos_r, "barrier flushes before the refs");
+        assert!(r.tex.contains("\\usepackage{placeins}"));
+        // No bib: knob on but nothing to guard — no stray barrier.
+        let mut s = spec();
+        s.bib_name.clear();
+        s.diagrams.clear();
+        s.table_captions.clear();
+        let r = build_document(md, "[floats]\nbarrier_before_refs = true\n", &s).unwrap();
+        assert!(!r.tex.contains("\\FloatBarrier"));
     }
 
     #[test]

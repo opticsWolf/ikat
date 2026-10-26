@@ -78,8 +78,13 @@ Wide+bottom loads `dblfloatfix`; `force`/`barrier` load
 `float`/`placeins` (or the template must carry them).
 Fraction `width` scales TikZ coordinates, not text (no `transform
 shape`): labels stay full-size, so leave air around them.
-`[floats]` tuning (fractions, counters, `barrier_sections`) emits
-only when non-default.
+`[floats]` tuning (fractions, counters, `barrier_sections`,
+`barrier_before_refs`) emits only when non-default.
+`barrier_before_refs` (default off) flushes pending floats ahead
+of `\bibliography`: without it, end-queued floats spill into/past
+`References` (bio-medsea's Figs 7-14 landed after it). Opt-in so
+default weaves stay byte-identical; needs `placeins` (auto-added
+to generated heads, required in skeletons/overrides).
 
 ## Auto-layout (`ikat layout`, M7.1)
 

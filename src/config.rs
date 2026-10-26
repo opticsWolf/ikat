@@ -350,6 +350,7 @@ impl Typography {
 /// topnumber = 2
 /// bottomnumber = 2
 /// barrier_sections = false
+/// barrier_before_refs = false
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Floats {
@@ -369,6 +370,13 @@ pub struct Floats {
     pub bottomnumber: i64,
     #[serde(default)]
     pub barrier_sections: bool,
+    /// `\FloatBarrier` before `\bibliography`: pending floats flush
+    /// at the body end instead of spilling into/past the reference
+    /// list (bio-medsea's Figs 7-14 landed after `References` without
+    /// it). Off by default: it appends one line to the document, so
+    /// default weaves stay byte-identical.
+    #[serde(default)]
+    pub barrier_before_refs: bool,
 }
 
 fn pos_top() -> Pos {
@@ -404,6 +412,7 @@ impl Default for Floats {
             topnumber: 2,
             bottomnumber: 1,
             barrier_sections: false,
+            barrier_before_refs: false,
         }
     }
 }

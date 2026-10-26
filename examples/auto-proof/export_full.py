@@ -480,10 +480,15 @@ def export_one(pid: str) -> dict:
         bib_name=pid,
         bib_keys={f"ref{n:02d}" for n in range(1, len(refs) + 1)},
     )
-    suggs = suggest_layout(md_text, "", spec)
+    # Corpus weave policy: pending floats flush before the reference
+    # list (otherwise end-queued figures spill past `References`)
+    # and stay inside their sections (tops are scarce with 18
+    # wide floats in one document). Additive vs the engine.
+    toml_src = "[floats]\nbarrier_before_refs = true\nbarrier_sections = true\n"
+    suggs = suggest_layout(md_text, toml_src, spec)
     new_md, n_applied = apply_layout(md_text, suggs)
     (work / f"{pid}-auto.md").write_text(new_md, encoding="utf-8")
-    r = build_document(new_md, "", spec)
+    r = build_document(new_md, toml_src, spec)
     (work / f"{pid}.tex").write_text(r.tex, encoding="utf-8")
     for png in figdir.glob("*.png"):
         pass  # staged beside the tex via figs/ graphicspath

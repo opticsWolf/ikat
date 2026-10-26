@@ -295,6 +295,21 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.3 — Refs barrier (opt-in) → 0.10.3
+
+`[floats] barrier_before_refs` (default off, so default weaves
+stay byte-identical): a `\FloatBarrier` ahead of
+`\bibliography` in all three preamble paths. End-queued floats
+otherwise spill into/past `References` — bio-medsea's Figs 7-14
+landed on pp37-42 after the reference list started (p27) because
+10 wide figure tops saturated and no barrier contained them. With
+`barrier_sections` + refs barrier (corpus weave policy), bio's
+tables sit inside Discussion beside their citing prose (TABLE IV
+under the `(Table 4)` paragraph, p26) and nothing crosses
+`References`. Proven over the full 10-paper re-export, 0
+unmatched, 0 stranded headings; golden byte-parity holds
+(default off).
+
 ## M7.2 — Top-fit + queue pressure → 0.10.2
 
 Wide floats taller than the page-top budget (`top_frac` 0.7 ×
