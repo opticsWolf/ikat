@@ -556,6 +556,9 @@ pub fn tex_extra_packages(tex: &str) -> Vec<String> {
     if tex.contains("\\needspace") {
         out.push("\\usepackage{needspace}".to_string());
     }
+    if tex.contains("sidewaystable") {
+        out.push("\\usepackage{rotating}".to_string());
+    }
     out
 }
 
@@ -695,6 +698,9 @@ pub fn convert(
                 let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
                 let tpos = tattrs.pos.unwrap_or(cfg.floats.pos_default);
                 let caption_top = tattrs.captionpos.map(|c| c == CaptionPos::Top).unwrap_or(true);
+                // Portrait spans in cm for the compaction ladder: the
+                // layout policy carries the class geometry, so custom
+                // classes compact against their own widths.
                 let (tab, n) = table_block(
                     &rows,
                     &spec.table_captions[table_idx],
@@ -704,6 +710,9 @@ pub fn convert(
                     tpos,
                     caption_top,
                     tattrs.width.as_deref(),
+                    cfg.layout.column_cm,
+                    cfg.layout.textwidth_cm,
+                    cfg.tables.compact_tables,
                     line,
                 )
                 .map_err(|e| Error {
@@ -1270,6 +1279,22 @@ mod tests {
         s.table_captions.clear();
         let r = build_document(md, "[floats]\nbarrier_before_refs = true\n", &s).unwrap();
         assert!(!r.tex.contains("\\FloatBarrier"));
+    }
+
+    #[test]
+    fn rotated_table_pulls_rotating_package() {
+        // 13 unbreakable columns: portrait cannot hold them.
+        let head = "| L |".to_string() + &"| -0.319(0.224) |".repeat(12);
+        let sep = "|---|".to_string() + &"|---|".repeat(12);
+        let md = format!("# T\n\n## 1. A\n\n%% table\n\n{head}\n{sep}\n| d | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |\n");
+        let mut s = spec();
+        s.table_captions = vec!["W.".into()];
+        s.diagrams.clear();
+        let r = build_document(&md, "[tables]\ncompact_tables = true\n", &s).unwrap();
+        // Column span promotes to wide before rotating: the 13
+        // unbreakable columns cannot live in 8.9cm at any size.
+        assert!(r.tex.contains("\\begin{sidewaystable*}[p]"), "rotates wide");
+        assert!(r.tex.contains("\\usepackage{rotating}"), "package follows needs");
     }
 
     #[test]

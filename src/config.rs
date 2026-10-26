@@ -158,6 +158,7 @@ pub struct FloatNeeds {
     pub barrier: bool,
     pub dblfloat: bool,
     pub graphicx: bool,
+    pub rotating: bool,
 }
 
 impl FloatNeeds {
@@ -170,6 +171,7 @@ impl FloatNeeds {
         self.barrier |= o.barrier;
         self.dblfloat |= o.dblfloat;
         self.graphicx |= o.graphicx;
+        self.rotating |= o.rotating;
     }
 
     /// Preamble lines, in load order.
@@ -183,6 +185,9 @@ impl FloatNeeds {
         }
         if self.dblfloat {
             out.push("\\usepackage{dblfloatfix}".to_string());
+        }
+        if self.rotating {
+            out.push("\\usepackage{rotating}".to_string());
         }
         out
     }
@@ -198,6 +203,9 @@ impl FloatNeeds {
         }
         if self.dblfloat {
             out.push("dblfloatfix");
+        }
+        if self.rotating {
+            out.push("rotating");
         }
         if self.graphicx {
             out.push("graphicx");
@@ -579,6 +587,34 @@ impl Default for LayoutPolicy {
     }
 }
 
+/// `[tables]` policy: portrait-fit compaction for dense tables.
+///
+/// ```toml
+/// [tables]
+/// compact_tables = false
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tables {
+    /// Run the portrait-fit ladder (M7.5): `Compact` shrinks to
+    /// `\footnotesize` + 3pt `\tabcolsep`, `Rotate` emits
+    /// `sidewaystable(*)` when portrait cannot hold the table at
+    /// any readable size. Off by default: auto-changing fonts and
+    /// rotating pages is a manuscript-level policy choice, and the
+    /// frozen paper track (58 accepted mild overfulls) must weave
+    /// byte-identically. The auto-layout notes always measure the
+    /// ladder and name the fix either way.
+    #[serde(default)]
+    pub compact_tables: bool,
+}
+
+impl Default for Tables {
+    fn default() -> Self {
+        Self {
+            compact_tables: false,
+        }
+    }
+}
+
 /// Whole-file configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -586,6 +622,8 @@ pub struct Config {
     pub document: Document,
     #[serde(default)]
     pub spans: Spans,
+    #[serde(default)]
+    pub tables: Tables,
     #[serde(default)]
     pub floats: Floats,
     #[serde(default)]

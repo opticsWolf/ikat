@@ -295,6 +295,22 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.5 — Table compaction ladder (opt-in) → 0.10.5
+
+`[tables] compact_tables` (default off, so the frozen paper and
+all default weaves stay byte-identical): the widest unbreakable
+token per table drives `Fit` (`\small`) → `Compact`
+(`\footnotesize` + 3pt padding) → `Rotate` (`sidewaystable(*)` in
+`\scriptsize` + 2pt padding against `\textheight`). Column
+tables that fail promote to `wide` before rotating. Prose labels
+never trigger it (they wrap); only unbreakable numeric cells do.
+Corpus proof: econ-tax 441 → 25 overfulls (max 2.9pt, invisible),
+the 13-column tables rotate readably; psych 200 → 19, bio 38 → 7,
+earth 17 → 1. The engine notes always measure the shared ladder
+and name the opt-in when it is off; `rotating` joins the strict
+package contract (auto-added to generated heads, named for
+skeletons/overrides).
+
 ## M7.4 — Tail page + no empty columns → 0.10.4
 
 `[layout] tail_lines` (default 10): a `wide`+`top` float with

@@ -249,7 +249,7 @@ fn balanced_braces(s: &str) -> Option<String> {
 }
 
 /// Longest `\\`-separated line, `\X` escapes collapsed to one char.
-fn label_len(label: &str) -> usize {
+pub(crate) fn label_len(label: &str) -> usize {
     let plain = label
         .replace("\\textbackslash{}", "x")
         .replace("\\textasciitilde{}", "x")
@@ -708,6 +708,67 @@ pub fn suggest_layout(
                 let cur_span = tattrs.span.map(|s| span_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let cur_pos = tattrs.pos.map(|s| pos_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let (mut span, mut pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
+                // Portrait-fit ladder, mirroring the weaver exactly:
+                // same rows, same widths, same `[tables]` gate — the
+                // weaver promotes column rotators to `wide` on these
+                // very inputs, so the suggestion and the output agree
+                // before and after `--apply`.
+                {
+                    use crate::table::{is_sep, split_row, table_compact, worst_token_cm, TableLevel};
+                    let data: Vec<Vec<String>> = rows
+                        .iter()
+                        .filter(|r| !is_sep(r))
+                        .map(|r| split_row(r))
+                        .collect();
+                    let ncols = data.iter().map(|r| r.len()).max().unwrap_or(1);
+                    let worst = worst_token_cm(&data);
+                    let col_level = if cfg.tables.compact_tables {
+                        table_compact(p.column_cm, ncols, worst)
+                    } else {
+                        TableLevel::Fit
+                    };
+                    let (eff_span, level) = if span == "wide" {
+                        ("wide", if cfg.tables.compact_tables {
+                            table_compact(p.textwidth_cm, ncols, worst)
+                        } else {
+                            TableLevel::Fit
+                        })
+                    } else if col_level == TableLevel::Rotate {
+                        ("wide", table_compact(p.textwidth_cm, ncols, worst))
+                    } else {
+                        ("column", col_level)
+                    };
+                    let share = (if eff_span == "wide" { p.textwidth_cm } else { p.column_cm }) / ncols as f64;
+                    if eff_span == "wide" && span == "column" {
+                        span = "wide".to_string();
+                        reason.push_str(&format!(
+                            "; column cannot hold it (worst token {worst:.2}cm vs {:.2}cm column share): promoted to wide",
+                            p.column_cm / ncols as f64
+                        ));
+                        // `force`/`here` are illegal on `table*`: the
+                        // in-flow pin becomes a page top (or a tail
+                        // page below).
+                        if pos == "force" || pos == "here" {
+                            pos = "top".to_string();
+                            reason.push_str("; in-flow pin illegal on wide floats: floats top");
+                        }
+                    }
+                    match level {
+                        TableLevel::Fit => {}
+                        TableLevel::Compact if cfg.tables.compact_tables => reason.push_str(&format!(
+                            "; portrait is tight (worst token {worst:.2}cm vs {share:.2}cm share): weaver compacts to footnotesize + 3pt padding"
+                        )),
+                        TableLevel::Rotate if cfg.tables.compact_tables => {
+                            pos = "page".to_string();
+                            reason.push_str(&format!(
+                                "; portrait cannot hold it compacted (worst token {worst:.2}cm vs {share:.2}cm share): weaver rotates (sidewaystable)"
+                            ));
+                        }
+                        TableLevel::Compact | TableLevel::Rotate => reason.push_str(&format!(
+                            "; portrait cannot hold it (worst token {worst:.2}cm vs {share:.2}cm share): set [tables] compact_tables = true to compact/rotate automatically"
+                        )),
+                    }
+                }
                 tail_page(p, &mut span, &mut pos, &mut reason, total_prose, seen_prose);
                 reason.push_str(&late_note(p, &span, prose_lines));
                 reason.push_str(&queue_note(&span, &mut wides));

@@ -80,6 +80,16 @@ Fraction `width` scales TikZ coordinates, not text (no `transform
 shape`): labels stay full-size, so leave air around them.
 `[floats]` tuning (fractions, counters, `barrier_sections`,
 `barrier_before_refs`) emits only when non-default.
+`[tables] compact_tables` (default off) runs the portrait-fit
+ladder: the widest *unbreakable* token per table decides — prose
+labels wrap in `X` columns, but numeric cells cannot break. `Fit`
+keeps `\small`; `Compact` steps to `\footnotesize` + 3pt
+`\tabcolsep`; `Rotate` emits `sidewaystable(*)` (own page) in
+`\scriptsize` + 2pt padding, sized against `\textheight`. A
+column table the column cannot hold promotes to `wide` first.
+Off keeps every table byte-identical (the frozen paper track
+carries accepted mild overfulls); the auto-layout notes always
+measure the ladder and name the opt-in when it is off.
 `barrier_before_refs` (default off) flushes pending floats ahead
 of `\bibliography`: without it, end-queued floats spill into/past
 `References` (bio-medsea's Figs 7-14 landed after it). Opt-in so

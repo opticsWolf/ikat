@@ -353,8 +353,21 @@ def export_one(pid: str) -> dict:
     work = OUT / pid
     figdir = work / "figs"
     if work.exists():
-        shutil.rmtree(work)
-    work.mkdir(parents=True)
+        try:
+            shutil.rmtree(work)
+        except OSError:
+            # Windows: a lingering handle (shell, indexer) can lock
+            # the dir itself while its contents stay writable — empty
+            # it file by file instead of giving up the whole batch.
+            for child in work.iterdir():
+                try:
+                    if child.is_dir() and not child.is_symlink():
+                        shutil.rmtree(child)
+                    else:
+                        child.unlink()
+                except OSError:
+                    pass
+    work.mkdir(parents=True, exist_ok=True)
     ctx = Ctx()
 
     root = ET.parse(xml_path).getroot()
@@ -490,8 +503,10 @@ def export_one(pid: str) -> dict:
     # wide float ejects the column (placeins clearpage), leaving a
     # half-empty column behind. Tail floats go to pages instead (no
     # downstream tops left), so the refs barrier meets empty defer
-    # lists and never ejects.
-    toml_src = "[floats]\nbarrier_before_refs = true\n"
+    # lists and never ejects. Dense regression tables compact and
+    # rotate automatically ([tables] opt-in: portrait cannot hold
+    # unbreakable numeric cells wider than their X share).
+    toml_src = "[floats]\nbarrier_before_refs = true\n[tables]\ncompact_tables = true\n"
     suggs = suggest_layout(md_text, toml_src, spec)
     new_md, n_applied = apply_layout(md_text, suggs)
     (work / f"{pid}-auto.md").write_text(new_md, encoding="utf-8")
