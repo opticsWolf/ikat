@@ -15,11 +15,11 @@ auto-proof/ — ikat auto-layout deliverables (Phase H, v0.10.0+).
 Stale stub-era artifacts (bench-*.pdf probes, build/ workdirs, render
 scratch) were removed 2026-10-26; full/ supersedes them.
 
-Auto layout now OUTPACKS the hand build (M7.2 top-fit, M7.4 tail
-page, M7.5 compaction ladder landed after the hand pass): 7 pages
-vs 8, both 0 overfull — the auto run pins Table 3 wide-top + the
-tables column-force with captionpos=bottom, so page 7 runs both
-columns full into the References while the hand build leaves a
-sparse page 8 (orphan paragraph + refs). Fig 2 keeps the floor
-width (0.57 vs hand 0.58) at zero cost. The hand PDF stays as the
-historical hand-tuned reference.
+Hand and auto showcases now AGREE (M7.10b era): the hand source
+ports the engine's winning attrs (tables span=column pos=force
+captionpos=bottom, skeleton-contract table span=wide pos=top,
+Fig 2 at the 0.57 floor), so both weave BYTE-IDENTICAL tex — 7
+pages, 0 overfull, final columns full into the References. Before
+the port the hand build predated M7.2/M7.4/M7.5 and left a sparse
+page 8; the hand PDF is the same document now, attrs written by
+hand instead of suggested.

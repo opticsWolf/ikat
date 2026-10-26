@@ -95,7 +95,7 @@ and `[]`/`{}` nodes. Anything else is a string error naming the
 line, because a diagram that almost renders is worse than one that
 refuses.
 
-```mermaid {span=column pos=here width=0.58}
+```mermaid {span=column pos=here width=0.57}
 sequenceDiagram
 participant U as Caller
 participant P as Python
@@ -177,7 +177,7 @@ at the bottom load `dblfloatfix` automatically; `force` and
 `barrier` load `float` and `placeins`, or require them in template
 heads. Table 1 lists the attribute surface.
 
-%% table {pos=force}
+%% table {span=column pos=force}
 
 | Attribute | Values | Default |
 |---|---|---|
@@ -204,12 +204,15 @@ dedicated float page.
 Everything else is LaTeX default, so the tuning stays visible and
 minimal. `barrier_sections` is on in this paper: each section
 starts with its predecessor's floats flushed, so no heading
-strands pages from its text. The engines table in §5 adds the
-per-element `barrier` on top, pinning itself above its own section.
+strands pages from its text. The skeleton-contract table rides
+`span=wide pos=top` at its section head and the engines table
+pins `span=column pos=force` — the same attrs the suggest/apply
+pass picks, so this hand-woven tex is byte-identical to the
+auto-layout build.
 
 ## 4. Evidence
 
-%% table {captionpos=bottom pos=force}
+%% table {span=column pos=force captionpos=bottom}
 
 | Suite | What it guards | Count |
 |---|---|---|
@@ -246,7 +249,7 @@ in the tree.
 
 ## 5. Engines and templates
 
-%% table {span=wide}
+%% table {span=wide pos=top}
 
 | Token | Fills from | Required |
 |---|---|---|
@@ -255,7 +258,7 @@ in the tree.
 | `{{bibliography}}` | style plus staged `.bib` name | exactly once unless `bib_name` is empty |
 | `{{abstract}}` | the whole woven abstract env | exactly once when the manuscript has one |
 
-%% table {pos=barrier}
+%% table {span=column pos=force}
 
 | Question | pdflatex (default) | tectonic (optional) |
 |---|---|---|

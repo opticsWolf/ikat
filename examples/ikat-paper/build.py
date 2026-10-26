@@ -142,15 +142,14 @@ def make_paper(engine: str = "pdflatex") -> None:
         ],
         plot_attrs={"fig-loc": "pos=force width=0.75", "fig-tests": "pos=force width=0.75"},
         # Order follows the md table blocks: the skeleton table moved
-        # ahead of the engines table so table* takes the p7 top.
+        # ahead of the engines table (block order = caption order).
         table_captions=[
             "Per-element float attributes.",
             "Test suites and what they guard.",
             "Skeleton token contract.",
             "Compile engines compared.",
         ],
-        # Keyed by md block order: the skeleton table is block 2
-        # (moved ahead of the engines table for the p7 top).
+        # Keyed by md block order: the skeleton table is block 2.
         table_specs={"2": "XXl"},
         plot_insert_before="\\subsection{Where",
         title_thanks=THANKS,
