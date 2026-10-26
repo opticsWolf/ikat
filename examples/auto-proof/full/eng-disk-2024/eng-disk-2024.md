@@ -258,7 +258,7 @@ In section 2.2, The *Z* world coordinate *Z*$_{0}$ of the point on lower end fac
 
 To verify accuracy of the online measurement method for the sizes of disk parts, a pulley, a flange, and a gear are selected for testing. The flowchart for executing the experiment steps is shown in Fig 4. The reference dimensions of three disk parts are obtained by a micrometer with an accuracy of $\pm$0.001mm, the values are average of measuring 3 times, as shown in Table 1.
 
-```mermaid {span=wide pos=top width=0.71}
+```mermaid {span=wide pos=page width=0.71}
 info:doi/10.1371/journal.pone.0307525.g004
 ```
 
@@ -284,7 +284,7 @@ Table 2 shows main equipments and their parameters of the measurement system.
 
 According to the method in this article, the Matlab software is used to complete online measurement for dimensions of disk parts based on machine vision. In the world coordinate system, the inner and outer diameters of disk parts are measured by geometrically fitting the part edge circle. Center and radius of the circle can be calculated by algebraic fitting used Matlab firstly, and the results are used as the initial values for geometric fitting. Then, the Gaussian Newton algorithm [[`ref24`]] is used to iteratively calculate the center and radius according to Eqs (12) and (18) to complete the circle geometric fitting. The duration for executing the main experimental program is approximately 5 seconds. An example of the fitting results is shown in Fig 5.
 
-```mermaid {span=wide pos=top width=0.74}
+```mermaid {span=wide pos=page width=0.74}
 info:doi/10.1371/journal.pone.0307525.g005
 ```
 

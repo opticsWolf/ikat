@@ -467,7 +467,7 @@ Further exploration and taxonomic work on seaweeds and seagrasses is needed in a
 
 A similar situation exists for the invertebrates (see File S2). Most of the small fauna of the Mediterranean are typical of current scientific knowledge: in one of the best-known geographic areas of the world, there are many regions and habitats that remain insufficiently studied, and several taxonomic groups in deep-sea areas and portions of the southern region are still poorly known. The description of new species is still a high priority. As illustrative examples, the accumulation curves for cumaceans, mysids, polychaetes, and ascidians discovered (described or first recorded) (Figure 13) show that no asymptote has been reached, and there has been no slowing in the rate of discovery for less conspicuous species in the Mediterranean, as it is observed when analyzing accumulation curves in other parts of the world [`ref76`].
 
-```mermaid {span=wide pos=top width=0.98}
+```mermaid {span=wide pos=page width=0.98}
 info:doi/10.1371/journal.pone.0011842.g013
 ```
 

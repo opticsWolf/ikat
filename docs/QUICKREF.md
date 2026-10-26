@@ -119,12 +119,19 @@ same-rank pairs) and capped at 15% over the fit (flagged when
 capped). A `wide` float declared after `late_wide_lines` (15)
 prose lines earns a move-the-fence note — page-top floats declared
 late strand trailing pages; the engine advises, never reorders.
+A `wide`+`top` float with fewer than `tail_lines` (10) body prose
+lines remaining takes a dedicated `page`: no downstream tops are
+left (it would pile at the end), and a still-pending float meeting
+`\FloatBarrier` ejects the column — the placeins eject strands a
+half-empty column behind it. Float pages never strand columns.
+Skipped in prose-free manuscripts (B1 stubs carry no discussing
+text, so their pins stay exact).
 External graphics (precompiled diagrams, plot PDFs) keep
 hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 `column_cm` 8.9, `textwidth_cm` 17.8, `caption_cm` 1.0,
 `here_max_cm` 7.0 (showcase-calibrated), `page_frac` 0.6,
 `min_width` 0.4, `late_wide_lines` 15, `top_frac` 0.7 (the LaTeX
-`topfraction`/`dbltopfraction` default).
+`topfraction`/`dbltopfraction` default), `tail_lines` 10.
 
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are

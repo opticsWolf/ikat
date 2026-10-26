@@ -1108,11 +1108,11 @@ This study applies the preceding numerical technique to approximate solutions to
 
 For Example 1; in Table 1, the correlation between data operations A$\hbar$,1(?) and $\Re$$\hbar$,1(?) are presented at $\hbar$ = 3, *$\alpha$* = 0.5, and *$\beta$*$\in${0.3,0.8}. In Table 2, the correlation between data operations A$\hbar$,2(?) and $\Re$$\hbar$,2(?) are presented at $\hbar$ = 3, *$\alpha$* = 0.5, and *$\beta$*$\in${0.3,0.8}. To provide additional information, Fig 1 displays A$\hbar$,1(?) and $\Re$$\hbar$,1(?) at ($\hbar$,$\alpha$,$\beta$)$\in${(3,0.3,0.3),(3,0.4,0.9),(3,0.9,0.4)} that generated from the SGLA. Fig 2 displays A$\hbar$,2(?) and $\Re$$\hbar$,2(?) at ($\hbar$,$\alpha$,$\beta$)$\in${(3,0.3,0.3),(3,0.4,0.9),(3,0.9,0.4)} that generated from the SGLA.
 
-```mermaid {span=wide pos=top width=0.9}
+```mermaid {span=wide pos=page width=0.9}
 info:doi/10.1371/journal.pone.0305259.g001
 ```
 
-```mermaid {span=wide pos=top width=0.89}
+```mermaid {span=wide pos=page width=0.89}
 info:doi/10.1371/journal.pone.0305259.g002
 ```
 
@@ -1150,11 +1150,11 @@ info:doi/10.1371/journal.pone.0305259.g002
 
 For Example 2; in Table 3, the correlation between data operations A$\hbar$,2(?) and $\Re$$\hbar$,1(?) are presented at $\hbar$ = 3, *$\beta$* = 0.5, and *$\alpha$*$\in${0.1,0.7}. In Table 4, the correlation between data operations A$\hbar$,2(?) and $\Re$$\hbar$,2(?) are presented at $\hbar$ = 3, *$\beta$* = 0.5, and *$\alpha$*$\in${0.1,0.7}. To provide additional information, Fig 3 displays A$\hbar$,1(?) and $\Re$$\hbar$,1(?) at ($\hbar$,$\alpha$,$\beta$)$\in${(3,0.3,0.6),(3,0.6,0.3),(3,0.4,0.4)} that generated from the SGLA. Fig 4 displays A$\hbar$,2(?) and R$\hbar$,2(?) at ($\hbar$,$\alpha$,$\beta$)$\in${(3,0.3,0.6),(3,0.6,0.3),(3,0.4,0.4)} that generated from the SGLA.
 
-```mermaid {span=wide pos=top width=0.89}
+```mermaid {span=wide pos=page width=0.89}
 info:doi/10.1371/journal.pone.0305259.g003
 ```
 
-```mermaid {span=wide pos=top width=0.89}
+```mermaid {span=wide pos=page width=0.89}
 info:doi/10.1371/journal.pone.0305259.g004
 ```
 

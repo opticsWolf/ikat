@@ -595,6 +595,17 @@ pub fn suggest_layout(
     // Diagrams since the last `##` section: the first one is the
     // section lead (fresh-column odds, inflow bonus in policy).
     let mut section_diagrams = 0usize;
+    // Total body prose (tail rule input) and the remainder ahead of
+    // each float: a `wide`+`top` with almost no text left has no
+    // downstream tops — dedicated page instead of end pile / eject.
+    let total_prose: usize = blocks(md_text)?
+        .iter()
+        .filter_map(|b| match &b.kind {
+            MdKind::Para(para) => Some(para.iter().filter(|l| !l.trim().is_empty()).count()),
+            _ => None,
+        })
+        .sum();
+    let mut seen_prose = 0usize;
     // Non-empty prose lines since the last float or section start:
     // a `wide` float declared after a wall of prose strands pages.
     let mut prose_lines = 0usize;
@@ -612,7 +623,9 @@ pub fn suggest_layout(
                 wides = 0;
             }
             MdKind::Para(para) => {
-                prose_lines += para.iter().filter(|l| !l.trim().is_empty()).count();
+                let n = para.iter().filter(|l| !l.trim().is_empty()).count();
+                prose_lines += n;
+                seen_prose += n;
             }
             MdKind::Fence { info: s, body: fence_body } => {
                 if !s.contains("mermaid") {
@@ -646,11 +659,12 @@ pub fn suggest_layout(
                 let (w1, h1, floor) = natural.unwrap_or((0.0, 0.0, 0.0));
                 let lead = section_diagrams == 0;
                 section_diagrams += 1;
-                let (span, pos, width, mut reason) = if kind == "picture" {
+                let (mut span, mut pos, width, mut reason) = if kind == "picture" {
                     suggest_for(p, "picture", w1, h1, &cur_span, &cur_pos, false, 0.0)
                 } else {
                     suggest_for(p, "diagram", w1, h1, &cur_span, &cur_pos, lead, floor)
                 };
+                tail_page(p, &mut span, &mut pos, &mut reason, total_prose, seen_prose);
                 reason.push_str(&late_note(p, &span, prose_lines));
                 reason.push_str(&queue_note(&span, &mut wides));
                 prose_lines = 0;
@@ -693,7 +707,8 @@ pub fn suggest_layout(
                 let (w1, h1) = measure_table(&rows);
                 let cur_span = tattrs.span.map(|s| span_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
                 let cur_pos = tattrs.pos.map(|s| pos_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
-                let (span, pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
+                let (mut span, mut pos, width, mut reason) = suggest_for(p, "table", w1, h1, &cur_span, &cur_pos, false, 0.0);
+                tail_page(p, &mut span, &mut pos, &mut reason, total_prose, seen_prose);
                 reason.push_str(&late_note(p, &span, prose_lines));
                 reason.push_str(&queue_note(&span, &mut wides));
                 prose_lines = 0;
@@ -802,6 +817,26 @@ fn queue_note(span: &str, wides: &mut usize) -> String {
     String::new()
 }
 
+/// Tail-page override: a `wide`+`top` float with fewer than
+/// `tail_lines` body prose lines remaining takes a dedicated page.
+/// No downstream tops are left (it would pile at the document end),
+/// and a still-pending float meeting `\FloatBarrier` ejects the
+/// column — the placeins eject strands a half-empty column behind
+/// it, the exact void this rule prevents. Float pages never strand
+/// columns: text flows past them. Skipped in prose-free manuscripts
+/// (B1 stubs), where there is no discussing text to stay near.
+fn tail_page(p: &LayoutPolicy, span: &mut String, pos: &mut String, reason: &mut String, total_prose: usize, seen_prose: usize) {
+    if span == "wide" && pos == "top" && total_prose > 0 {
+        let remaining = total_prose.saturating_sub(seen_prose);
+        if remaining < p.tail_lines {
+            *pos = "page".to_string();
+            reason.push_str(&format!(
+                "; tail float ({remaining} prose lines remain in the body): no downstream tops left -> dedicated page stays adjacent instead of piling at the end"
+            ));
+        }
+    }
+}
+
 /// Move-the-fence note: a `wide` float declared after a wall of
 /// prose strands a trailing page (page-top floats need a top at or
 /// after their declaration). Advisory — the engine never reorders,
@@ -839,6 +874,7 @@ mod tests {
             lead_bonus_cm: 1.0,
             late_wide_lines: 15,
             top_frac: 0.7,
+            tail_lines: 10,
         }
     }
 
@@ -936,6 +972,33 @@ mod tests {
             suggest_for(&pol(), "diagram", 30.0, 28.0, "default", "default", true, 0.0);
         assert_eq!((span.as_str(), pos.as_str()), ("wide", "page"));
         assert!(reason.contains("page-top budget"), "named: {reason}");
+    }
+
+    #[test]
+    fn tail_page_overrides_top_only_near_body_end() {
+        let mut span = "wide".to_string();
+        let mut pos = "top".to_string();
+        let mut reason = String::from("overflows, floats top");
+        // 9 of 100 prose lines seen: plenty of tops ahead, untouched.
+        tail_page(&pol(), &mut span, &mut pos, &mut reason, 100, 9);
+        assert_eq!(pos.as_str(), "top");
+        // 95 of 100 seen: no downstream tops left -> page.
+        tail_page(&pol(), &mut span, &mut pos, &mut reason, 100, 95);
+        assert_eq!(pos.as_str(), "page");
+        assert!(reason.contains("tail float"), "named: {reason}");
+        // Column floats never eject: untouched at the tail.
+        let mut span = "column".to_string();
+        let mut pos = "force".to_string();
+        let mut reason = String::new();
+        tail_page(&pol(), &mut span, &mut pos, &mut reason, 100, 99);
+        assert_eq!((span.as_str(), pos.as_str()), ("column", "force"));
+        // Prose-free manuscripts (B1 stubs): no adjacency to
+        // protect, pins stay exact.
+        let mut span = "wide".to_string();
+        let mut pos = "top".to_string();
+        let mut reason = String::new();
+        tail_page(&pol(), &mut span, &mut pos, &mut reason, 0, 0);
+        assert_eq!(pos.as_str(), "top");
     }
 
     #[test]

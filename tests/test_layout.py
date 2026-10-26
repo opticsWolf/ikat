@@ -88,11 +88,31 @@ def test_h2_resets_section_lead():
 
 def test_late_wide_table_names_the_fix():
     prose = "\n".join(f"Prose line {i} fills the column." for i in range(20))
-    md = f"# T\n\n## 1. A\n\n{prose}\n\n{WIDE_TABLE}\n"
+    tail = "\n".join(f"Trailing line {i} holds tops open." for i in range(15))
+    md = f"# T\n\n## 1. A\n\n{prose}\n\n{WIDE_TABLE}\n\n{tail}\n"
     spec = _spec(captions=["W."])
     (s,) = suggest_layout(md, "", spec)
     assert s["span"] == "wide" and s["pos"] == "top", s
     assert "move the fence" in s["reason"], s["reason"]
+
+
+def test_tail_float_takes_page_not_top():
+    # 20 prose lines, then the wide table with nothing after it: no
+    # downstream tops remain, so it takes a dedicated page instead
+    # of piling at the end (and the refs barrier meets it placed).
+    prose = "\n".join(f"Prose line {i} fills the column." for i in range(20))
+    md = f"# T\n\n## 1. A\n\n{prose}\n\n{WIDE_TABLE}\n"
+    (s,) = suggest_layout(md, "", _spec(captions=["W."]))
+    assert (s["span"], s["pos"]) == ("wide", "page"), s
+    assert "tail float" in s["reason"], s["reason"]
+
+
+def test_prose_free_tail_stays_top():
+    # B1 stubs carry no discussing text: no adjacency to protect,
+    # so the tail rule skips them and pins stay exact.
+    md = f"# T\n\n## 1. A\n\n{WIDE_TABLE}\n"
+    (s,) = suggest_layout(md, "", _spec(captions=["W."]))
+    assert (s["span"], s["pos"]) == ("wide", "top"), s
 
 
 def test_section_head_wide_table_is_quiet():

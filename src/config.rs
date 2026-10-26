@@ -459,6 +459,7 @@ impl Floats {
 /// lead_bonus_cm = 1.0
 /// late_wide_lines = 15
 /// top_frac = 0.7
+/// tail_lines = 10
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutPolicy {
@@ -490,6 +491,16 @@ pub struct LayoutPolicy {
     /// sets fine — only clearly wider ones earn full width.
     #[serde(default = "layout_wide_ratio")]
     pub wide_ratio: f64,
+    /// A `wide` float with fewer body prose lines remaining than
+    /// this takes a dedicated `page` instead of `top`: no downstream
+    /// tops are left, so it would pile at the document end — or meet
+    /// a `\FloatBarrier` still pending and eject the column (the
+    /// placeins eject leaves a half-empty column behind). Float pages
+    /// never strand columns: text flows past them. Skipped in
+    /// prose-free manuscripts (B1 stubs carry no discussing text, so
+    /// there is no adjacency to protect and their pins stay exact).
+    #[serde(default = "layout_tail_lines")]
+    pub tail_lines: usize,
     /// A `wide` float declared more prose lines than this after
     /// the section start (or the previous float) earns a move-the-
     /// fence note: page-top floats declared late strand trailing
@@ -542,6 +553,9 @@ fn layout_lead_bonus() -> f64 {
 fn layout_late_wide() -> usize {
     15
 }
+fn layout_tail_lines() -> usize {
+    10
+}
 fn layout_top_frac() -> f64 {
     0.7
 }
@@ -560,6 +574,7 @@ impl Default for LayoutPolicy {
             lead_bonus_cm: layout_lead_bonus(),
             late_wide_lines: layout_late_wide(),
             top_frac: layout_top_frac(),
+            tail_lines: layout_tail_lines(),
         }
     }
 }

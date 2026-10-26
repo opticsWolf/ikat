@@ -323,14 +323,15 @@ def extract_images(pdf_path: Path, figdir: Path) -> list:
 
 TEXT_H_CM = 23.0
 TOP_MAX_CM = 0.7 * TEXT_H_CM  # mirrors engine [layout] top_frac
+TAIL_LINES = 10  # mirrors engine [layout] tail_lines
 
 
-def pic_attrs(w: float, h: float) -> str:
+def pic_attrs(w: float, h: float, tail: bool = False) -> str:
     """Measured-size pinning, mirroring the engine thresholds.
     Wide floats taller than the page-top budget take a dedicated
     page: [t] cannot hold them and the queue strands at the end."""
     if w >= COL_CM * 1.25:
-        if h + 1.0 > TOP_MAX_CM:
+        if h + 1.0 > TOP_MAX_CM or tail:
             return f"{{span=wide pos=page width={min(1.0, round(w / TEXT_CM, 2))}}}"
         return f"{{span=wide pos=top width={min(1.0, round(w / TEXT_CM, 2))}}}"
     if h > 14.0:
@@ -423,6 +424,8 @@ def export_one(pid: str) -> dict:
         else:
             n_unmatched += 1
 
+    total_prose = sum(len([l for l in pay.splitlines() if l.strip()]) for k, _, pay in blocks if k == "p")
+    seen_prose = 0
     for bkind, depth, payload in blocks:
         if bkind == "h":
             payload = clean_prose(payload, ctx, "heading")
@@ -432,6 +435,7 @@ def export_one(pid: str) -> dict:
             else:
                 md.append(f"**{payload}.**\n")
         elif bkind == "p":
+            seen_prose += len([l for l in payload.splitlines() if l.strip()])
             payload = clean_prose(payload, ctx, "para")
             if payload:
                 md.append(payload + "\n")
@@ -453,7 +457,7 @@ def export_one(pid: str) -> dict:
             else:
                 (figdir / f"{key}.png").write_bytes(g["png"])
                 (figdir / g["file"]).unlink(missing_ok=True)
-                md.append(f"```mermaid {pic_attrs(g['w'], g['h'])}\n{fold(fig_el.find('graphic').get('{http://www.w3.org/1999/xlink}href', key) if fig_el.find('graphic') is not None else key, ctx.stats)}\n```\n")
+                md.append(f"```mermaid {pic_attrs(g['w'], g['h'], tail=total_prose > 0 and total_prose - seen_prose < TAIL_LINES)}\n{fold(fig_el.find('graphic').get('{http://www.w3.org/1999/xlink}href', key) if fig_el.find('graphic') is not None else key, ctx.stats)}\n```\n")
                 diagrams.append(DiagramEntry(key=key, caption=caption, mode="precompiled", path_prefix="figs/"))
         elif bkind == "TAB":
             n_tab_floats += 1
@@ -482,9 +486,12 @@ def export_one(pid: str) -> dict:
     )
     # Corpus weave policy: pending floats flush before the reference
     # list (otherwise end-queued figures spill past `References`)
-    # and stay inside their sections (tops are scarce with 18
-    # wide floats in one document). Additive vs the engine.
-    toml_src = "[floats]\nbarrier_before_refs = true\nbarrier_sections = true\n"
+    # Section barriers stay OFF: a barrier meeting a still-pending
+    # wide float ejects the column (placeins clearpage), leaving a
+    # half-empty column behind. Tail floats go to pages instead (no
+    # downstream tops left), so the refs barrier meets empty defer
+    # lists and never ejects.
+    toml_src = "[floats]\nbarrier_before_refs = true\n"
     suggs = suggest_layout(md_text, toml_src, spec)
     new_md, n_applied = apply_layout(md_text, suggs)
     (work / f"{pid}-auto.md").write_text(new_md, encoding="utf-8")

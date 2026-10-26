@@ -295,6 +295,23 @@ diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
 build, golden byte-identical, auto-applied showcase copy builds
 8pp with 0 overfull and the hand float distribution.
 
+## M7.4 — Tail page + no empty columns → 0.10.4
+
+`[layout] tail_lines` (default 10): a `wide`+`top` float with
+fewer body prose lines remaining takes a dedicated `page`. Two
+birds: no downstream tops are left (it would pile at the document
+end), and a still-pending float meeting `\FloatBarrier` ejects
+the column — placeins issues `\clearpage` in the first column,
+stranding a half-empty column behind it. That eject was the
+corpus's void source: section barriers (since reverted for the
+corpus) met pending wides and blanked ~17 right columns
+(chem p2, bio p17/p22/p33). Float pages never strand columns:
+text flows past them, and the refs barrier meets empty defer
+lists. Skipped in prose-free manuscripts so B1 stub pins stay
+exact. Corpus result: 0 true mid-body voids across all 10 papers
+(the 3 remaining flags are final-text-column end geometry + one
+normal column break); nothing crosses `References`.
+
 ## M7.3 — Refs barrier (opt-in) → 0.10.3
 
 `[floats] barrier_before_refs` (default off, so default weaves

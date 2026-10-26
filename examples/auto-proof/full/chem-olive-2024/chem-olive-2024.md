@@ -113,7 +113,7 @@ info:doi/10.1371/journal.pone.0306040.g004
 
 The X-ray diffraction (XRD) pattern of the manufactured Cd nanoparticles sample was obtained and shown in **Fig** 5 using CuK radiation ($\lambda$ = 1.5406), 40 kV- 40mA, and 2$\theta$ scanning mode. This analysis aimed to confirm the crystallinity of the Cd-nano compound. The data collection range was between 10 and 80 degrees. A comparison was made between the experimental diffractogram (**Fig** 5), Cd file No. 04–0783, and the JCPDS standard powder diffraction card. Four peaks at 2$\theta$ values of 45.30$^{\circ}$, 55.50$^{\circ}$, 68.70$^{\circ}$, and 79.80$^{\circ}$ in the experimental diffractogram were identified as originating from Cd metal.
 
-```mermaid {span=wide pos=top width=0.91}
+```mermaid {span=wide pos=page width=0.91}
 info:doi/10.1371/journal.pone.0306040.g005
 ```
 
@@ -129,7 +129,7 @@ info:doi/10.1371/journal.pone.0306040.g006
 
 **Fig** 7 displays the optimized structures of the Schiff base ligand (**H**$_{2}$**L**), 1-hydroxy-2-naphthaldehyde (HN), amino-N-(4,6-dimethylpyrimidin-2-yl)-4-benzenesulfonamide (ANB), and the Cd(II) complex (Cd$_{2}$ **H**$_{2}$**L**) conformers. The condensation reaction that forms the Schiff base ligand (**H**$_{2}$**L**) has positive values for E, H, and G, indicating that the reaction is endothermic and not spontaneous (Table 2). Despite these small values, the reaction is still considered viable and responsive to external stimuli. In contrast, the production of the Cd(II) complex is exothermic and spontaneous, with significantly negative and moderately high E, H, and G values, indicating a favorable reaction leading to the spontaneous formation of a strong and stable complex, the Cd(II) complex.
 
-```mermaid {span=wide pos=top width=0.87}
+```mermaid {span=wide pos=page width=0.87}
 info:doi/10.1371/journal.pone.0306040.g007
 ```
 
