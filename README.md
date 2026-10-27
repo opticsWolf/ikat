@@ -319,8 +319,9 @@ recommended path.
 ## LaTeX requirements
 
 ikat emits standard LaTeX; it never bundles classes or packages.
-You need a working TeX installation with `pdflatex` (and `bibtex`
-if you stage a `.bib`). TeX Live `scheme-full` covers everything;
+The `pdflatex` engine needs a working TeX installation (and
+`bibtex` if you stage a `.bib`); the `texres` engine bundles
+its own archive (this table applies to the pdflatex path). TeX Live `scheme-full` covers everything;
 minimal schemes (TinyTeX included) need at least:
 
 | what | packages | needed when |

@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.11.0 · 2026-10-26 · 173 cargo + 104 pytest green.
+Version 0.11.2 · 2026-10-27 · 173 cargo + 104 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -228,11 +228,25 @@ at parse time, not at TeX time.
   verification) and the gate greps both engines' `.log` files.
   Both papers build under both engines with 0 undefined
   citations (22 + 10 pages, same geometry; engine deltas —
-  all font-encoding class — ledgered in `ACCEPTED.md`). Crate
-  embedding does not link on Windows (C deps) — the supported
-  path is the `TECTONIC_EXE`/PATH binary cascade, and embedding
-  stays a Linux-CI exercise by design (recorded so it stops
-  being re-proposed).
+  all font-encoding class — ledgered in `ACCEPTED.md`). The
+  embed is **Linux-gated in code** (0.11.1): the dependency
+  lives under `cfg(target_os = "linux")` and the module/exports
+  gate on `all(feature, target_os)`, so `--features tectonic`
+  resolves on every target — a no-op where the C/C++ XeTeX core
+  has no pkg-config answer. CI compiles the embed on ubuntu
+  (`cargo test --features tectonic --lib tectonic`, bundle
+  download included); elsewhere the supported path is the
+  `TECTONIC_EXE`/PATH binary cascade, which the Python side
+  reaches automatically when the binding is absent.
+- texres (0.11.2) is the third engine, Python-side only:
+  `_compile_texres` runs the texres one-binary Rust TeX
+  distribution (`TEXRES_EXE`/PATH) — LaTeX, packages, fonts and
+  BibTeX bundled, all passes to convergence, stdout transcript
+  kept beside the PDF for the undefined-citation gate;
+  `ensure_packages` is a no-op (nothing to install). No Rust
+  involvement: upstream publishes no library crate, and its
+  baked-in data (~810 MB) would blow past PyPI's 100 MB cap —
+  the cascade is the shippable form (ROADMAP watch item).
 - `md.rs` (E.1/M5.4): the block splitter. pulldown-cmark owns
   boundaries (`Parser::into_offset_iter`, `TABLES` only — no
   other extensions); content comes from raw source slices, so
@@ -327,11 +341,14 @@ CLI, MCP, and headsproof alike.
 ### 4.3 `compile.py`, `texenv.py`, `cli.py`, `mcp_server.py`
 
 - `compile.py`: `compile_pdf(workdir, main, ensure_packages,
-  engine)` drives `pdflatex`+`bibtex` passes (or the tectonic
-  cascade), raising `CompileError` with the log tail instead of
-  a return code. `ensure_packages=True` gates the build on the
-  texenv probe. Deliberately excluded from MCP (workdir-bound,
-  minutes-long) — drive it from the CLI.
+  engine)` drives `pdflatex`+`bibtex` passes, or the tectonic
+  cascade (embedded binding on Linux feature builds, else the
+  binary with `--keep-logs`), or texres (one binary, all passes
+  + BibTeX to convergence), raising `CompileError` with the log
+  tail instead of a return code. `ensure_packages=True` gates
+  the build on the texenv probe (no-op for texres). Deliberately
+  excluded from MCP (workdir-bound, minutes-long) — drive it
+  from the CLI.
 - `texenv.py`: `check` (report) / `ensure` (install + re-probe)
   around the Rust scan; failure carries the manual texmf-install
   recipe and the MiKTeX Portable fallback.
@@ -468,5 +485,9 @@ Phase A, 0.3.0), layout + heading guards (M3.4, Phase D —
 0.6.0), parser switch (M5.4, Phase E — 0.7.0), line-numbered
 errors (M4.1, Phase F — 0.8.0), tectonic hardening (M4.10,
 Phase G — 0.9.0), auto-layout (M7.1, Phase H — 0.9.2/0.10.0).
-No open milestones; tectonic crate embedding remains a Linux-CI
-exercise by design.
+After them: author front matter + opt-in collapse (M7.10/
+M7.10b — 0.10.14/0.10.15), the Linux-gated tectonic embed
+CI-exercised on ubuntu (0.11.1), and texres as the third engine
+via its binary cascade (0.11.2). No open milestones; the next
+engine step (in-memory texres embed) is analyzed in the
+ROADMAP watch item.
