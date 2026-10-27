@@ -46,9 +46,9 @@ no font mismatch between text and figures.
   global — each element kind (diagram, plot, table) declares
   `column` or `wide`, overridable per element from Markdown.
 - **Compile** (`ikat.compile`): `pdflatex`/`bibtex` driver that turns
-  the woven tree into PDF, with a `tectonic` engine option
-  (`compile_pdf(..., engine="tectonic")`, `--engine` on the
-  `build`/`weave` CLIs and the example builders). The tectonic
+  the woven tree into PDF, with `tectonic` and `texres` engine
+  options (`compile_pdf(..., engine=...)`, `--engine` on the
+  `build`/`standalone` CLIs and the example builders). The tectonic
   crate as an optional cargo feature (off by default) is
   **Linux-only by design**: its C/C++ XeTeX core builds through
   pkg-config, which has no answer where no system C libraries
@@ -71,9 +71,11 @@ pgfplots emission, layout suggestions, package checks, templates,
 skeletons, and the skills installer. PDF output additionally needs
 a TeX distribution with `pdflatex` on PATH —
 [TinyTeX](https://yihui.org/tinytex) is the lightweight default;
-point `--engine tectonic` at a
-[tectonic](https://tectonic-typesetting.github.io) binary to skip
-the classic toolchain. Once a distribution exists,
+skip the classic toolchain entirely with `--engine texres` (a
+[one-binary Rust TeX distribution](https://github.com/leoliu0/texres):
+LaTeX + packages + fonts + BibTeX bundled, fully offline) or
+`--engine tectonic` (a [tectonic](https://tectonic-typesetting.github.io)
+binary, bundle fetched on first run). Once a distribution exists,
 `ikat check --install` fetches the exact packages a document needs
 (see [LaTeX requirements](#latex-requirements) for the full table).
 

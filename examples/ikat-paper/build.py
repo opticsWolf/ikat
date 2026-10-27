@@ -10,6 +10,7 @@ citations, math, code spans, unicode, a dagger note, skeleton
 tokens, plot registry + plot_attrs, and [floats] tuning.
 """
 
+import os
 import shutil
 import subprocess
 import sys
@@ -170,9 +171,11 @@ if __name__ == "__main__":
     import argparse
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic"])
+    ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic", "texres"])
     engine = ap.parse_args().engine
-    if shutil.which(engine) is None:
+    # compile.py honors the _EXE overrides (embedded binding for
+    # tectonic; TEXRES_EXE for texres) - the pre-check must too.
+    if shutil.which(engine) is None and not os.environ.get(engine.upper() + "_EXE"):
         raise SystemExit(f"{engine} not on PATH")
     OUT.mkdir(exist_ok=True)
     FIGS.mkdir(exist_ok=True)

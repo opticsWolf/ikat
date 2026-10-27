@@ -557,12 +557,24 @@ engine swap).
 
 **Why it matters for ikat:**
 
-1. ~~`engine="texres"` slots into the binary cascade~~ DONE in
-   0.11.1 for tectonic itself: the `tectonic` cargo feature is
-   Linux-gated and CI-exercised; the same gating pattern is what
-   a `texres` feature would use. texres-specific: the binary
-   cascade slot (probe PATH) remains unimplemented — trivial
-   when wanted.
+1. ~~`engine="texres"` slots into the binary cascade~~ **DONE in
+   0.11.2**: `compile_pdf(engine="texres")` + `--engine texres` on
+   `build`/`standalone` — `TEXRES_EXE`/PATH probe, stdout transcript
+   kept beside the PDF for the CI gate, `ensure_packages` a no-op
+   (everything bundles). Locally proven end-to-end on the demo and
+   the showcase sources.
+2. The strategic prize: texres ships a **C library and a WASM module**
+   that compile documents in memory — a C embedding WITHOUT the
+   pkg-config/system-lib chain that makes the `tectonic` cargo
+   feature Linux-only. The credible endgame for an embedded engine on
+   Windows; could replace the tectonic embed entirely. **Embed
+   feasibility (checked 2026-10-27):** upstream publishes NO crate
+   to crates.io (`libtex` absent); a git-dependency on their
+   workspace would work, but the data is baked into the binary
+   (that is why the exe is 810 MB) — an ikat embed would balloon
+   the extension module to ~800 MB, far past PyPI's 100 MB upload
+   cap. So: embed = source-build/offline-deployment option only,
+   never a wheel; the cascade slot is the shippable form.
 2. The strategic prize: texres ships a **C library and a WASM module**
    that compile documents in memory — a C embedding WITHOUT the
    pkg-config/system-lib chain that makes the `tectonic` cargo

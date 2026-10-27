@@ -123,8 +123,8 @@ def test_live_probe_sees_base_files():
 
 
 def test_compile_pdf_engine_passthrough(monkeypatch, tmp_path):
-    # G.2: `engine=` is honored — tectonic routes to the tectonic
-    # path, anything else names the options. No binary needed.
+    # G.2: `engine=` is honored — tectonic/texres route to their
+    # paths, anything else names the options. No binary needed.
     from ikat import compile as compile_mod
     from ikat.compile import CompileError, compile_pdf
 
@@ -135,5 +135,11 @@ def test_compile_pdf_engine_passthrough(monkeypatch, tmp_path):
     )
     compile_pdf(tmp_path, "doc.tex", engine="tectonic")
     assert (seen["workdir"], seen["main"]) == (tmp_path, "doc.tex")
-    with pytest.raises(CompileError, match="pdflatex\|tectonic"):
+    monkeypatch.setattr(
+        compile_mod, "_compile_texres",
+        lambda workdir, main: seen.update(workdir=workdir, main=main) or tmp_path / "y.pdf",
+    )
+    compile_pdf(tmp_path, "doc.tex", engine="texres")
+    assert (seen["workdir"], seen["main"]) == (tmp_path, "doc.tex")
+    with pytest.raises(CompileError, match="pdflatex\\|tectonic\\|texres"):
         compile_pdf(tmp_path, "doc.tex", engine="luatex")
