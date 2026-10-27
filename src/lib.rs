@@ -20,7 +20,7 @@ mod preset;
 mod sequence;
 mod state;
 mod table;
-#[cfg(feature = "tectonic")]
+#[cfg(all(feature = "tectonic", target_os = "linux"))]
 mod tectonic;
 mod texenv;
 
@@ -243,9 +243,10 @@ fn tex_extra_packages(tex: &str) -> Vec<String> {
     doc::tex_extra_packages(tex)
 }
 
-/// Tectonic engine (feature `tectonic` only): full `.tex` in,
-/// PDF bytes out. Absent without the feature — see `compile.py`.
-#[cfg(feature = "tectonic")]
+/// Tectonic engine (feature `tectonic`, Linux builds only): full
+/// `.tex` in, PDF bytes out. Absent elsewhere — the Python cascade
+/// in `compile.py` falls back to the `tectonic` binary.
+#[cfg(all(feature = "tectonic", target_os = "linux"))]
 #[pyfunction]
 fn compile_tectonic_pdf(tex: &str) -> PyResult<Vec<u8>> {
     crate::tectonic::compile_tectonic(tex).map_err(pyo3::exceptions::PyRuntimeError::new_err)
@@ -270,7 +271,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(document_class, m)?)?;
     m.add_function(wrap_pyfunction!(package_needs, m)?)?;
     m.add_function(wrap_pyfunction!(suggest_layout, m)?)?;
-    #[cfg(feature = "tectonic")]
+    #[cfg(all(feature = "tectonic", target_os = "linux"))]
     m.add_function(wrap_pyfunction!(compile_tectonic_pdf, m)?)?;
     Ok(())
 }

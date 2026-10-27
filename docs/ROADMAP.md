@@ -11,8 +11,12 @@ POSIX load_preset fix — 173 cargo + 104 pytest green (104 passed,
 site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
 PyPI wheels (3.10-3.15 + PyPy, via Trusted Publishing) and the
 crates.io crate published — first release from merged `main`.
-Open: tectonic crate embedding (Linux-CI exercise, by design —
-but see the TeXres watch item below).
+0.11.1: the `tectonic` cargo feature is now Linux-gated
+(`cfg(target_os = "linux")` — `--features tectonic` resolves on
+every target, no-op where the C deps can't build) and CI on
+ubuntu exercises the embedded engine via `cargo test --features
+tectonic`; Windows keeps the binary cascade. Open: none.
+See the TeXres watch item below for the next engine step.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -553,9 +557,12 @@ engine swap).
 
 **Why it matters for ikat:**
 
-1. `engine="texres"` slots into the binary cascade exactly like the
-   tectonic binary (probe PATH, run) — a zero-install PDF path on
-   Windows; small addition when wanted.
+1. ~~`engine="texres"` slots into the binary cascade~~ DONE in
+   0.11.1 for tectonic itself: the `tectonic` cargo feature is
+   Linux-gated and CI-exercised; the same gating pattern is what
+   a `texres` feature would use. texres-specific: the binary
+   cascade slot (probe PATH) remains unimplemented — trivial
+   when wanted.
 2. The strategic prize: texres ships a **C library and a WASM module**
    that compile documents in memory — a C embedding WITHOUT the
    pkg-config/system-lib chain that makes the `tectonic` cargo

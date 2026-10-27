@@ -1,6 +1,6 @@
 [package]
 name = "ikat"
-version = "0.11.0"
+version = "0.11.1"
 edition = "2021"
 description = "Weave Markdown into camera-ready LaTeX: mermaid-to-TikZ, pgfplots figures, publisher templates"
 authors = ["opticsWolf"]
@@ -20,10 +20,16 @@ pulldown-cmark = "0.13"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tectonic = { version = "0.17.0", optional = true }
 toml = "1"
 
 [dev-dependencies]
 
 [features]
+# Linux-only by design: the tectonic crate builds its C/C++ XeTeX
+# core through pkg-config, which has no answer where no system C
+# libraries exist (Windows/macOS defaults). Elsewhere the binary
+# cascade covers tectonic (TECTONIC_EXE or PATH).
 tectonic = ["dep:tectonic"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tectonic = { version = "0.17.0", optional = true }
