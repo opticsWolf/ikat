@@ -125,7 +125,7 @@ Text + citations
       <div class="page-width try-grid">
         <div class="try-intro">
           <h2 id="try-title">Build it. Then weave a paper.</h2>
-          <p>Try the current source with Python and Rust installed. The <code>--no-pdf</code> build writes LaTeX without TeX installed; remove that flag after adding TeX Live or TinyTeX to produce a PDF.</p>
+          <p>Install the published wheel with pip, or build the current source with Python and Rust installed. The <code>--no-pdf</code> build writes LaTeX without TeX installed; remove that flag after adding TeX Live or TinyTeX to produce a PDF.</p>
           <ul class="prerequisites" aria-label="Build prerequisites">
             <li>Python 3.10 or newer</li>
             <li>Rust stable toolchain</li>
@@ -136,10 +136,18 @@ Text + citations
         <div class="install-sheet">
           <div class="install-heading">
             <h3>Quick start</h3>
-            <span>Source build</span>
+            <span>pip, then source</span>
           </div>
           <details class="command-details" open>
-            <summary>macOS / Linux</summary>
+            <summary>pip — published wheel</summary>
+            <div class="command-block">
+              <pre><code id="pypi-commands">python -m pip install &quot;ikat[mcp]&quot;
+ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
+              <button class="copy-button js-only" type="button" data-copy="pypi-commands">Copy commands</button>
+            </div>
+          </details>
+          <details class="command-details">
+            <summary>macOS / Linux — source</summary>
             <div class="command-block">
               <pre><code id="unix-commands">git clone https://github.com/opticsWolf/ikat.git
 cd ikat
@@ -153,7 +161,7 @@ ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
             </div>
           </details>
           <details class="command-details">
-            <summary>Windows PowerShell</summary>
+            <summary>Windows PowerShell — source</summary>
             <div class="command-block">
               <pre><code id="windows-commands">git clone https://github.com/opticsWolf/ikat.git
 cd ikat

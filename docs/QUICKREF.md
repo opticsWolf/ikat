@@ -9,6 +9,8 @@
 ## Install & build
 
 ```bash
+pip install ikat                     # users: published wheel (add "ikat[mcp]" for the MCP server)
+# contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
 cargo test                               # 173 Rust tests
