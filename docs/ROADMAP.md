@@ -52,7 +52,7 @@ ikat's test suite.
 shows only intended improvements; resulting PDF compiles with
 0 undefined citations.
 
-## Phase 2 — Data plots live (matplotlib out)
+## Phase 2 — Data plots live (matplotlib out) ✅ DONE 2026-10-08
 
 - **M2.1 presets.** ✅ DONE 2026-10-08 (Phase A.1+A.2, 0.2.2+0.2.3)
   — `src/preset.rs` + `load_preset`: benchmark JSON → emitters
@@ -95,7 +95,7 @@ shows only intended improvements; resulting PDF compiles with
 *Acceptance:* `paper/figs/` producible with no matplotlib import
 anywhere in the loop.
 
-## Phase 3 — Figures advanced (all OPEN)
+## Phase 3 — Figures advanced ✅ DONE 2026-10-08
 
 - **M3.1 standalone export.** ✅ DONE 2026-10-08 (Phase B,
   0.3.1+0.4.0) — `python/ikat/standalone.py` (`wrap_standalone`
@@ -130,7 +130,7 @@ anywhere in the loop.
 read-questions, stratum) regenerate from their mermaid fences with
 no hand-tuning.
 
-## Phase 4 — Harden & release
+## Phase 4 — Harden & release ✅ DONE 2026-10-08
 
 - **M4.1 errors.** ✅ DONE 2026-10-08 (Phase F, 0.7.1 → gate
   0.8.0) — `src/error.rs::Error { msg, line, col, echo }` at
@@ -192,10 +192,10 @@ prints verbatim; MCP returns the text. 118 cargo + 75 pytest
   (`tectonic` cargo feature, off by default) → `TECTONIC_EXE`/PATH
   binary; `tex_for_tectonic` drops the inputenc line; woven doc
   with TikZ+table compiled to a content-verified PDF. Tectonic
-  *crate* embedding stays OPEN (blocked on Windows C deps —
-  pkg-config / system libs; the `tectonic` cargo feature does not
-  link here, so embedding is a Linux-CI exercise verified under
-  M4.2b); empty `bib_name` now emits no bibliography lines (tectonic auto-runs
+  *crate* embedding was Linux-only from the start (C deps via
+  pkg-config) and is now enforced in code: since 0.11.1 the
+  dependency is `cfg(target_os = "linux")`-gated and CI on ubuntu
+  compiles the embed (`cargo test --features tectonic`); empty `bib_name` now emits no bibliography lines (tectonic auto-runs
   BibTeX and dies on empty `\bibliography{}`).
   What M4.9 did NOT cover is itemized in M4.10.
 - **M4.10 tectonic hardening.** ✅ DONE 2026-10-08 (Phase G,
@@ -232,7 +232,7 @@ M4.3 can jump the queue any time — it costs nothing but tokens.
 M4.10 rides along with any CI work (it is a `tex`-job step plus
 verification runs, no new machinery).
 
-## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md)
+## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md) ✅ DONE 2026-10-08
 
 - **M5.1 float formatting.** ✅ DONE 2026-10-07 — per-element
   `span/pos/width/captionpos` attrs (`%% table {...}` for tables,
