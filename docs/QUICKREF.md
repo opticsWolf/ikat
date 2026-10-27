@@ -258,5 +258,6 @@ PyPI wheels + crates.io publish in parallel
 (`PYPI_API_TOKEN`, `CARGO_REGISTRY_TOKEN` secrets).
 
 *Full docs: `ARCHITECTURE.md` (split + module map),
-`ROADMAP.md` (milestones M1–M6), `RESEARCH.md`, `FORMAT-DRAFT.md`
+`ROADMAP.md` (status + engine ladder), `CHANGELOG.md`
+(per-version history), `RESEARCH.md`, `FORMAT-DRAFT.md`
 (float/skeleton spec).*

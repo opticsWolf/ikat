@@ -118,7 +118,7 @@ ikat/
   tests/          pytest suite incl. the surface drift tests
                   (commands/flags/tools/skills pinned to the code)
   docs/           ARCHITECTURE.md, QUICKREF.md, ROADMAP.md,
-                  RESEARCH.md, FORMAT-DRAFT.md, PLAN-dev.md
+                  CHANGELOG.md, RESEARCH.md, FORMAT-DRAFT.md, PLAN-dev.md
   examples/       mini.md starter + ikat-paper/ showcase (7-page
                   paper built by ikat itself), auto-proof/ (the
                   layout-bench corpus + the auto-layout showcase,

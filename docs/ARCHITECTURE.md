@@ -476,8 +476,10 @@ in parallel.
 
 ## 9. Roadmap
 
-The plan of record is `docs/ROADMAP.md` (milestones M1–M6 with
-acceptance gates). Done: pipeline parity + golden master (M1,
+The plan of record is `docs/ROADMAP.md` (status, engine ladder,
+watch items, non-goals); the shipped history is
+`docs/CHANGELOG.md` (per-version, derived from commit messages
+- minors combined up to v0.10.0). Done: pipeline parity + golden master (M1,
 M4.4), floats (M5.1), skeletons (M5.2), CLI/MCP/surface parity
 (M4.2, M4.8), legend auto-placement (M2.4), CI + release
 workflows (M4.2b), preset loader + regen harness (M2.1, M2.2 —
