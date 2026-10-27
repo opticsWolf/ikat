@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.11.2 · 2026-10-27 · 173 cargo + 104 pytest green.
+Version 0.12.0 · 2026-10-27 · 173 cargo + 104 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.

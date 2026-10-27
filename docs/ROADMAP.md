@@ -1,6 +1,6 @@
 # ikat roadmap
 
-Status 2026-10-26 (0.11.0, merged to `main`): through M7.10b done —
+Status 2026-10-27 (0.12.0, on `main`): through M7.10b done —
 TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
 annotations + instructions + bundled skills + installer + registry
 (M7.9/M7.9b), help verb + registry JSON + bare-invocation help
@@ -15,8 +15,11 @@ crates.io crate published — first release from merged `main`.
 (`cfg(target_os = "linux")` — `--features tectonic` resolves on
 every target, no-op where the C deps can't build) and CI on
 ubuntu exercises the embedded engine via `cargo test --features
-tectonic`; Windows keeps the binary cascade. Open: none.
-See the TeXres watch item below for the next engine step.
+tectonic`; Windows keeps the binary cascade. 0.11.2: texres as
+the third engine (binary cascade, `--engine texres`). 0.12.0:
+docs + site engine-story sync (no code change over 0.11.2).
+Open: none. See the TeXres watch item below for the next engine
+step.
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
