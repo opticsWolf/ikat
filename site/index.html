@@ -37,7 +37,7 @@
           <a class="button button-primary" href="#try-it">Try ikat from source</a>
           <a class="text-link" href="#pipeline">See what it emits</a>
         </div>
-        <p class="requirements-line"><strong>Python 3.10+</strong><span aria-hidden="true">·</span><strong>Rust</strong><span aria-hidden="true">·</span><strong>TeX for PDF output</strong></p>
+        <p class="requirements-line"><strong>Python 3.10+</strong><span aria-hidden="true">·</span><strong>Rust</strong><span aria-hidden="true">·</span><strong>TeX for PDF output — or texres, no install</strong></p>
       </div>
 
       <figure class="assembly-figure" aria-labelledby="assembly-title" aria-describedby="assembly-description">
@@ -75,10 +75,10 @@ Text + citations
             <div class="part-caption"><span class="part-index">D</span><span>DOCUMENT</span></div>
             <h3>paper.tex</h3>
             <p class="output-line">TikZ + pgfplots</p>
-            <p class="output-stamp">PDF, when TeX is installed</p>
+            <p class="output-stamp">PDF — local TeX, or the texres one-binary</p>
           </article>
         </div>
-        <p id="assembly-description" class="sr-only">Markdown and editable figure inputs pass through ikat’s Rust core, which emits LaTeX with TikZ and pgfplots figures. PDF compilation uses the local TeX installation.</p>
+        <p id="assembly-description" class="sr-only">Markdown and editable figure inputs pass through ikat’s Rust core, which emits LaTeX with TikZ and pgfplots figures. PDF compilation uses the local TeX installation, or the texres engine — a single Rust binary bundling LaTeX, packages, fonts, and BibTeX, needing no installation.</p>
         <p class="assembly-status" id="assembly-status" aria-live="polite">The parts are separated so each input and output is visible.</p>
         <noscript><p class="noscript-note">The assembly view is shown as a static exploded diagram. The pipeline description and all commands are available below.</p></noscript>
       </figure>
@@ -125,11 +125,11 @@ Text + citations
       <div class="page-width try-grid">
         <div class="try-intro">
           <h2 id="try-title">Build it. Then weave a paper.</h2>
-          <p>Install the published wheel with pip, or build the current source with Python and Rust installed. The <code>--no-pdf</code> build writes LaTeX without TeX installed; remove that flag after adding TeX Live or TinyTeX to produce a PDF.</p>
+          <p>Install the published wheel with pip, or build the current source with Python and Rust installed. The <code>--no-pdf</code> build writes LaTeX without TeX installed; for PDFs, point <code>--engine texres</code> at the single-binary <a href="https://github.com/leoliu0/texres">texres</a> distribution — or add TeX Live or TinyTeX and keep the default engine.</p>
           <ul class="prerequisites" aria-label="Build prerequisites">
             <li>Python 3.10 or newer</li>
             <li>Rust stable toolchain</li>
-            <li>TeX only for PDF compilation</li>
+            <li>TeX only for PDF compilation (or texres — no install)</li>
           </ul>
           <a class="try-secondary" href="https://github.com/opticsWolf/ikat">Open the source repository</a>
         </div>
@@ -142,7 +142,8 @@ Text + citations
             <summary>pip — published wheel</summary>
             <div class="command-block">
               <pre><code id="pypi-commands">python -m pip install &quot;ikat[mcp]&quot;
-ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
+ikat build site/hello-paper.md --outdir out --no-pdf
+rem PDFs with no TeX install: get texres, then add --engine texres</code></pre>
               <button class="copy-button js-only" type="button" data-copy="pypi-commands">Copy commands</button>
             </div>
           </details>
