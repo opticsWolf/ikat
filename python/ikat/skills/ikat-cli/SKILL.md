@@ -20,7 +20,7 @@ built module on PATH (`maturin develop` installs the `ikat` script).
 ikat build DOC.md --toml T.toml --outdir OUT [--spec S.json] [--bib R.bib]
      [--author NAME…] [--affiliation INST…] [--author-affil A:N[,N…]]
      [--authors-max N]
-     [--engine pdflatex|tectonic] [--bib-style B] [--ensure-packages] [--no-pdf]
+     [--engine pdflatex|tectonic|texres] [--bib-style B] [--ensure-packages] [--no-pdf]
 ikat weave DOC.md --toml T.toml --spec S.json [--bib R.bib] [--author NAME…]
      [--affiliation INST…] [--author-affil A:N[,N…]] [--authors-max N] > doc.tex   # stdout, no TeX needed
 ikat check DOC.tex [--install] [--verbose]                # exit 1 if anything missing
@@ -42,6 +42,8 @@ ikat version
 - `--spec` is BuildSpec JSON (`diagrams/plots/table_captions/bib_style/...`).
 - `--bib refs.bib` derives the allowed citation keys (dangling keys fail).
 - `--engine tectonic` uses the `TECTONIC_EXE`/PATH binary cascade.
+- `--engine texres` runs the texres one-binary Rust TeX distribution
+  (`TEXRES_EXE`/PATH; bundles LaTeX + packages + fonts + BibTeX, offline).
 - Plot payloads: barchart needs `title ylabel group_labels series_names
   values mins maxs` (+ optional `log_y refline:[x0,x1,y,label] legend`);
   lineplot needs `title xlabel ylabel xs names yss errs` (+ optional

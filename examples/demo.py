@@ -44,6 +44,6 @@ floats = [
 tex = PREAMBLE + "\n\n".join(floats) + "\n\\end{document}\n"
 (outdir / "mini.tex").write_text(tex, encoding="utf-8")
 ap = argparse.ArgumentParser()
-ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic"])
+ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "tectonic", "texres"])
 pdf = compile_pdf(outdir, "mini.tex", engine=ap.parse_args().engine)
 print("demo PDF ->", pdf, f"({pdf.stat().st_size} bytes)")

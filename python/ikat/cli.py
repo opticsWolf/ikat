@@ -1,7 +1,7 @@
 """ikat command line: the same operations as the Python API and MCP tools.
 
     ikat build MD [--toml T] [--outdir D] [--spec S.json] [--bib R.bib]
-                 [--engine pdflatex|tectonic] [--bib-style B]
+                 [--engine pdflatex|tectonic|texres] [--bib-style B]
                  [--ensure-packages] [--no-pdf]
     ikat weave MD [--toml T] [--spec S.json] [--bib R.bib]   # .tex to stdout
     ikat layout MD [--toml T] [--spec S.json] [--json] [--apply]
@@ -381,7 +381,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="mark author A (1-based) with affiliations N (1-based); repeatable")
     b.add_argument("--authors-max", type=int, default=0, metavar="N",
                    help="collapse to the first N names + ', et al.' (0 = never)")
-    b.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
+    b.add_argument("--engine", default="pdflatex", help="pdflatex (default), tectonic, or texres")
     b.add_argument("--bib-style", default=None)
     b.add_argument("--ensure-packages", action="store_true")
     b.add_argument("--no-pdf", action="store_true", help="stop after .tex (no TeX needed)")
@@ -452,7 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("standalone", help="one mermaid/chart fence -> figure PDF")
     s.add_argument("md", help="markdown file or - for stdin")
     s.add_argument("--out", default=None, help="PDF path (default fig.pdf)")
-    s.add_argument("--engine", default="pdflatex", help="pdflatex (default) or tectonic")
+    s.add_argument("--engine", default="pdflatex", help="pdflatex (default), tectonic, or texres")
     s.set_defaults(func=cmd_standalone)
 
     k = sub.add_parser("skeletons", help="list shipped skeleton documents")

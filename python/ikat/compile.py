@@ -85,6 +85,34 @@ def _compile_tectonic(workdir: str | Path, main_tex: str) -> Path:
     return pdf
 
 
+def _compile_texres(workdir: str | Path, main_tex: str) -> Path:
+    """texres binary (`TEXRES_EXE` or PATH): a TeX distribution in
+    one Rust executable (bundled formats, packages, fonts, BibTeX).
+    Runs LaTeX + BibTeX as needed to convergence and writes the PDF
+    next to the source; aux state lives in texres's own cache dir.
+    The engine (pdfLaTeX/XeLaTeX/LuaLaTeX) is picked from the
+    preamble, so no inputenc adaptation is needed; `ensure_packages`
+    is a no-op here — everything ships bundled."""
+    import os
+
+    exe = os.environ.get("TEXRES_EXE") or shutil.which("texres")
+    if exe is None:
+        raise CompileError(
+            "texres engine needs the texres binary (TEXRES_EXE or PATH) - "
+            "releases: https://github.com/leoliu0/texres"
+        )
+    workdir = Path(workdir)
+    out = _run(exe, [main_tex], workdir)
+    stem = Path(main_tex).stem
+    # stdout transcript kept beside the PDF: the CI gate greps the
+    # same undefined-citation patterns as for pdflatex.
+    (workdir / f"{stem}-texres-stdout.log").write_text(out, encoding="utf-8")
+    pdf = workdir / f"{stem}.pdf"
+    if not pdf.exists():
+        raise CompileError(f"no PDF produced for {main_tex}")
+    return pdf
+
+
 def compile_pdf(workdir: str | Path, main_tex: str, ensure_packages: bool = False,
                 engine: str = "pdflatex") -> Path:
     """Compile `main_tex` inside `workdir`; return the PDF path.
@@ -99,14 +127,16 @@ def compile_pdf(workdir: str | Path, main_tex: str, ensure_packages: bool = Fals
     """
     if engine == "tectonic":
         return _compile_tectonic(workdir, main_tex)
+    if engine == "texres":
+        return _compile_texres(workdir, main_tex)
     if engine != "pdflatex":
-        raise CompileError(f"unknown engine {engine!r} (pdflatex|tectonic)")
+        raise CompileError(f"unknown engine {engine!r} (pdflatex|tectonic|texres)")
     if shutil.which("pdflatex") is None:
         raise CompileError(
             "pdflatex not on PATH - install a TeX distribution"
             " (TinyTeX: https://yihui.org/tinytex), weave to .tex with"
-            " --no-pdf, or use engine='tectonic' with the tectonic"
-            " binary on PATH"
+            " --no-pdf, or use engine='tectonic' or engine='texres'"
+            " with the respective binary on PATH"
         )
     workdir = Path(workdir)
     if ensure_packages:
