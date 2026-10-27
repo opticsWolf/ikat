@@ -205,7 +205,7 @@ ikat build site/hello-paper.md --outdir out --no-pdf</code></pre>
             <dd>Configure width, column span, placement, document heads, and whole-document skeletons without surrendering the source.</dd>
           </div>
         </dl>
-        <p class="tex-note"><strong>TeX boundary:</strong> <code>ikat weave</code> writes TeX without TeX installed. To compile a PDF, use a local <code>pdflatex</code> installation; a bibliography also needs <code>bibtex</code>.</p>
+        <p class="tex-note"><strong>TeX boundary:</strong> <code>ikat weave</code> writes TeX without TeX installed. To compile a PDF, use a local <code>pdflatex</code> installation (<code>bibtex</code> too when a bibliography is staged), or skip installation entirely with <code>--engine texres</code> — one binary bundling LaTeX, packages, fonts, and BibTeX — or <code>--engine tectonic</code>, which fetches its bundle on first run.</p>
       </div>
     </section>
 
