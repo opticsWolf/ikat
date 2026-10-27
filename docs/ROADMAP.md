@@ -8,9 +8,11 @@ annotations + instructions + bundled skills + installer + registry
 POSIX load_preset fix — 173 cargo + 104 pytest green (104 passed,
 4 skipped), hand and auto showcases byte-identical (7 pages,
 0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
-site asset = the auto-layout build. Open: PyPI/crates publish (needs
-Trusted-Publisher registration; tag `v0.11.0` when ready), tectonic
-crate embedding (Linux-CI exercise, by design).
+site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
+PyPI wheels (3.10-3.15 + PyPy, via Trusted Publishing) and the
+crates.io crate published — first release from merged `main`.
+Open: tectonic crate embedding (Linux-CI exercise, by design —
+but see the TeXres watch item below).
 
 Acceptance rules for every phase: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
@@ -525,6 +527,45 @@ the p24–26 end pile for an in-section float page (9 tables now
 p9–p21 beside their prose, 26pp→25pp), 0 stranded headings
 across all 10 papers (D.2 needspace guards hold). Exporter
 `pic_attrs` mirrors the budget for precompiled pictures.
+
+## Watch: TeXres — a Rust TeX distribution (2026-10-27)
+
+Survey question: "is there an alternative in Rust to tectonic?"
+Answer: yes, one serious candidate — **TeXres** (github.com/leoliu0/texres,
+v0.7.8 2026-10-23, MIT/Apache-2.0): a TeX distribution in a single
+Rust executable (pdfLaTeX/XeLaTeX/LuaLaTeX + LaTeX formats + package
+archive + fonts + BibTeX/Biber, fully offline, output CI-compared
+against TeX Live 2026).
+
+**Empirically verified on the showcase** (not just README claims):
+portable Windows build (810 MB), the woven `ikat-paper.tex` (IEEEtran
+conference class + TikZ + pgfplots + precompiled PDF figures +
+`\bibliography` with staged `ikat-refs.bib`) compiled with zero other
+software installed — 7 pages (same as pdflatex), References resolved
+in IEEE style, IEEEtran typography correct, line-anchored errors with
+source snippets. Found `IEEEtran.bst` in its own archive.
+
+Also surveyed, all lesser: `texforge` (workflow wrapper that installs
+tectonic underneath), `tex_engine` crate (real Rust engine framework,
+GPL, research-grade), `rustatex` (own language, toy), Typst (mature
+pure Rust, but a different language — an emission target, not an
+engine swap).
+
+**Why it matters for ikat:**
+
+1. `engine="texres"` slots into the binary cascade exactly like the
+   tectonic binary (probe PATH, run) — a zero-install PDF path on
+   Windows; small addition when wanted.
+2. The strategic prize: texres ships a **C library and a WASM module**
+   that compile documents in memory — a C embedding WITHOUT the
+   pkg-config/system-lib chain that makes the `tectonic` cargo
+   feature Linux-only. The credible endgame for an embedded engine on
+   Windows; could replace the tectonic embed entirely.
+
+**Why watch, not switch:** 810 MB per platform (the distribution is
+the product, vs ~30 MB tectonic binary + cached bundles), v0.7.x
+maturity, single maintainer. Revisit when a Windows/CI pain point or
+the WASM/C-library embedding justifies the work.
 
 ## Tracked elsewhere (not ikat work)
 
