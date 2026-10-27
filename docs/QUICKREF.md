@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.11.2 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.12.0 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
