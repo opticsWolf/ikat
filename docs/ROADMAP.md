@@ -1,220 +1,67 @@
 # ikat roadmap
 
-Status 2026-10-27 (0.12.0, on `main`): through M7.10b done —
-TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
-annotations + instructions + bundled skills + installer + registry
-(M7.9/M7.9b), help verb + registry JSON + bare-invocation help
-(M7.9c), full author front matter + opt-in collapse (M7.10/M7.10b),
-POSIX load_preset fix — 173 cargo + 104 pytest green (104 passed,
-4 skipped), hand and auto showcases byte-identical (7 pages,
-0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
-site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
-PyPI wheels (3.10-3.15 + PyPy, via Trusted Publishing) and the
-crates.io crate published — first release from merged `main`.
-0.11.1: the `tectonic` cargo feature is now Linux-gated
-(`cfg(target_os = "linux")` — `--features tectonic` resolves on
-every target, no-op where the C deps can't build) and CI on
-ubuntu exercises the embedded engine via `cargo test --features
-tectonic`; Windows keeps the binary cascade. 0.11.2: texres as
-the third engine (binary cascade, `--engine texres`). 0.12.0:
-docs + site engine-story sync (no code change over 0.11.2).
-Open: none. See the TeXres watch item below for the next engine
-step.
+Planning lives here; history lives in `docs/CHANGELOG.md`.
 
-Acceptance rules for every phase: `cargo test` + `pytest` green,
+Status 2026-10-27 (0.12.0, on `main`): all planned phases and
+milestones are done — Phases 1–6 (pipeline, plots, figures,
+hardening, floats/skeletons/parsing, showcase), Phases A–H
+(presets, standalone, sequence/state, layout+guards, parser
+switch, line-numbered errors, tectonic hardening, auto-layout),
+M7.2–M7.10b (float policy, math, author front matter, MCP
+surface), the Linux-gated tectonic embed, and texres as the
+third engine. Shipped: v0.11.0 on PyPI (wheels 3.10–3.15 + PyPy,
+Trusted Publishing) and crates.io. 173 cargo + 104 pytest green;
+hand and auto showcases byte-identical; the site link-gates its
+deploys. Open: nothing.
+
+Acceptance rules for every change: `cargo test` + `pytest` green,
 `maturin develop` warning-free, demo + showcase paper still build.
 
-## Phase 1 — Dogfood the paper (pipeline parity) ✅ DONE 2026-10-06
+## Engine ladder (current)
 
-All compute in Rust (`src/esc.rs`, `src/table.rs`, `src/doc.rs`);
-Python (`python/ikat/document.py`) only carries strings over the
-PyO3 boundary. Golden test `tests/test_paper.py` rebuilds
-`paper-2026-10-05.tex` **byte-identical** to `build-paper.py` output
-(4 diagrams, 9 tables, 50-entry `.bib` derivative identical too).
-Strictness upgrade kept: dangling citation keys fail the build.
+1. `pdflatex` (default) — a local TeX distribution; `bibtex` for
+   staged bibliographies; `ensure_packages` can install missing
+   LaTeX packages (texliveonfly trick).
+2. `tectonic` — the `TECTONIC_EXE`/PATH binary everywhere; on
+   Linux also embeddable via the `tectonic` cargo feature
+   (Linux-gated, CI-exercised; the C/C++ XeTeX core has no
+   pkg-config answer elsewhere).
+3. `texres` — the one-binary Rust TeX distribution
+   (`TEXRES_EXE`/PATH): LaTeX, packages, fonts, and BibTeX
+   bundled, all passes to convergence, nothing to install.
 
-Goal: ikat rebuilds `paper-2026-10-05.tex` from the draft markdown.
-This is the fastest hardener: the paper's converter edge cases become
-ikat's test suite.
+## Watch: TeXres — the next engine step (2026-10-27)
 
-- **M1.1 tables.** Pipe tables → `tabularx` with per-table colspec
-  (`Xcl` appendix style), caption registry, `TABLE` numbering.
-  Port from `build-paper.py::table_block`.
-- **M1.2 citations.** `[key]`, `[author: key]`, `;`-groups, prose
-  fallback — with keyset validation against the staged `.bib` so a
-  dangling key fails the build instead of printing raw.
-- **M1.3 inline.** Unicode→LaTeX map, `$…$` math protection,
-  code/emphasis, IEEE section-number stripping.
-- **M1.4 document writer.** Preamble from `ikat.toml` (class, options,
-  columns, margins), float assembly in source order, `.bbl` passthrough.
+**TeXres** (github.com/leoliu0/texres, v0.7.8 2026-10-23,
+MIT/Apache-2.0): a TeX distribution in a single Rust executable —
+pdfLaTeX/XeLaTeX/LuaLaTeX + formats + package archive + fonts +
+BibTeX/Biber, fully offline, output CI-compared against TeX Live
+2026. Empirically verified on the showcase: the woven
+`ikat-paper.tex` (IEEEtran + TikZ + pgfplots + staged `.bib`)
+compiled on Windows with zero other software installed — 7 pages,
+IEEE-style References, line-anchored errors. Also surveyed, all
+lesser: `texforge` (workflow wrapper that installs tectonic),
+`tex_engine` (GPL, research-grade), `rustatex` (own language,
+toy), Typst (different language — an emission target, not an
+engine swap).
 
-*Acceptance:* ikat output diffed against the checked-in `.tex`
-shows only intended improvements; resulting PDF compiles with
-0 undefined citations.
+The strategic prize: texres ships a **C library and a WASM
+module** that compile documents in memory — a C embedding WITHOUT
+the pkg-config/system-lib chain that makes the `tectonic` cargo
+feature Linux-only. The credible endgame for an embedded engine
+on Windows; could replace the tectonic embed entirely.
 
-## Phase 2 — Data plots live (matplotlib out) ✅ DONE 2026-10-08
+**Embed feasibility (checked 2026-10-27):** upstream publishes NO
+crate to crates.io (`libtex` absent); a git-dependency on their
+workspace would work, but the data is baked into the binary
+(that is why the exe is 810 MB) — an ikat embed would balloon the
+extension module to ~800 MB, far past PyPI's 100 MB upload cap.
+So: embed = source-build/offline-deployment option only, never a
+wheel; the cascade slot is the shippable form (shipped, 0.11.2).
 
-- **M2.1 presets.** ✅ DONE 2026-10-08 (Phase A.1+A.2, 0.2.2+0.2.3)
-  — `src/preset.rs` + `load_preset`: benchmark JSON → emitters
-  (series names, min/max-validated whiskers, refline, footnote,
-  legend key); CLI `--preset` + MCP `preset_json` wired with the
-  surfaces synchronized in the same commits; skills updated.
-- **M2.2 regeneration.** ✅ DONE 2026-10-08 (Phase A.3, 0.2.4)
-  — `examples/regen/`: 4 fixtures transcribed from
-  `benchmarks/results`, TikZ snapshots (CI byte-gate), standalone
-  PDFs, pixel scores pinned in `ACCEPTED.md` with reviewed deltas
-  (degenerate Fig-A whiskers, symmetric max-errors, linear Fig-D
-  x, below-legend/45° touch, refline edge clip). Outputs stay in
-  `regen/out/` — staging into `paper/figs/` is the paper track's
-  call.
-- **M2.3 local pgfplots.** ✅ DONE 2026-10-06 — tlnet `pgfplots.tar.xz`
-  extracted into the TinyTeX texmf tree (`tlmgr` GPG is broken on
-  this mirror chain); `tex_requirements()` auto-detects TikZ/pgfplots
-  needs from the woven body so preambles stay minimal.
-- **M2.4 legend positioning.** ✅ DONE 2026-10-07 (keyword;
-  `auto` resolver follows) — `plot::LegendPos`: `auto` (the
-  default) tries the inside corners in top-left, top-right,
-  bottom-right, bottom-left order, testing each against the drawn
-  data — polyline + error-bar segments for lines, whole-slot bar
-  rects to the whisker top (log-mapped for log-y) plus the refline
-  — on visual ranges that overestimate pgfplots' padding, and falls
-  back to the under-axis row when every corner is occupied.
-  Inside corners cannot touch axis labels (labels live outside the
-  axis box); the below row clears tick labels by construction.
-  Explicit `below`, four corners, and `outside-right` place it by
-  hand; unknown words are `ValueError`s naming the set. Threaded
-  Rust core → PyO3 (keyword-with-default, backward compatible) →
-  MCP tools; showcase figs prove it (LOC → top-right, growth →
-  top-left).
-- **M2.5 emitter polish.** ✅ DONE 2026-10-07 — mermaid edge
-  labels get `fill=white` knockout (diagonal edges no longer
-  strike through `column`/`wide`); barchart x ticks rotate 45°;
-  lineplot pins `xmin`/`xmax` to the data (no pre-first-point gap).
-  All three are structural emitter changes, each with a Rust test.
-
-*Acceptance:* `paper/figs/` producible with no matplotlib import
-anywhere in the loop.
-
-## Phase 3 — Figures advanced ✅ DONE 2026-10-08
-
-- **M3.1 standalone export.** ✅ DONE 2026-10-08 (Phase B,
-  0.3.1+0.4.0) — `python/ikat/standalone.py` (`wrap_standalone`
-  + `compile_standalone`), `ikat standalone` (exactly-one-fence
-  rule), MCP `standalone_figure` (returns source, workdir rule),
-  `tikz_needed`/`plots_needed` predicates, four paper-diagram
-  proofs with ledger scores in `examples/regen/ACCEPTED.md`.
-- **M3.2 sequence subset**, **M3.3 state subset** ✅ DONE
-  2026-10-08 (Phase C, 0.4.1+0.4.2+0.5.0) — `src/sequence.rs`
-  (columns in declaration order, alt/else/opt boxes) +
-  `src/state.rs` (shared placer, composite boxes) behind the same
-  `flowchart_to_tikz` entry; `emit.rs` holds the shared TikZ
-  vocabulary; showcase Figures 2+3 are the proofs.
-- **M3.4 layout.** ✅ DONE 2026-10-08 (Phase D.1, 0.5.1) —
-  `src/layout.rs` (legend geometry reused: `segs_cross`,
-  `seg_hits_rect`, `cluster_box`), longest-path layering
-  (multi-parent = max+1), `subgraph ID [title]`…`end` clusters
-  (nesting errors), edge router (clear segments byte-identical,
-  crossings reroute via pushed midpoint, exhaustion names the
-  edge); showcase Figure 1 re-laid and reviewed.
-- **D.2 heading guards.** ✅ DONE 2026-10-08 (0.5.2) —
-  `[typography]` (`keep_with_next = true` default, `min_lines =
-  2`): `\clubpenalty`/`\widowpenalty` 10000 +
-  `\needspace{min_lines+1\baselineskip}` before sections;
-  needspace auto-added (generated/override/skeleton paths);
-  `titlesec` under IEEE rejected by `check_titlesec` +
-  `ikat check`; main paper `.tex` regenerated (61 added guard
-  lines, 0 removed) and recompiled clean.
-
-*Acceptance:* the paper's TikZ diagrams (corpus: the four
-`paper/figs/tikz/fig-*.tex` sources — branch-tree, ledger-flow,
-read-questions, stratum) regenerate from their mermaid fences with
-no hand-tuning.
-
-## Phase 4 — Harden & release ✅ DONE 2026-10-08
-
-- **M4.1 errors.** ✅ DONE 2026-10-08 (Phase F, 0.7.1 → gate
-  0.8.0) — `src/error.rs::Error { msg, line, col, echo }` at
-every fail-fast site (61 `Err`s audited: mermaid/sequence/state
-statements + edge targets + empty diagrams, router exhaustion,
-subgraph/composite errors, ragged plot/preset series, dangling
-keys, template/skeleton tokens, titlesec, float attrs, legend
-words, refdefs). Manuscript lines via `md.rs` original-number
-blocks (fence bodies `line + row`), head-file lines for
-templates, line 0 (no line part) for JSON/TOML data errors;
-carets where the grammar knows the token (char columns,
-indent-exact). Python `document.with_file` upgrades to
-`file:line:` (head-path routing for template errors); CLI
-prints verbatim; MCP returns the text. 118 cargo + 75 pytest
-(16 + 6 new error tests); golden untouched (`ebe698db`).
-- **M4.2 CLI.** ✅ DONE 2026-10-07 — `ikat build/weave/check/templates/template/flowchart/version`
-  (`python/ikat/cli.py`, `ikat` console script): same operations as
-  the API, `--spec` BuildSpec JSON, `--ensure-packages` gate.
-- **M4.8 MCP server.** ✅ DONE 2026-10-07 — `python -m
-  ikat.mcp_server` (FastMCP stdio, `ikat[mcp]` extra): nine tools
-  mirroring the CLI/API map; `compile_pdf` deliberately excluded.
-- **M4.2b CI compile check.** ✅ DONE — `.github/workflows/ci.yml`:
-  `test` runs cargo + pytest on ubuntu/windows/macos-latest;
-  `tex` (ubuntu) installs real TeX Live via apt, builds the demo
-  and the showcase paper, and fails on undefined citations or
-  control sequences. (Docker image dropped: runner TeX Live is
-  the same backend verification with less machinery; the tectonic
-  crate-embedding check rides along once M4.2b exists.)
-- **M4.5 ensure-packages helper.** ✅ DONE 2026-10-06 — the
-  texliveonfly trick: `src/texenv.rs` scans any preamble into
-  `(probe file, tlmgr package)` needs, `python/ikat/texenv.py`
-  probes via one `kpsewhich` call and `tlmgr install`s what's
-  missing; `compile_pdf(..., ensure_packages=True)` gates the
-  build on it.
-- **M4.6 user templates.** ✅ DONE 2026-10-06 — `[template]`
-  `preamble_file` replaces the generated head, `preamble_append`
-  adds lines before `\\begin{document}`; Rust validates the
-  replacement carries a class + every package the body needs.
-- **M4.7 template library.** ✅ DONE 2026-10-07 — nine shipped
-  heads (arXiv, article 1/2/3-col, IEEE, ACM, LNCS, Elsevier, APS)
-  with `{{{title}}}`/`{{{author}}}`/`{{{thanks}}}` tokens,
-  per-template presets (bib_style + toml), `abstract_before_maketitle`
-  hoist for top-matter classes, all nine compile-proven locally.
-- **M4.3 claim the names.** ✅ READY 2026-10-07 — both `ikat`
-  names verified free; `cargo publish --dry-run` green; release
-  wheel proven in a clean venv (9 heads + skeleton, weave ok);
-  `v0.1.0` tagged. Ships with two commands once the tokens exist:
-  `cargo login` + `cargo publish` (crates.io), `maturin publish`
-  or `twine upload dist/*` (PyPI). Until then: install from the
-  GitHub repo (`pip install git+https://github.com/opticsWolf/ikat`).
-- **M4.4 self-hosting.** ✅ DONE 2026-10-07 — the paper builds with
-  ikat itself (`ikat weave paper/paper-2026-10-05.md --spec
-  paper/ikat-spec.json --bib paper/refs.bib`, byte-identical);
-  `build-paper.py` retired (kept in git history, not in the tree); new
-  `--bib` flag derives `bib_keys` from the `.bib` (no frozen
-  derived data, no drift).
-- **M4.9 tectonic engine (prototype).** ✅ DONE 2026-10-07 —
-  `compile_pdf(engine="tectonic")` cascades embedded binding
-  (`tectonic` cargo feature, off by default) → `TECTONIC_EXE`/PATH
-  binary; `tex_for_tectonic` drops the inputenc line; woven doc
-  with TikZ+table compiled to a content-verified PDF. Tectonic
-  *crate* embedding was Linux-only from the start (C deps via
-  pkg-config) and is now enforced in code: since 0.11.1 the
-  dependency is `cfg(target_os = "linux")`-gated and CI on ubuntu
-  compiles the embed (`cargo test --features tectonic`); empty `bib_name` now emits no bibliography lines (tectonic auto-runs
-  BibTeX and dies on empty `\bibliography{}`).
-  What M4.9 did NOT cover is itemized in M4.10.
-- **M4.10 tectonic hardening.** ✅ DONE 2026-10-08 (Phase G,
-  0.8.1 → gate 0.9.0) — (1) CI `tex` job installs the pinned
-  0.17.0 binary (checksum-verified linux-gnu tarball) and builds
-  demo + showcase with `--engine tectonic` (new flag on both
-  builders, default pdflatex); (2) showcase (10 pp) AND main
-  paper (22 pp) verified under tectonic, 0 undefined citations
-  both engines, engine deltas (all font-encoding class: TU/OTF
-  vs OT1/Type1 extraction, quote glyphs, hyphenation points)
-  ledgered in `ACCEPTED.md` — no content delta, nothing filed;
-  (3) Windows-embedding limitation in README (binary cascade is
-  the supported path; embedding stays Linux-CI by design).
-  Found in passing: tectonic swallows the XeTeX log without
-  `--keep-logs` (undefined citations would pass silently) —
-  `_compile_tectonic` now passes it and writes the transcript
-  beside the kept log; the gate grep covers both. Red-then-green
-  proven locally with the exact gate patterns (broken citation
-  → 2 matches; clean → 0).
+**Why watch, not deepen:** 810 MB per platform, v0.7.x maturity,
+single maintainer. Revisit when a Windows/CI pain point or the
+WASM/C-library embedding justifies the work.
 
 ## Non-goals
 
@@ -224,370 +71,12 @@ reference-manager integration.
 
 ## Ordering
 
-Phases 1, 4 (core), 5, 6 done. Remaining order: M2.1 → M2.2 (the
-preset loader feeds regeneration) → M3 (layout work needs real
-diagrams to test against) → M5.4 (the parser switch needs the full
-test corpus green) → M4.1 whenever (error paths are additive).
-M4.3 can jump the queue any time — it costs nothing but tokens.
-M4.10 rides along with any CI work (it is a `tex`-job step plus
-verification runs, no new machinery).
-
-## Phase 5 — Floats, skeletons, parsing (spec: docs/FORMAT-DRAFT.md) ✅ DONE 2026-10-08
-
-- **M5.1 float formatting.** ✅ DONE 2026-10-07 — per-element
-  `span/pos/width/captionpos` attrs (`%% table {...}` for tables,
-  `plot_attrs` registry for plots) + `[floats]` fractions/counters/
-  `barrier_sections` + `table*` + `picture` kind; packages
-auto-added or template-validated; compile-proven to PDF.
-- **M5.2 level-3 skeleton.** ✅ DONE 2026-10-07 — `[template]`
-  `skeleton` with `{{body}}`/`{{bibliography}}`/`{{abstract}}`
-  token contract (comment-aware counting/rendering, unknown-token
-  errors, exclusion vs `preamble_file`), shipped
-  `skeleton-plain.tex`, compile-proven to PDF.
-- **M5.3 Markdown AST spike.** ✅ SPIKE DONE 2026-10-07 —
-  pulldown-cmark 0.13.4 event-diff vs the hand scanner: all four
-  required properties hold (verbatim info strings, identical
-  headings, matching table shapes, aligned paras modulo the
-  `%%` directive line, which stays pre-processing either way).
-  Switch viable, deferred to its own golden-parity milestone.
-- **M5.4 pulldown-cmark switch.** ✅ DONE 2026-10-08 (Phase E,
-  0.6.1 → gate 0.7.0) — `src/md.rs` production mapping +
-  `convert()` on `MdBlock`s. Acceptance met: empty diff on the
-  harness (141+35+3 corpus blocks + latent synthetics), golden
-  paper byte-identical (`ebe698db`, 0 edits to the golden file),
-  98 cargo + 69 pytest green, all proofs build. One consumption
-  bug found mid-switch (blank-separated Paras merged — `convert`
-  now flushes between consecutive `Para` blocks); one orphaned
-  `#[cfg(test)]` on `mod mermaid` found via a failed
-  `maturin develop` (probe-cleanup scar, fixed). `esc.rs`
-  untouched, as the spike predicted.
-
-## Phase 6 — Showcase paper ✅ DONE 2026-10-07
-
-`examples/ikat-paper/` builds a 6-page two-column paper about ikat
-itself (`build.py` + `ikat.toml` + `skel.tex` + `refs.bib`): two
-inline mermaid diagrams (wide pipeline, column float-resolution),
-two pgfplots figures (LOC bars from `wc -l`, test-growth line from
-`git grep` history — no invented numbers), four tables, citations
-via BibTeX, math, unicode. It is the release demo AND the
-constructive proof that every md feature composes in one document.
-Side fixes landed here and covered by tests: mermaid `[scale=]`
-attribute splice (Rust + Python), lineplot `+- (0,0)` zero-error
-emission. The shipped `IEEEtran.bst` is CTAN v1.14 (a 404-page
-copy found in the texmf tree was replaced and the file staged
-locally with an HTML guard).
-
-*Acceptance:* `build.py` runs green, PDF is 6 pages with 2
-diagrams + 2 plots + 4 tables and 0 undefined citations.
-
-## Phase H — Auto-layout (M7.1) → 0.10.0
-
-Advisory auto-layouter: `ikat layout` measures every float and
-suggests `span`/`pos`/`width` with reasons; `--apply` rewrites
-fence attrs. No pagination simulation (only LaTeX knows text
-flow) — classification by measured size, LaTeX still places.
-Estimators: TikZ coord scan + `node_box` margins (diagrams),
-pgfplots defaults (plots), row-pitch + cell widths (tables);
-pictures/external PDFs keep hand attrs. Policy: `page_frac`
-pre-empt, section-lead bonus, wide ratio, crowding floor from
-placed node labels. Surfaces in the same commits: Rust core +
-`layout.py` (`suggest`/`apply`/`report`) + `ikat layout` CLI +
-` suggest_layout` MCP tool + QUICKREF/skills/ARCHITECTURE.
-Co-agent B1 bench (`examples/bench-layout/`, untracked scratch)
-drives `suggest_layout` over 10 PLOS papers: v2 distributions
-reproduce exactly under the final engine; showcase engine-vs-hand
-diff is 2 hunks (Fig 2 `0.57` vs hand `0.58`, Table 3 `force` vs
-`barrier`). E1 closed as expected (PLOS is single-column; the
-1-col run puts everything in-flow).
-
-*Acceptance (M7 gate):* `cargo test` + `pytest` green
-(135 + 86), demo + showcase + regen + standalone + heads proofs
-build, golden byte-identical, auto-applied showcase copy builds
-8pp with 0 overfull and the hand float distribution.
-
-## M7.10b — Opt-in author collapse (`authors_max`) → 0.10.15
-
-The deliberate "first N + et al." form, previously unavailable:
-`BuildSpec.authors_max` (CLI `--authors-max N` on `build`/`weave`)
-composes the first N marked names + ", et al." (IEEE style) when the
-list is longer; the full affiliation block stays, so everything
-shown remains true. 0 (default) never collapses; negative fails
-fast; `max >= len` is a no-op. The exporter does NOT use it — the
-bench corpus keeps complete front matter.
-
-## M7.10 — Full author front matter → 0.10.14
-
-The 10-paper exports showed "Coll et al." with no institutes while
-the originals carry 39 authors + 26 affiliations: the bench exporter
-collapsed JATS front matter to one surname (its md had no channel
-for authors), and the engine modeled authors as one scalar.
-Amended end to end:
-
-- `BuildSpec` gains `authors` / `affiliations` / `author_affils`
-  (0-based affiliation indices per author); when `authors` is empty
-  every spec is byte-identical to before.
-- `author_front` (doc.rs) composes one wrapped `\parbox` — names
-  with numeric `\textsuperscript` marks over the institute rows —
-  because the IEEEtran author blocks are tabular rows that never
-  wrap (a 39-name list clips at the margin) and a parbox nested
-  inside them breaks the row alignment; raw `&` in institute names
-  is escaped via `esc_text`. Out-of-range marks fail fast naming
-  the count.
-- CLI: repeatable `--author` / `--affiliation` / `--author-affil
-  A:N[,N…]` (1-based) on `build`/`weave`; MCP/API ride the existing
-  `spec_json`.
-- The bench exporter reads every contrib + aff with xref marks —
-  the re-exported corpus now shows the complete front matter
-  (verified against the originals on page 1).
-
-## M7.9c — `ikat help [COMMAND]` + bare-invocation help → 0.10.13
-
-Argparse help as a verb: `ikat help` prints the command list (the
-fifteenth subcommand), `ikat help CMD` prints that command's flags —
-the git convention, so agents can discover the surface without the
-`--help` global-flag form. Unknown command names name the valid set.
-`ikat help --json` dumps the agent-tool registry (all 14 MCP tools,
-full schemas via `llm_tool_definitions()`) — the MCP surface is
-discoverable from the CLI too. And bare `ikat` prints help with exit
-0 instead of an argparse error (gossamer errors on both; ikat
-previously errored on bare).
-
-The drift tests now pin FLAGS, not just command names: every
-optional flag of every subcommand (nested `skills install` flags
-included) must appear in the skill's fenced syntax, and invented
-flags fail — this audit caught `ikat weave` never teaching
-`--bib`.
-
-## M7.9b — Tool registry + skill installer (gossamer transfer, tranche 2) → 0.10.12
-
-The second gossamer-learning tranche: the 14 MCP tools became DATA.
-`python/ikat/registry.py` holds `TOOL_REGISTRY` — name, description,
-callable, parameter specs (type, default, description, legend enum),
-return type, and the annotation flags — and generates all three
-consumptions from it: the FastMCP server (schemas/docstrings/
-annotations are built from the spec, so the MCP surface cannot drift),
-`llm_tool_definitions()` (OpenAI-style function-calling definitions,
-full fidelity), and `execute_tool(name, arguments)` (drive the whole
-surface from a dict, no MCP installed). The composites
-(`weave_document`, `standalone_figure`, `suggest_layout`, …) moved
-into the registry; `mcp_server.py` is now a thin renderer. And ikat
-gained gossamer's skill installer: `ikat skills list | show NAME |
-install [--dest DIR…] [--project] [--skill NAME…] [--force]` copies
-the bundled packs into Claude Code, OpenCode, pi, and Agent Skills
-directories (skip-unless-`--force`; the drift tests exercise the
-whole lifecycle).
-
-## M7.9 — MCP schema fidelity + bundled skills (gossamer-audit transfer) → 0.10.11
-
-An audit of the gossamer MCP surface (registry-driven, drift-tested,
-but with lossy schemas) transferred here: ikat's FastMCP tools now
-carry per-parameter descriptions and enum constraints in the
-inputSchema (`legend` renders as a real enum; previously every
-parameter was an undescribed bare type), every tool declares MCP
-annotations (readOnly/destructive/idempotent/openWorld — all tools
-are local, network-free, read-only computation except
-`ensure_tex_packages`, the one tlmgr-mutating tool), and the server
-sets `instructions` describing the weave-here-compile-via-CLI
-doctrine. The four agent skills moved into the package
-(`python/ikat/skills/`, ships in the wheel) and are served as
-resources `skill://ikat*` so MCP-only hosts can read them; drift
-tests pin every taught CLI command, MCP tool, and API name to the
-live surfaces, frontmatter name/description validity included. The
-CLI reconfigures stdio to UTF-8 so unicode error echoes cannot crash
-a cp1252 console.
-
-## M7.8b — Calibrated display-math width (probe, don't guess) → 0.10.10
-
-The M7.8 estimator's guessed constants (0.16–0.35 cm/char) mis-sized
-caligraphic, big-operator, and script-heavy spans: the median
-estimate ran 1.26× TeX truth (range 1.09–1.50), classifying 6 of
-math-hilfer's 100 display spans into full-width strips that TeX
-fits in one column. The replacement (`src/mathwidth.rs`) is probed,
-not guessed: glyph widths at the three math styles (10/7/5 pt) come
-from TeX `\sbox` measurements (examples/auto-proof/
-math_probe_widths.py → `glyphs_raw.json` → math_emit_table.py
-generates the Rust table); the structural rules are measured too —
-class glue per the TeXbook table with previous-atom tracking (thin
-before Open/Close, thick both sides of a relation, none in script
-styles), stacked sub/sup = max + one `\scriptspace`, fraction
-children descending display→text→script, column-aligned matrix
-width (sum of per-column maxima + 10pt gaps + bracket pairs), and
-one thin pad inside radicals set over an Inner. Unit tests pin ~40
-TeX-measured composites within 0.01 cm. Result: math-hilfer 0
-disagreements, 0 hbox + 0 vbox overfulls, strips 66 → 59, aligned
-24 → 15, golden byte-parity and all regen snapshots hold.
-
-## M7.8 — Honest math (MathML rebuild + auto-stretch) → 0.10.8
-
-The bench exporter flattened 511 real MathML equations into symbol soup
-(fractions lost their bar, 993 glyphs became ?, 70 overfulls to 494pt).
-A structural MathML-to-LaTeX converter (mml.py) reconstructs single
-breakable spans: sub/sup/fractions/sums/limits/roots/matrices/cases,
-empty-base prescripts, JATS sub/sup merging, three publisher-misencoded
-glyphs mapped by role (time renders as zeta, upright beta, k-index).
-Core weaves whole-paragraph double-dollar spans to display math:
-wider than the column takes a cuted strip; wider than the full measure
-breaks BEFORE top-level relations into left-aligned rows (matrix
-spans take one strip per piece instead). A glyph-aware width
-estimator (TeX glue,
-script extension, banked matrices, depth-matched envs, nested-aware
-row splits) decides. math-hilfer-2024: 70 to 0 hbox overfulls;
-econ/physics formulas restored from dropped to rendered.
-## M7.7 — Honest portrait limits (Tiny rung + pin height) → 0.10.7
-
-`Tiny`: a fourth ladder rung — `\scriptsize` + 2pt padding but
-still portrait — for dense regression tables between `Compact`
-and `Rotate` (relative type size matches the originals' 7.5pt on
-their wider measure). A narrow-aware token ruler (digits/punct at
-0.85) replaces the flat 0.16/char. A hyphenation discount was tried
-and reverted the same session: isolation renders proved TeX never
-breaks the words (IEEEtran sets `\hyphenpenalty=750` — measured
-750 in the class), and the discount printed 16 overlapping tables;
-every whitespace run binds.
-Pin-height promotion: stacked rows double a table's height, so a
-column table taller than the in-flow budget now floats wide + top
-instead of overflowing (`\vbox too high`) — the width ladder
-approves the column, the height vetoes the pin. Tail threshold
-recalibrated 10 → 6 paragraphs (a column of downstream text; the
-paragraph unit had made 10 three times stricter than the JATS-line
-calibration) and the exporter's tail counter counts paragraphs,
-fixing chem Fig 5's lone float page (10pp → 8pp). Corpus: econ
-0 overfulls with 8/10 tables portrait; the two true 13-col tables stay
-rotated — `globalization`-class words need 2.08cm against a
-1.37cm share, mathematically unportraitable at IEEE widths (the
-originals need 19cm + 7.5pt for the same).
-
-## M7.6 — Cell stacking (PLOS-original style) → 0.10.6
-
-Stacks estimate/SE cells before deciding: `0.080***(0.015)`
-renders as estimate over `(0.015)` (`\newline` in the `X` cell,
-via a split mark that survives `inline()` escaping). Only
-trailing digit-bearing paren groups split — stars stay with the
-estimate, empty heads and prose notes stay single-line. The
-shared `decide_table` (weaver + engine notes) stacks first, then
-re-decides: econ's 7-col tables drop from `Compact` to `Fit` at
-full size, the 13-col tables rotate roomy. Result: econ 25 → **0**
-overfulls (was 441), corpus total 441 → 47 with all remainders
-in prose (flattened formulas) or ≤3pt. Prose labels never trigger
-(they wrap); the knob stays default-off so the frozen paper and
-all default weaves hold byte-identical.
-
-## M7.5 — Table compaction ladder (opt-in) → 0.10.5
-
-`[tables] compact_tables` (default off, so the frozen paper and
-all default weaves stay byte-identical): the widest unbreakable
-token per table drives `Fit` (`\small`) → `Compact`
-(`\footnotesize` + 3pt padding) → `Rotate` (`sidewaystable(*)` in
-`\scriptsize` + 2pt padding against `\textheight`). Column
-tables that fail promote to `wide` before rotating. Prose labels
-never trigger it (they wrap); only unbreakable numeric cells do.
-Corpus proof: econ-tax 441 → 25 overfulls (max 2.9pt, invisible),
-the 13-column tables rotate readably; psych 200 → 19, bio 38 → 7,
-earth 17 → 1. The engine notes always measure the shared ladder
-and name the opt-in when it is off; `rotating` joins the strict
-package contract (auto-added to generated heads, named for
-skeletons/overrides).
-
-## M7.4 — Tail page + no empty columns → 0.10.4
-
-`[layout] tail_lines` (default 10): a `wide`+`top` float with
-fewer body prose lines remaining takes a dedicated `page`. Two
-birds: no downstream tops are left (it would pile at the document
-end), and a still-pending float meeting `\FloatBarrier` ejects
-the column — placeins issues `\clearpage` in the first column,
-stranding a half-empty column behind it. That eject was the
-corpus's void source: section barriers (since reverted for the
-corpus) met pending wides and blanked ~17 right columns
-(chem p2, bio p17/p22/p33). Float pages never strand columns:
-text flows past them, and the refs barrier meets empty defer
-lists. Skipped in prose-free manuscripts so B1 stub pins stay
-exact. Corpus result: 0 true mid-body voids across all 10 papers
-(the 3 remaining flags are final-text-column end geometry + one
-normal column break); nothing crosses `References`.
-
-## M7.3 — Refs barrier (opt-in) → 0.10.3
-
-`[floats] barrier_before_refs` (default off, so default weaves
-stay byte-identical): a `\FloatBarrier` ahead of
-`\bibliography` in all three preamble paths. End-queued floats
-otherwise spill into/past `References` — bio-medsea's Figs 7-14
-landed on pp37-42 after the reference list started (p27) because
-10 wide figure tops saturated and no barrier contained them. With
-`barrier_sections` + refs barrier (corpus weave policy), bio's
-tables sit inside Discussion beside their citing prose (TABLE IV
-under the `(Table 4)` paragraph, p26) and nothing crosses
-`References`. Proven over the full 10-paper re-export, 0
-unmatched, 0 stranded headings; golden byte-parity holds
-(default off).
-
-## M7.2 — Top-fit + queue pressure → 0.10.2
-
-Wide floats taller than the page-top budget (`top_frac` 0.7 ×
-text height, the LaTeX `topfraction`/`dbltopfraction` default)
-take `wide`+`page` instead of `wide`+`top`: `[t]` cannot legally
-hold them, so they (and the queue behind them) pile at the
-document end. Column tables taller than the text height go
-`page` (`[H]` would blast through). The third and later `wide`
-floats since a section heading earn a spread-the-fences note.
-Proven on the full-export corpus: psych-maia's 41-row table left
-the p24–26 end pile for an in-section float page (9 tables now
-p9–p21 beside their prose, 26pp→25pp), 0 stranded headings
-across all 10 papers (D.2 needspace guards hold). Exporter
-`pic_attrs` mirrors the budget for precompiled pictures.
-
-## Watch: TeXres — a Rust TeX distribution (2026-10-27)
-
-Survey question: "is there an alternative in Rust to tectonic?"
-Answer: yes, one serious candidate — **TeXres** (github.com/leoliu0/texres,
-v0.7.8 2026-10-23, MIT/Apache-2.0): a TeX distribution in a single
-Rust executable (pdfLaTeX/XeLaTeX/LuaLaTeX + LaTeX formats + package
-archive + fonts + BibTeX/Biber, fully offline, output CI-compared
-against TeX Live 2026).
-
-**Empirically verified on the showcase** (not just README claims):
-portable Windows build (810 MB), the woven `ikat-paper.tex` (IEEEtran
-conference class + TikZ + pgfplots + precompiled PDF figures +
-`\bibliography` with staged `ikat-refs.bib`) compiled with zero other
-software installed — 7 pages (same as pdflatex), References resolved
-in IEEE style, IEEEtran typography correct, line-anchored errors with
-source snippets. Found `IEEEtran.bst` in its own archive.
-
-Also surveyed, all lesser: `texforge` (workflow wrapper that installs
-tectonic underneath), `tex_engine` crate (real Rust engine framework,
-GPL, research-grade), `rustatex` (own language, toy), Typst (mature
-pure Rust, but a different language — an emission target, not an
-engine swap).
-
-**Why it matters for ikat:**
-
-1. ~~`engine="texres"` slots into the binary cascade~~ **DONE in
-   0.11.2**: `compile_pdf(engine="texres")` + `--engine texres` on
-   `build`/`standalone` — `TEXRES_EXE`/PATH probe, stdout transcript
-   kept beside the PDF for the CI gate, `ensure_packages` a no-op
-   (everything bundles). Locally proven end-to-end on the demo and
-   the showcase sources.
-2. The strategic prize: texres ships a **C library and a WASM module**
-   that compile documents in memory — a C embedding WITHOUT the
-   pkg-config/system-lib chain that makes the `tectonic` cargo
-   feature Linux-only. The credible endgame for an embedded engine on
-   Windows; could replace the tectonic embed entirely. **Embed
-   feasibility (checked 2026-10-27):** upstream publishes NO crate
-   to crates.io (`libtex` absent); a git-dependency on their
-   workspace would work, but the data is baked into the binary
-   (that is why the exe is 810 MB) — an ikat embed would balloon
-   the extension module to ~800 MB, far past PyPI's 100 MB upload
-   cap. So: embed = source-build/offline-deployment option only,
-   never a wheel; the cascade slot is the shippable form.
-2. The strategic prize: texres ships a **C library and a WASM module**
-   that compile documents in memory — a C embedding WITHOUT the
-   pkg-config/system-lib chain that makes the `tectonic` cargo
-   feature Linux-only. The credible endgame for an embedded engine on
-   Windows; could replace the tectonic embed entirely.
-
-**Why watch, not switch:** 810 MB per platform (the distribution is
-the product, vs ~30 MB tectonic binary + cached bundles), v0.7.x
-maturity, single maintainer. Revisit when a Windows/CI pain point or
-the WASM/C-library embedding justifies the work.
+Nothing is queued. New work lands as M7.x-style milestones with
+their own gate commits and version bumps (the 0.10.x pattern);
+version numbering has no 1.0 planned. Candidate directions, none
+committed: an in-memory texres embed (see the watch item), slim
+crates.io packaging via `[package] include`, and Macrame-side
+integration work tracked in the Macrame_docs repository.
 
 ## Tracked elsewhere (not ikat work)
 
