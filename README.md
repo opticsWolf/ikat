@@ -49,11 +49,14 @@ no font mismatch between text and figures.
   the woven tree into PDF, with a `tectonic` engine option
   (`compile_pdf(..., engine="tectonic")`, `--engine` on the
   `build`/`weave` CLIs and the example builders). The tectonic
-  Rust crate does NOT link on Windows (C dependencies) — the
-  supported path is the `tectonic` binary (`TECTONIC_EXE` or
-  PATH; CI pins 0.17.0 by checksum). Crate embedding stays a
-  Linux-CI exercise by design; wheels stay lean (feature-gated,
-  off by default).
+  crate as an optional cargo feature (off by default) is
+  **Linux-only by design**: its C/C++ XeTeX core builds through
+  pkg-config, which has no answer where no system C libraries
+  exist; CI compiles the embed on ubuntu (`cargo test --features
+  tectonic`). The supported path everywhere is the `tectonic`
+  binary (`TECTONIC_EXE` or PATH; CI pins 0.17.0 by checksum),
+  and the Python cascade falls back to it automatically wherever
+  the embedded binding is absent. Wheels stay lean (feature off).
 
 ## Install
 

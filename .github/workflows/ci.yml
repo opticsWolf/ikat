@@ -80,6 +80,12 @@ jobs:
         run: |
           "$VENV_BIN"/python examples/demo.py --engine tectonic
           "$VENV_BIN"/python examples/ikat-paper/build.py --engine tectonic
+      - name: Embedded tectonic (cargo feature, linux-only)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy pkg-config libfontconfig1-dev libfreetype6-dev \
+            libharfbuzz-dev libgraphite2-dev libicu-dev libpng-dev
+          cargo test --features tectonic --lib tectonic
       - name: Regen main-paper plots (preset -> TikZ snapshots + PDFs)
         run: '"$VENV_BIN"/python examples/regen/regen.py'
       - name: Standalone figure proofs (fence -> TikZ -> PDF)
