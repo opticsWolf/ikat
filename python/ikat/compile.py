@@ -27,7 +27,11 @@ def _run(exe: str, args: list[str], workdir: Path) -> str:
             timeout=600,
         )
     except FileNotFoundError as e:
-        raise CompileError(f"{exe} not on PATH") from e
+        raise CompileError(
+            f"{exe} not on PATH - install a TeX distribution"
+            " (TinyTeX: https://yihui.org/tinytex) and run"
+            " `ikat check --install` for the packages"
+        ) from e
     if p.returncode != 0:
         tail = (p.stdout + p.stderr)[-2000:]
         raise CompileError(f"{exe} failed in {workdir}:\n{tail}")
@@ -98,7 +102,12 @@ def compile_pdf(workdir: str | Path, main_tex: str, ensure_packages: bool = Fals
     if engine != "pdflatex":
         raise CompileError(f"unknown engine {engine!r} (pdflatex|tectonic)")
     if shutil.which("pdflatex") is None:
-        raise CompileError("pdflatex not on PATH")
+        raise CompileError(
+            "pdflatex not on PATH - install a TeX distribution"
+            " (TinyTeX: https://yihui.org/tinytex), weave to .tex with"
+            " --no-pdf, or use engine='tectonic' with the tectonic"
+            " binary on PATH"
+        )
     workdir = Path(workdir)
     if ensure_packages:
         from .texenv import ensure as _ensure

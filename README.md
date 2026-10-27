@@ -55,6 +55,25 @@ no font mismatch between text and figures.
   Linux-CI exercise by design; wheels stay lean (feature-gated,
   off by default).
 
+## Install
+
+```bash
+pip install ikat            # wheels: CPython 3.10-3.15, PyPy 3.11 (win/mac/linux)
+pip install "ikat[mcp]"     # + the stdio MCP server extra
+```
+
+The wheel is self-sufficient for everything that does not render
+PDF: weaving to LaTeX on stdout (`ikat weave`), mermaid/TikZ and
+pgfplots emission, layout suggestions, package checks, templates,
+skeletons, and the skills installer. PDF output additionally needs
+a TeX distribution with `pdflatex` on PATH —
+[TinyTeX](https://yihui.org/tinytex) is the lightweight default;
+point `--engine tectonic` at a
+[tectonic](https://tectonic-typesetting.github.io) binary to skip
+the classic toolchain. Once a distribution exists,
+`ikat check --install` fetches the exact packages a document needs
+(see [LaTeX requirements](#latex-requirements) for the full table).
+
 ## Showcase paper
 
 [Read the ikat showcase paper (PDF)](site/assets/ikat-paper.pdf), or browse its [Markdown source and build instructions](examples/ikat-paper/).
