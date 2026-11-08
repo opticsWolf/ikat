@@ -179,9 +179,35 @@ hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are
 a build error (the text would vanish silently — write it inline);
-`~~~` fences, indented code, lists, HTML blocks, setext headings,
-and H4+ feed their raw lines as paragraph text (as the old scanner
-did); `>` quote lines are dropped without breaking paragraphs.
+bullet/ordered lists (`- `, `* `, `+ `, `1. `, `1) `) are a build
+error naming the line (they used to flatten silently into the
+paragraph — write blank-line-separated paragraphs instead);
+`~~~` fences, indented code, HTML blocks, setext headings, and H4+
+feed their raw lines as paragraph text (as the old scanner did);
+`>` quote lines are dropped without breaking paragraphs.
+
+Unicode gate (fail-fast, not in the TeX log): the heads are pdflatex
++ `inputenc`/`lmodern`/`textcomp`, so any non-ASCII character outside
+the transliteration table fails the weave with `file:line:` + caret
+naming the character (U+ code) and its replacement (Greek hints like
+$\lambda$ for λ). The table covers § — – … ≈ ∅ ≤ × → ≥ µ
+sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; raw Latin accents
+(Böhlen, Šafařík) pass through via `inputenc`. Applies to body text,
+headings, captions, table cells, display math, author names, plot
+labels, and inline/standalone diagram labels (precompiled diagram
+PDFs are external — their labels never reach TeX). Manuscripts are
+ASCII + Latin accents + table, never raw Greek or symbols.
+
+Emphasis may span `$…$` math: `**$P(z)$ depends on $n(z)$**` emits
+`\textbf{…$…$…}` (valid LaTeX) instead of literal stars.
+Display-math numbering rides inside the span as `\tag{N}`
+(`$$… \tag{12.1}$$`); trailing `(12.1)` after the span is not in
+the subset. The only display-math environment is `matrix` — write
+`pmatrix` as `\left( \begin{matrix} … \end{matrix} \right)` and
+`cases` as `\left\lbrace \begin{matrix} … \end{matrix} \right.`.
+
+Publish-ready default: the fallback author is a placeholder handle —
+pass real `--author` names (or spec `authors`) before publishing.
 
 `[typography]` keep-with-next (default ON): `\clubpenalty` +
 `\widowpenalty` at 10000, `\needspace{3\baselineskip}` before

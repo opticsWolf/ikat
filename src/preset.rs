@@ -58,11 +58,13 @@ fn esc_prose(s: &str) -> String {
         .replace('_', "\\_")
 }
 
-fn with_footnote(mut tikz: String, footnote: &Option<String>) -> String {
+fn with_footnote(mut tikz: String, footnote: &Option<String>) -> Result<String, crate::error::Error> {
     if let Some(f) = footnote {
+        // Unicode gate (probe #2): footnotes reach TeX verbatim.
+        crate::unicode::check_data(f)?;
         tikz.push_str(&format!("{{\\footnotesize {}\\par}}\n", esc_prose(f)));
     }
-    tikz
+    Ok(tikz)
 }
 
 /// Parse preset JSON and emit the `tikzpicture`. Errors name the
@@ -118,7 +120,7 @@ pub fn preset_to_tikz(src: &str) -> Result<String, crate::error::Error> {
                 p.refline,
                 legend,
             )?;
-            Ok(with_footnote(tikz, &p.footnote))
+            Ok(with_footnote(tikz, &p.footnote)?)
         }
         "line" => {
             if p.xs.is_empty() || p.series_names.is_empty() {
@@ -159,7 +161,7 @@ pub fn preset_to_tikz(src: &str) -> Result<String, crate::error::Error> {
                 }
             }
             let tikz = plot::lineplot(&p.title, &p.xlabel, &p.ylabel, &p.xs, &series, legend)?;
-            Ok(with_footnote(tikz, &p.footnote))
+            Ok(with_footnote(tikz, &p.footnote)?)
         }
         other => Err(Error::data(
             format!("preset: kind must be bar|line, got {other:?}"),

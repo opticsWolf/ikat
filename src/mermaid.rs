@@ -473,6 +473,11 @@ pub(crate) fn layered_xy(g: &Graph, depth: &[usize]) -> Vec<(f64, f64)> {
 /// for bare snippets) — every error below resolves against it.
 pub fn flowchart_to_tikz(src: &str, base_line: usize) -> Result<String, crate::error::Error> {
     use crate::error::Error;
+    // Unicode gate (probe #1): diagram labels reach TikZ text mode
+    // verbatim — raw non-ASCII outside the transliteration table
+    // would die in pdflatex. Fail here with the body line. Runs
+    // before grammar dispatch so sequence/state share the gate.
+    crate::unicode::check_block(src, base_line)?;
     if first_stmt(src) == "sequenceDiagram" {
         return crate::sequence::to_tikz(src, base_line);
     }
@@ -698,6 +703,19 @@ mod tests {
         // No dashes in labels (an em-dash would read as `--`).
         let tikz = flowchart_to_tikz("graph TD\na[alpha]-->b[beta]\nb-->c[gamma]", 1).unwrap();
         for l in tikz.lines().filter(|l| l.contains("\\draw")) {
+            assert_eq!(l.matches("--").count(), 1, "straight edge untouched: {l}");
+        }
+    }
+
+    #[test]
+    fn short_linear_chain_stays_clean() {
+        // Probe #7 repro: single-char ids with a longish label,
+        // a diamond, and a tail — no crossing is visible, so no
+        // reroute and no exhaustion error.
+        let tikz = flowchart_to_tikz(
+            "graph TD\nG-->N\nN-->P[longish label polish]\nP-->W{choice}\nW-->S", 1)
+        .unwrap();
+        for l in tikz.lines().filter(|l| l.contains("draw[")) {
             assert_eq!(l.matches("--").count(), 1, "straight edge untouched: {l}");
         }
     }

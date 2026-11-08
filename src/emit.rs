@@ -31,15 +31,33 @@ pub fn esc_label(s: &str) -> String {
         s = s.replace(ch, rep);
     }
     s = s.replace(BR, "\\\\");
-    // Common prose glyphs mermaid authors actually type.
+    // Transliteration table (probe #1): kept in sync with
+    // `esc.rs::UNI` + `SYM_TOKENS` so the `unicode` gate's
+    // allowlist holds everywhere. Anything else non-ASCII is
+    // rejected by the caller before emission (never raw to TeX).
     for (ch, rep) in [
-        ('×', "$\\times$"),
-        ('→', "$\\to$"),
-        ('–', "--"),
-        ('—', "---"),
-        ('≤', "$\\leq$"),
-        ('≥', "$\\geq$"),
-        ('✓', "\\checkmark{}"),
+        ("§", "\\S{}"),
+        ("—", "---"),
+        ("–", "--"),
+        ("…", "\\dots{}"),
+        ("≈", "$\\approx$"),
+        ("∅", "$\\emptyset$"),
+        ("≤", "$\\leq$"),
+        ("×", "$\\times$"),
+        ("→", "$\\to$"),
+        ("≥", "$\\geq$"),
+        ("µ", "\\textmu{}"),
+        ("₂", "$_{2}$"),
+        ("₁", "$_{1}$"),
+        ("₃", "$_{3}$"),
+        ("₀", "$_{0}$"),
+        ("ₙ", "$_{n}$"),
+        ("ᵢ", "$_{i}$"),
+        ("³", "$^{3}$"),
+        ("✓", "$\\checkmark$"),
+        ("○", "$\\circ$"),
+        ("◐", "$\\oslash$"),
+        ("†", "\\dag{}"),
     ] {
         s = s.replace(ch, rep);
     }

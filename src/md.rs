@@ -60,9 +60,24 @@ pub enum MdKind {
     DisplayMath(String),
 }
 
+/// `1. ` / `1) ` ordered-list marker (byte scan: digits are ASCII,
+/// so byte indexing is safe). Up to 9 digits; the delimiter must be
+/// followed by a space (`1.x` is prose, not a list).
+fn ordered_list_marker(s: &str) -> bool {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == 0 || i > 9 || i + 1 >= b.len() {
+        return false;
+    }
+    (b[i] == b'.' || b[i] == b')') && b[i + 1] == b' '
+}
+
 /// Fence-aware pre-pass: drop `>` quote lines, extract
 /// `%% table`-before-table directives keyed by the table sequence
-/// they precede, reject link reference definitions. Returns the
+/// they precede, reject lists and link reference definitions. Returns the
 /// stripped lines, their 1-based original line numbers, and
 /// `(table_seq, attrs, orig_line)` directives.
 pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String, usize)>), Error> {
@@ -105,6 +120,20 @@ pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String,
                 directives.push((runs, crate::doc::fence_attr_str(s).to_string(), n + 1));
             }
             continue;
+        }
+        // Lists are not in the subset (probe #3): a `- ` / `* ` /
+        // `+ ` / `1. ` line would silently flatten into the paragraph
+        // (the stream emits no list events in this mapping) — error
+        // loudly instead, naming the line. Emphasis (`*italic*`) has
+        // no space after the marker, so it never matches.
+        if s.starts_with("- ") || s.starts_with("* ") || s.starts_with("+ ")
+            || ordered_list_marker(s)
+        {
+            return Err(Error::new(
+                "lists are not in the subset (write paragraphs instead)",
+                n + 1,
+                s.to_string(),
+            ).with_col(Some(1)));
         }
         // Link reference definition (`[label]: dest`, not `[^..]:`):
         // the event stream swallows these with no event — the text
@@ -425,6 +454,28 @@ mod tests {
         assert!(e.msg.contains("reference definitions"), "got: {e}");
         assert_eq!(e.line, 3, "got: {e}");
         assert!(e.echo.contains("[lab]: /url"), "got: {e}");
+    }
+
+    #[test]
+    fn lists_fail_fast_with_line() {
+        // Probe #3: bullets and ordered markers error instead of
+        // silently flattening into the paragraph.
+        for md in [
+            "# T\n\n- item\n",
+            "# T\n\n* item\n",
+            "# T\n\n+ item\n",
+            "# T\n\n1. item\n",
+            "# T\n\n2) item\n",
+            "# T\n\n  - indented\n",
+        ] {
+            let e = blocks(md).unwrap_err();
+            assert!(e.msg.contains("lists are not in the subset"), "got: {e}");
+            assert_eq!(e.line, 3, "got: {e}");
+        }
+        // Emphasis is not a list (no space after the marker).
+        assert!(blocks("# T\n\n*italic* and **bold**\n").is_ok());
+        // List markers inside fences are code, not lists.
+        assert!(blocks("# T\n\n```mermaid\n- not a list\n```\n").is_ok());
     }
 
     #[test]

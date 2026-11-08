@@ -426,7 +426,10 @@ dangling citation keys; unknown template/skeleton tokens and
 duplicates; template heads missing class or packages; wide floats
 with `here`/`force`; unknown float attrs or keys; unknown legend
 words; `--bib` keysets that exclude a cited key; reference
-definitions; router exhaustion; subgraph/composite nesting. The
+definitions; bullet/ordered list markers; raw non-ASCII outside the
+transliteration table and Latin pass-through (Greek/symbols raise
+with a replacement hint); router exhaustion; subgraph/composite
+nesting. Emphasis spanning math is supported, not rejected. The
 doctrine: nothing fails in a TeX log that could have failed in
 Rust or in the wrapper.
 

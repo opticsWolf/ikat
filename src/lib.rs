@@ -20,6 +20,7 @@ mod preset;
 mod sequence;
 mod state;
 mod table;
+mod unicode;
 #[cfg(all(feature = "tectonic", target_os = "linux"))]
 mod tectonic;
 mod texenv;
