@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.12.0 · 2026-10-27 · 173 cargo + 104 pytest green.
+Version 0.13.0 · 2026-11-08 · 187 cargo + 119 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -80,8 +80,9 @@ The hand-off between the layers is narrow on purpose:
 
 ### 3.1 `mermaid.rs` — flowchart subset → TikZ
 
-Deliberately not mermaid: `graph TD`/`graph LR` with `-->` edges,
-`---` links, `|label|` edge labels, `[]` box nodes and `{}`
+Deliberately not mermaid: `graph TD`/`graph LR` with `-->`, `<-->`
+bidirectional and `==>` edges, `---` links, `|label|` edge labels
+(quoted labels strip), `&` fan-in/fan-out, `[]` box nodes and `{}`
 diamond nodes. Anything else — other directions, other node
 shapes, subgraphs, styling statements — is a string error naming
 the offending statement, because a diagram that almost renders is
@@ -426,7 +427,10 @@ dangling citation keys; unknown template/skeleton tokens and
 duplicates; template heads missing class or packages; wide floats
 with `here`/`force`; unknown float attrs or keys; unknown legend
 words; `--bib` keysets that exclude a cited key; reference
-definitions; router exhaustion; subgraph/composite nesting. The
+definitions; bullet/ordered list markers; raw non-ASCII outside the
+transliteration table and Latin pass-through (Greek/symbols raise
+with a replacement hint); router exhaustion; subgraph/composite
+nesting. Emphasis spanning math is supported, not rejected. The
 doctrine: nothing fails in a TeX log that could have failed in
 Rust or in the wrapper.
 

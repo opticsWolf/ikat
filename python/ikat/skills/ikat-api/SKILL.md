@@ -73,7 +73,9 @@ Validation: rectangular series, `min ≤ value ≤ max` elementwise,
 
 - Strict subset, fail-fast: dangling citation keys, unknown
   template/skeleton tokens, wide+here floats, unknown attrs/keys,
-  line-starting `[label]: ...` reference definitions
+  line-starting `[label]: ...` reference definitions, bullet/ordered
+  lists, and non-ASCII outside the transliteration table + Latin
+  pass-through (raw Greek/symbols raise with a replacement hint)
   all raise — never catch-and-continue into a TeX log mystery.
   Errors render `msg` + ` --> line N` + echo (+ `^` caret where
   the grammar knows the token); `build_from_paths` upgrades to

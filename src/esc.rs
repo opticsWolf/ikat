@@ -197,25 +197,26 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
     buf.push_str(&text[last..]);
     text = buf;
 
-    // Math protection, escaping, emphasis.
-    let mut out = String::new();
+    // Math-aware emphasis (probe #4): stash dollar-math spans as
+    // placeholder slots FIRST, so a bold span crossing math matches
+    // as one span and emits textbf around verbatim math (valid
+    // LaTeX). Math restores after emphasis; escapes never touch it.
+    let mut mixed = String::new();
     for (is_math, seg) in protect_math(&text) {
         if is_math {
-            out.push('$');
-            out.push_str(&seg);
-            out.push('$');
-            continue;
+            mixed.push_str(&stash(ph, format!("${seg}$")));
+        } else {
+            mixed.push_str(&seg);
         }
-        let mut seg = esc_text(&seg);
+    }
+    let mut seg = esc_text(&mixed);
         seg = bold_re()
             .replace_all(&seg, |cap: &regex::Captures| format!("\\textbf{{{}}}", &cap[1]))
             .into_owned();
         seg = italic_re()
             .replace_all(&seg, |cap: &regex::Captures| format!("\\textit{{{}}}", &cap[1]))
             .into_owned();
-        out.push_str(&seg);
-    }
-    Ok(out)
+    Ok(seg)
 }
 
 /// Full inline render with placeholder restore (descending indices —
@@ -223,6 +224,11 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
 /// line for errors (the caller knows it; the echo is the text
 /// itself, which always contains the offending key).
 pub fn inline(text: &str, keys: Option<&HashSet<String>>, line: usize) -> Result<String, crate::error::Error> {
+    // Unicode gate (probe #2): fail here with file:line:, never
+    // inside the TeX log. Mapped characters pass; everything else
+    // non-ASCII errors (math segments included — raw unicode is
+    // fatal in pdflatex math too).
+    crate::unicode::check(text, line)?;
     let mut ph = Vec::new();
     let mut text = inline_inner(text, keys, &mut ph)
         .map_err(|(m, key)| {
@@ -292,5 +298,29 @@ mod tests {
         assert!(got.contains("\\S{}3.2"));
         assert!(got.contains("\\textit{true at v}"));
         assert!(got.contains("\\textbf{bold}"));
+    }
+
+    #[test]
+    fn bold_across_math_supported() {
+        // Probe #4: emphasis spanning math emits textbf around
+        // verbatim math instead of literal stars.
+        let got = inline(
+            "**$P(z)$ depends only on the current $n(z)$**",
+            no_keys().as_ref(),
+            1,
+        )
+        .unwrap();
+        assert!(!got.contains("**"), "literal stars survive: {got}");
+        assert!(got.contains("$P(z)$"), "math kept: {got}");
+        assert!(got.contains("$n(z)$"), "math kept: {got}");
+        assert!(got.starts_with("\\textbf{"), "wrapped: {got}");
+    }
+
+    #[test]
+    fn italic_across_math_supported() {
+        let got = inline("*rate $r$ rises*", no_keys().as_ref(), 1).unwrap();
+        assert!(!got.contains('*'), "literal star survives: {got}");
+        assert!(got.contains("$r$"), "math kept: {got}");
+        assert!(got.starts_with("\\textit{"), "wrapped: {got}");
     }
 }

@@ -176,6 +176,16 @@ pub fn barchart(
     legend: LegendPos,
 ) -> Result<String, crate::error::Error> {
     use crate::error::Error;
+    // Unicode gate (probe #2): titles/labels reach pgfplots
+    // verbatim — raw non-ASCII outside the table dies in TeX.
+    for s in [title, ylabel]
+        .into_iter()
+        .chain(group_labels.iter().map(String::as_str))
+        .chain(series_names.iter().map(String::as_str))
+        .chain(refline.as_ref().map(|r| r.3.as_str()))
+    {
+        crate::unicode::check_data(s)?;
+    }
     if group_labels.is_empty() || series_names.is_empty() {
         return Err(Error::data("barchart: no groups or no series", String::new()));
     }
@@ -317,6 +327,13 @@ pub fn lineplot(
     legend: LegendPos,
 ) -> Result<String, crate::error::Error> {
     use crate::error::Error;
+    // Unicode gate (probe #2): titles/labels reach pgfplots verbatim.
+    for s in [title, xlabel, ylabel]
+        .into_iter()
+        .chain(series.iter().map(|(n, _, _)| *n))
+    {
+        crate::unicode::check_data(s)?;
+    }
     if xs.is_empty() || series.is_empty() {
         return Err(Error::data("lineplot: empty data", String::new()));
     }

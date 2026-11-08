@@ -396,7 +396,15 @@ fn strip_tex_comments(skel: &str) -> String {
 /// commands are out of scope and composed flat).
 pub fn author_front(spec: &BuildSpec) -> Result<String, Error> {
     if spec.authors.is_empty() {
+        // Unicode gate (probe #2/#9): the legacy scalar reaches
+        // `\author{...}` verbatim — raw non-ASCII would die in TeX.
+        crate::unicode::check_data(&spec.author)?;
         return Ok(spec.author.clone());
+    }
+    // Unicode gate: raw names/affiliations are spec data (no
+    // manuscript line); mapped characters pass, the rest fail here.
+    for name in spec.authors.iter().chain(spec.affiliations.iter()) {
+        crate::unicode::check_data(name)?;
     }
     if spec.authors_max < 0 {
         return Err(Error::data(
@@ -1026,6 +1034,9 @@ pub fn convert(
                 // of overflowing. Weaver-side and deterministic — no
                 // advisory needed, the width is intrinsic.
                 flush(&mut out, &mut para, para_line)?;
+                // Unicode gate (probe #2): raw non-ASCII in display
+                // math dies in pdflatex too — fail here with the line.
+                crate::unicode::check(&t, line)?;
                 if t.contains("$$") {
                     return Err(Error::new(
                         format!("line {line}: display math holds a second `$$`; one span per paragraph"),

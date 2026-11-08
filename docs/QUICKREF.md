@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.12.0 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.0 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 173 Rust tests
-.venv/Scripts/pytest tests/              # 104 pytest, 4 skipped (windows; pytest tests/ elsewhere)
+cargo test                               # 187 Rust tests
+.venv/Scripts/pytest tests/              # 119 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)
@@ -26,6 +26,7 @@ ikat build DOC.md --toml ikat.toml --outdir out [--spec S.json] [--bib R.bib]
      [--engine pdflatex|tectonic|texres] [--bib-style B] [--ensure-packages] [--no-pdf]
 ikat weave DOC.md --toml ikat.toml --spec S.json [--bib R.bib] [--author NAME…]
      [--affiliation INST…] [--author-affil A:N[,N…]] [--authors-max N] > doc.tex   # no TeX needed
+# build/weave without --author warn on stderr (placeholder author); stdout/exit codes unchanged.
 ikat check DOC.tex [--install] [--verbose]                   # exit 1 if missing
 ikat templates | ikat template NAME [--show-preset]
 ikat skeletons | ikat skeleton skeleton-plain
@@ -61,7 +62,7 @@ cannot touch axis labels; the below row clears tick labels.
 
 | grammar | covered | errors |
 |---|---|---|
-| `graph TD/LR/...` | directions TD/TB/LR/RL/BT; nodes `[]` `{}` `([])` `[[]]`; edges `-->`, `---`, `==>` with `\|label\|`; chains, `;`, `%%`, `<br/>`; `subgraph ID [title]`…`end` (nesting errors); multi-parent takes max(parent)+1; crossing edges reroute (exhaustion errors) | other directions/shapes, styling, `{{}}`, dotted edges |
+| `graph TD/LR/...` | directions TD/TB/LR/RL/BT; nodes `[]` `{}` `([])` `[[]]`; edges `-->`, `<-->` bidir, `---`, `==>` with `\|label\|` (quoted ok); `&` fan-in/out; chains, `;`, `%%`, `<br/>`; `subgraph ID [title]`…`end` (nesting errors); multi-parent takes max(parent)+1; crossing edges reroute (exhaustion errors) | other directions/shapes, styling, `{{}}`, dotted edges |
 | `sequenceDiagram` | `participant`/`actor` (+ `as` labels); `->>` solid, `-->>` dashed; `alt`/`else`/`opt`/`end` boxes | `loop`/`par`/`Note`/self-messages, anything else |
 | `stateDiagram-v2` | `[*]` endpoints; `A --> B [: label]`; `state "Label" as Name`; one composite level | nested composites, `direction`, notes |
 
@@ -179,9 +180,35 @@ hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 Markdown subset notes (the parser is CommonMark-shaped, the subset
 is strict): line-starting `[label]: ...` reference definitions are
 a build error (the text would vanish silently — write it inline);
-`~~~` fences, indented code, lists, HTML blocks, setext headings,
-and H4+ feed their raw lines as paragraph text (as the old scanner
-did); `>` quote lines are dropped without breaking paragraphs.
+bullet/ordered lists (`- `, `* `, `+ `, `1. `, `1) `) are a build
+error naming the line (they used to flatten silently into the
+paragraph — write blank-line-separated paragraphs instead);
+`~~~` fences, indented code, HTML blocks, setext headings, and H4+
+feed their raw lines as paragraph text (as the old scanner did);
+`>` quote lines are dropped without breaking paragraphs.
+
+Unicode gate (fail-fast, not in the TeX log): the heads are pdflatex
++ `inputenc`/`lmodern`/`textcomp`, so any non-ASCII character outside
+the transliteration table fails the weave with `file:line:` + caret
+naming the character (U+ code) and its replacement (Greek hints like
+$\lambda$ for λ). The table covers § — – … ≈ ∅ ≤ × → ≥ µ
+sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; raw Latin accents
+(Böhlen, Šafařík) pass through via `inputenc`. Applies to body text,
+headings, captions, table cells, display math, author names, plot
+labels, and inline/standalone diagram labels (precompiled diagram
+PDFs are external — their labels never reach TeX). Manuscripts are
+ASCII + Latin accents + table, never raw Greek or symbols.
+
+Emphasis may span `$…$` math: `**$P(z)$ depends on $n(z)$**` emits
+`\textbf{…$…$…}` (valid LaTeX) instead of literal stars.
+Display-math numbering rides inside the span as `\tag{N}`
+(`$$… \tag{12.1}$$`); trailing `(12.1)` after the span is not in
+the subset. The only display-math environment is `matrix` — write
+`pmatrix` as `\left( \begin{matrix} … \end{matrix} \right)` and
+`cases` as `\left\lbrace \begin{matrix} … \end{matrix} \right.`.
+
+Publish-ready default: the fallback author is a placeholder handle —
+pass real `--author` names (or spec `authors`) before publishing.
 
 `[typography]` keep-with-next (default ON): `\clubpenalty` +
 `\widowpenalty` at 10000, `\needspace{3\baselineskip}` before
