@@ -26,6 +26,7 @@ ikat build DOC.md --toml ikat.toml --outdir out [--spec S.json] [--bib R.bib]
      [--engine pdflatex|tectonic|texres] [--bib-style B] [--ensure-packages] [--no-pdf]
 ikat weave DOC.md --toml ikat.toml --spec S.json [--bib R.bib] [--author NAME…]
      [--affiliation INST…] [--author-affil A:N[,N…]] [--authors-max N] > doc.tex   # no TeX needed
+# build/weave without --author warn on stderr (placeholder author); stdout/exit codes unchanged.
 ikat check DOC.tex [--install] [--verbose]                   # exit 1 if missing
 ikat templates | ikat template NAME [--show-preset]
 ikat skeletons | ikat skeleton skeleton-plain

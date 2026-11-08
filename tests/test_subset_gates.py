@@ -85,6 +85,26 @@ def test_bidir_and_fan():
     assert tikz.count("\\draw[") == 2
 
 
+def test_placeholder_author_warns_on_stderr(tmp_path, capsys):
+    from ikat.cli import main as cli_main
+
+    md = tmp_path / "doc.md"
+    md.write_text("# T\n\nBody.\n", encoding="utf-8")
+    assert cli_main(["weave", str(md)]) == 0
+    err = capsys.readouterr().err
+    assert "placeholder author" in err
+    assert "--author" in err
+
+
+def test_explicit_author_stays_silent(tmp_path, capsys):
+    from ikat.cli import main as cli_main
+
+    md = tmp_path / "doc.md"
+    md.write_text("# T\n\nBody.\n", encoding="utf-8")
+    assert cli_main(["weave", str(md), "--author", "Ada Lovelace"]) == 0
+    assert capsys.readouterr().err == ""
+
+
 def test_bold_across_math_supported():
     r = build_document("# T\n\n**$P(z)$ depends only on $n(z)$**\n", "", _spec())
     assert "**" not in r.body

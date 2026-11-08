@@ -79,6 +79,19 @@ def _apply_authors(spec, a: argparse.Namespace) -> None:
     spec.authors_max = a.authors_max
 
 
+def _warn_placeholder_author(cmd: str, spec) -> None:
+    """Probe #9: the fallback author is the maintainer's handle, not
+    the user's name. Warn on stderr when a build would publish it
+    (no --author/--spec authors anywhere); explicit names stay
+    silent. Non-breaking by design: exit codes and stdout unchanged."""
+    from ikat.document import BuildSpec as _DefaultSpec
+
+    if not spec.authors and spec.author == _DefaultSpec().author:
+        print(f"ikat {cmd}: no --author given; using placeholder author "
+              f"{spec.author!r} (override with --author for publish-ready output)",
+              file=sys.stderr)
+
+
 def cmd_build(a: argparse.Namespace) -> int:
     from ikat import build_document, build_from_paths, compile_pdf
     from ikat.document import with_file
@@ -92,6 +105,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
+    _warn_placeholder_author("build", spec)
     outdir = Path(a.outdir or ".")
     outdir.mkdir(parents=True, exist_ok=True)
     stem = Path(a.md).stem
@@ -129,6 +143,7 @@ def cmd_weave(a: argparse.Namespace) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
+    _warn_placeholder_author("weave", spec)
     try:
         if a.toml:
             r = build_from_paths(a.md, a.toml, spec)
