@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.12.0 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.0 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 173 Rust tests
-.venv/Scripts/pytest tests/              # 104 pytest, 4 skipped (windows; pytest tests/ elsewhere)
+cargo test                               # 187 Rust tests
+.venv/Scripts/pytest tests/              # 119 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)

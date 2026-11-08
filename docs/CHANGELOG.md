@@ -7,6 +7,30 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.0 — 2026-11-08
+
+External probe-report hardening batch: fail-fast instead of TeX-log
+mysteries, plus a flowchart subset expansion.
+
+- Weave-time unicode gate (`492380f`) — any non-ASCII outside the
+  transliteration table + Latin pass-through fails with `file:line:`,
+  caret, U+ code and replacement hint (Greek hints like the lambda
+  one); wired into body, headings, captions, cells, display math,
+  author names, plot labels/footnotes and diagram labels; the label
+  emitter expanded to the full table; precompiled fences exempt
+  (their labels never reach TeX)
+- Bullet/ordered list markers rejected with the line instead of
+  silently flattening (`492380f`)
+- Math-aware emphasis (`492380f`) — emphasis spanning dollar-math
+  emits textbf/textit around verbatim math instead of literal stars
+- Flowchart `<-->` bidirectional edges + `&` fan-in/fan-out with
+  all-pairs semantics (`b1642f0`); quoted edge labels verified and
+  locked; short linear chains locked with a regression test
+- Placeholder-author stderr warning on `build`/`weave` (`c414852`)
+- Docs: manuscript-subset section (README), unicode gate + tag
+  numbering + matrix-only rule (QUICKREF), strictness catalog
+  (ARCHITECTURE), skill boundaries (ikat, ikat-api, ikat-cli)
+
 ## v0.12.0 — 2026-10-27
 
 Docs + site engine-story sync (no code change over 0.11.2).
