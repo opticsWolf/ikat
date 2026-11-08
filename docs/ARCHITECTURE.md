@@ -80,8 +80,9 @@ The hand-off between the layers is narrow on purpose:
 
 ### 3.1 `mermaid.rs` — flowchart subset → TikZ
 
-Deliberately not mermaid: `graph TD`/`graph LR` with `-->` edges,
-`---` links, `|label|` edge labels, `[]` box nodes and `{}`
+Deliberately not mermaid: `graph TD`/`graph LR` with `-->`, `<-->`
+bidirectional and `==>` edges, `---` links, `|label|` edge labels
+(quoted labels strip), `&` fan-in/fan-out, `[]` box nodes and `{}`
 diamond nodes. Anything else — other directions, other node
 shapes, subgraphs, styling statements — is a string error naming
 the offending statement, because a diagram that almost renders is

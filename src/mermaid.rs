@@ -11,7 +11,11 @@
 //!
 //! - directions `TD`, `TB`, `LR`, `RL`, `BT` (`graph` or `flowchart`)
 //! - node shapes `[rect]`, `{diamond}`, `([stadium])`, `[[subroutine]]`
-//! - edges `-->`, `---`, `==>` with optional `|label|`
+//! - edges `-->`, `<-->` (bidirectional, layout follows the written
+//!   direction), `---`, `==>` with optional `|label|` (quoted
+//!   labels work — one layer of double quotes strips)
+//! - `&` fan-in/fan-out (`A & B --> C`, `A --> B & C`, all-pairs
+//!   `A & B --> C & D`); chains continue from the last target
 //! - edge chains (`A-->B-->C`), `;` separators, `%%` comments,
 //!   `<br/>` line breaks in labels
 //!
@@ -40,6 +44,9 @@ pub(crate) enum EdgeStyle {
     Arrow,
     Line,
     Thick,
+    /// Bidirectional `<-->` (emits TikZ `<->`; layout follows the
+    /// written direction, so no layering cycle is introduced).
+    Bidir,
 }
 
 #[derive(Debug, Clone)]
@@ -103,7 +110,9 @@ fn parse_node(s: &str) -> Option<(String, Shape, String, &str)> {
 /// Parse one edge connector at the head of `s`.
 /// Returns (style, edge label, target node spec, rest).
 fn parse_edge(s: &str) -> Option<(EdgeStyle, Option<String>, &str)> {
-    let (style, rest) = if s.starts_with("-->") {
+    let (style, rest) = if s.starts_with("<-->") {
+        (EdgeStyle::Bidir, &s[4..])
+    } else if s.starts_with("-->") {
         (EdgeStyle::Arrow, &s[3..])
     } else if s.starts_with("==>") {
         (EdgeStyle::Thick, &s[3..])
@@ -199,6 +208,23 @@ fn parse_subgraph(stmt: &str) -> Option<(String, String)> {
         .strip_prefix('[')
         .and_then(|t| t.strip_suffix(']'))?;
     Some((id, unquote(title)))
+}
+
+/// One node (shaped definition or bare id) at the head of `s`.
+/// Returns (id, rest) or None when no node opens the string
+/// (connector, `&`, or empty — the caller errors naming it).
+fn take_node<'a>(s: &'a str, g: &mut Graph) -> Option<(String, &'a str)> {
+    if let Some((id, shape, label, r)) = parse_node(s) {
+        g.set_node(id.clone(), shape, label);
+        return Some((id, r));
+    }
+    let end = s.find(|c: char| !is_id_char(c)).unwrap_or(s.len());
+    if end == 0 || s.is_empty() {
+        return None;
+    }
+    let id = s[..end].to_string();
+    g.ensure_node(&id);
+    Some((id, s[end..].trim_start()))
 }
 
 fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error::Error> {
@@ -302,29 +328,61 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
         }
         let mut rest = stmt.as_str();
         let mut touched: Vec<String> = Vec::new();
-        // Optional leading node definition or bare id.
-        let mut current: Option<String> = None;
-        if let Some((id, shape, label, r)) = parse_node(rest) {
-            g.set_node(id.clone(), shape, label);
-            current = Some(id.clone());
-            touched.push(id);
+        // Pending sources for the next connector: `A & B` accumulates
+        // both, a lone node leaves one pending source with no edges.
+        let mut pending: Vec<String> = Vec::new();
+        // Sources (and style) of the most recent edge: a post-edge `&`
+        // fans from these, so `A --> B & C` also links A->C in the
+        // style of A->B, and `A & B --> C & D` links all four.
+        let mut last: Vec<String> = Vec::new();
+        let mut last_style = EdgeStyle::Arrow;
+        let mut have_edge = false;
+        if let Some((id, r)) = take_node(rest.trim_start(), &mut g) {
+            touched.push(id.clone());
+            pending.push(id);
             rest = r;
-        } else if let Some(end) = rest.find(|c: char| !is_id_char(c)) {
-            if end > 0 {
-                current = Some(rest[..end].to_string());
-                g.ensure_node(&rest[..end]);
-                touched.push(rest[..end].to_string());
-                rest = rest[end..].trim_start();
-            }
-        } else if !rest.is_empty() {
-            g.ensure_node(rest);
-            current = Some(rest.to_string());
-            touched.push(rest.to_string());
-            rest = "";
         }
-        // Edge chain: (connector target)*.
+        // Edge chain with `&` fan-in/fan-out: (connector target)*
+        // where `& node` either accumulates (pre-edge) or fans
+        // (post-edge, from the latest edge's sources).
         while !rest.trim_start().is_empty() {
             rest = rest.trim_start();
+            if rest.starts_with('&') {
+                if pending.is_empty() {
+                    return Err(Error::new(
+                        format!("edge without source in `{stmt}`"),
+                        line,
+                        raw.clone(),
+                    )
+                    .with_col(Some(1)));
+                }
+                rest = rest[1..].trim_start();
+                let (id, r) = take_node(rest, &mut g).ok_or_else(|| {
+                    Error::new(
+                        format!("expected a node after `&` in `{stmt}`"),
+                        line,
+                        raw.clone(),
+                    )
+                    .with_col(Some(stmt[..stmt.len() - rest.len()].chars().count() + 1))
+                })?;
+                touched.push(id.clone());
+                pending.push(id.clone());
+                if have_edge {
+                    for s in last.clone() {
+                        g.edges.push(Edge {
+                            from: s.clone(),
+                            to: id.clone(),
+                            label: None,
+                            style: last_style,
+                            line,
+                            stmt: raw.clone(),
+                        });
+                        touched.push(s);
+                    }
+                }
+                rest = r;
+                continue;
+            }
             let (style, label, r) = parse_edge(rest).ok_or_else(|| {
                 Error::new(
                     format!("cannot parse edge in statement `{stmt}` near `{rest}`"),
@@ -334,40 +392,39 @@ fn parse(src: &str, base: usize) -> Result<(Graph, Vec<Subgraph>), crate::error:
                 .with_col(Some(stmt[..stmt.len() - rest.len()].chars().count() + 1))
             })?;
             rest = r;
-            let target = if let Some((id, shape, label, r2)) = parse_node(rest) {
-                g.set_node(id.clone(), shape, label);
-                rest = r2;
-                id
-            } else {
-                let end = rest.find(|c: char| !is_id_char(c)).unwrap_or(rest.len());
-                if end == 0 {
-                    return Err(Error::new(
-                        format!("missing edge target in `{stmt}`"),
-                        line,
-                        raw.clone(),
-                    )
-                    .with_col(Some(stmt.chars().count() + 1)));
-                }
-                let id = rest[..end].to_string();
-                g.ensure_node(&id);
-                rest = rest[end..].trim_start();
-                id
-            };
-            let from = current.clone().ok_or_else(|| {
-                Error::new(format!("edge without source in `{stmt}`"), line, raw.clone())
-                    .with_col(Some(1))
+            let (target, r2) = take_node(rest, &mut g).ok_or_else(|| {
+                Error::new(
+                    format!("missing edge target in `{stmt}`"),
+                    line,
+                    raw.clone(),
+                )
+                .with_col(Some(stmt.chars().count() + 1))
             })?;
-            g.edges.push(Edge {
-                from: from.clone(),
-                to: target.clone(),
-                label,
-                style,
-                line: line,
-                stmt: raw.clone(),
-            });
-            touched.push(from);
+            rest = r2;
+            if pending.is_empty() {
+                return Err(Error::new(
+                    format!("edge without source in `{stmt}`"),
+                    line,
+                    raw.clone(),
+                )
+                .with_col(Some(1)));
+            }
+            for s in pending.clone() {
+                g.edges.push(Edge {
+                    from: s.clone(),
+                    to: target.clone(),
+                    label: label.clone(),
+                    style,
+                    line,
+                    stmt: raw.clone(),
+                });
+                touched.push(s);
+            }
             touched.push(target.clone());
-            current = Some(target);
+            last = pending.clone();
+            last_style = style;
+            pending = vec![target];
+            have_edge = true;
         }
         // A lone node definition with no edges is already recorded.
         if let Some(b) = open.as_mut() {
@@ -527,6 +584,7 @@ pub fn flowchart_to_tikz(src: &str, base_line: usize) -> Result<String, crate::e
             EdgeStyle::Arrow => "->",
             EdgeStyle::Line => "-",
             EdgeStyle::Thick => "->,thick",
+            EdgeStyle::Bidir => "<->",
         };
         let (ai, bi) = match (g.node_idx.get(&e.from), g.node_idx.get(&e.to)) {
             (Some(&a), Some(&b)) => (a, b),
@@ -718,6 +776,43 @@ mod tests {
         for l in tikz.lines().filter(|l| l.contains("draw[")) {
             assert_eq!(l.matches("--").count(), 1, "straight edge untouched: {l}");
         }
+    }
+
+    #[test]
+    fn bidir_emits_double_head() {
+        let tikz = flowchart_to_tikz("graph TD\nA[x]<-->B[y]", 1).unwrap();
+        assert!(tikz.contains("<->"), "double head, got:\n{tikz}");
+        // One recorded edge, layout follows the written direction.
+        assert_eq!(tikz.matches("draw[").count(), 1);
+        assert!(tikz.contains("\\node (A) at (0.0,-0.0)"), "A on top, got:\n{tikz}");
+    }
+
+    #[test]
+    fn fan_in_and_out() {
+        let tikz = flowchart_to_tikz("graph TD\nA[x] & B[y] --> C[z]", 1).unwrap();
+        assert_eq!(tikz.matches("draw[").count(), 2, "both sources link, got:\n{tikz}");
+        let tikz = flowchart_to_tikz("graph TD\nA[x] --> B[y] & C[z]", 1).unwrap();
+        assert_eq!(tikz.matches("draw[").count(), 2, "both targets link, got:\n{tikz}");
+        let tikz =
+            flowchart_to_tikz("graph TD\nA[x] & B[y] --> C[z] --> D[w]", 1).unwrap();
+        assert_eq!(tikz.matches("draw[").count(), 3, "fan then chain, got:\n{tikz}");
+    }
+
+    #[test]
+    fn quoted_edge_labels_strip() {
+        let tikz =
+            flowchart_to_tikz("graph TD\nA[x]-->|\"my label\"|B[y]", 1).unwrap();
+        assert!(tikz.contains("{my label}"), "quotes stripped, got:\n{tikz}");
+    }
+
+    #[test]
+    fn fan_and_bidir_errors() {
+        let e = flowchart_to_tikz("graph TD\nA[x] &\n", 1).unwrap_err();
+        assert!(e.msg.contains("expected a node after"), "got: {e}");
+        let e = flowchart_to_tikz("graph TD\n& B[y] --> C[z]\n", 1).unwrap_err();
+        assert!(e.msg.contains("edge without source"), "got: {e}");
+        // `<--` (half of `<-->`) is not a connector.
+        assert!(flowchart_to_tikz("graph TD\nA[x] <-- B[y]\n", 1).is_err());
     }
 
     #[test]

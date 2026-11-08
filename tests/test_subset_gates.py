@@ -76,6 +76,15 @@ def test_lists_fail_fast(tmp_path):
     assert "- item" in str(ei.value)
 
 
+def test_bidir_and_fan():
+    tikz = flowchart_to_tikz("graph TD\nA[x]<-->B[y]")
+    assert "<->" in tikz
+    tikz = flowchart_to_tikz("graph TD\nA[x] & B[y] --> C[z]")
+    assert tikz.count("\\draw[") == 2
+    tikz = flowchart_to_tikz("graph TD\nA[x] --> B[y] & C[z]")
+    assert tikz.count("\\draw[") == 2
+
+
 def test_bold_across_math_supported():
     r = build_document("# T\n\n**$P(z)$ depends only on $n(z)$**\n", "", _spec())
     assert "**" not in r.body
