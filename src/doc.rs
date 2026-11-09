@@ -1039,6 +1039,10 @@ pub fn convert(
                 // Display math is verbatim math: combining marks fail
                 // with math-accent hints (text accents break math).
                 crate::unicode::check_math(&t, line)?;
+                // Greek auto-map (probe follow-up): mapped letters
+                // render bare here (also feeds the width model text
+                // TeX actually measures).
+                let t = crate::unicode::map_greek_math(&t).into_owned();
                 if t.contains("$$") {
                     return Err(Error::new(
                         format!("line {line}: display math holds a second `$$`; one span per paragraph"),

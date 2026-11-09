@@ -767,6 +767,13 @@ mod tests {
 
     #[test]
     #[test]
+    #[test]
+    fn greek_label_wraps() {
+        let tikz = flowchart_to_tikz("graph TD\nA[R(λ) spectra]-->B[merit]", 1).unwrap();
+        assert!(tikz.contains("$\\lambda$"), "wrapped greek, got:\\n{tikz}");
+    }
+
+    #[test]
     fn combining_label_folds() {
         // Probe follow-up: needle-math labels weave clean.
         let tikz =

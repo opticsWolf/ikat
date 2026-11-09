@@ -207,7 +207,9 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
     let mut mixed = String::new();
     for (is_math, seg) in protect_math(&text) {
         if is_math {
-            mixed.push_str(&stash(ph, format!("${seg}$")));
+            // Greek auto-map (probe follow-up): math restores
+            // verbatim, so mapped letters render bare here.
+            mixed.push_str(&stash(ph, format!("${}$", crate::unicode::map_greek_math(&seg))));
         } else {
             mixed.push_str(&seg);
         }
@@ -288,6 +290,16 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    #[test]
+    fn greek_wraps_in_text_maps_bare_in_math() {
+        let got = inline("R(λ) spectra", no_keys().as_ref(), 1).unwrap();
+        assert!(got.contains("$\\lambda$"), "got: {got}");
+        let got = inline("val $σ + π$", no_keys().as_ref(), 1).unwrap();
+        assert!(got.contains("\\sigma + \\pi"), "got: {got}");
+        assert!(!got.contains("$$"), "no nested math: {got}");
+    }
+
     #[test]
     fn combining_folds_to_text_accents() {
         let got = inline("n\u{302} over \u{1e91}", no_keys().as_ref(), 1).unwrap();

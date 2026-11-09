@@ -7,6 +7,25 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.1 — 2026-11-09
+
+Combining diacritics fold (needle-math follow-up, one minor feature).
+
+- Base+mark pairs (`n` + U+0302, `z` + U+030C, …) weave clean: the
+  gate skips foldable pairs and every text emitter folds them to
+  text-mode accents; precomposed Ẑ/ẑ map alongside (`322dec7`)
+- Inside `$…$` math and display-math spans (verbatim math) combining
+  marks fail with the exact math accent (`$\hat{n}$`) instead —
+  text accents would break math mode; stacking, lone marks and
+  non-alnum bases fail loud with U+ codes
+- Plot titles/legends/ticks, the scalar author and preset footnotes
+  render the same folds (they bypassed the transliteration tables)
+- Proven end to end: folded accents compile under pdflatex
+- Greek auto-map (external-transform follow-up): full alphabet +
+  ς/ϵ/ϑ/ϕ/ϱ map to `$…$`-wrapped commands in text, bare in math
+  (omicron → plain `o`; ε/ς follow the hint vocabulary); AMS-only
+  ϰ/ϖ and other symbols still fail with exact hints
+
 ## v0.13.0 — 2026-11-08
 
 External probe-report hardening batch: fail-fast instead of TeX-log

@@ -20,15 +20,15 @@ def _spec(**kw):
     return BuildSpec(**kw)
 
 
-def test_unicode_body_error_is_file_line(tmp_path):
+def test_greek_automaps_in_body(tmp_path):
     (tmp_path / "doc.md").write_text("# T\n\nR(λ,θ) spectra.\n", encoding="utf-8")
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"doc\.md:3:.*U\+03BB") as ei:
-        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
-    assert "lambda" in str(ei.value)
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
+    assert "$\\lambda$" in r.body
+    assert "$\\theta$" in r.body
 
 
-def test_unicode_mermaid_inline_error_is_file_line(tmp_path):
+def test_greek_automaps_in_mermaid_label(tmp_path):
     md = ("# T\n\n```mermaid {inline}\n"
           "graph TD\n"
           "A[R(λ) spectra]-->B[merit]\n"
@@ -36,15 +36,13 @@ def test_unicode_mermaid_inline_error_is_file_line(tmp_path):
     (tmp_path / "doc.md").write_text(md, encoding="utf-8")
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
     spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="inline")])
-    with pytest.raises(ValueError, match=r"doc\.md:5:.*U\+03BB") as ei:
-        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
-    assert "lambda" in str(ei.value)
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
+    assert "$\\lambda$" in r.body
 
 
-def test_unicode_flowchart_api_keeps_rust_rendering():
-    with pytest.raises(ValueError, match=re.escape(" --> line 2")) as ei:
-        flowchart_to_tikz("graph TD\nA[R(λ) spectra]-->B[merit]")
-    assert "U+03BB" in str(ei.value)
+def test_greek_flowchart_api_wraps():
+    tikz = flowchart_to_tikz("graph TD\nA[R(λ) spectra]-->B[merit]")
+    assert "$\\lambda$" in tikz
 
 
 def test_unicode_precompiled_labels_do_not_reach_tex():
@@ -63,9 +61,10 @@ def test_latin_accents_pass_through():
     assert "Šafařík" in r.body
 
 
-def test_unicode_display_math_errors():
-    with pytest.raises(ValueError, match="U\\+03BB"):
-        build_document("# T\n\n$$R(λ) = x^2$$\n", "", _spec())
+def test_greek_automaps_in_display_math():
+    r = build_document("# T\n\n$$R(λ) = x^2$$\n", "", _spec())
+    assert "\\lambda" in r.body
+    assert "$$" not in r.body
 
 
 def test_lists_fail_fast(tmp_path):

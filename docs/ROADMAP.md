@@ -3,12 +3,12 @@
 Milestone detail stays here, done or not; the version-by-version
 shipping record lives in `docs/CHANGELOG.md`.
 
-Status 2026-11-08 (0.13.0): through M7.10b done —
+Status 2026-11-09 (0.13.1): through M7.10b done —
 TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
 annotations + instructions + bundled skills + installer + registry
 (M7.9/M7.9b), help verb + registry JSON + bare-invocation help
 (M7.9c), full author front matter + opt-in collapse (M7.10/M7.10b),
-POSIX load_preset fix — 187 cargo + 119 pytest green, hand and
+POSIX load_preset fix — 201 cargo + 122 pytest green, hand and
 auto showcases byte-identical (7 pages,
 0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
 site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
@@ -23,7 +23,8 @@ the third engine (binary cascade, `--engine texres`). 0.12.0:
 docs + site engine-story sync (no code change over 0.11.2).
 0.13.0: external probe-report hardening — weave-time unicode
 gate, list rejection, math-aware emphasis, flowchart `<-->` +
-`&` fan, placeholder-author warning.
+`&` fan, placeholder-author warning. 0.13.1: combining-diacritic
+folds (text accents in text mode, exact-accent errors in math).
 Open: none. See the TeXres watch item below for the next engine
 step.
 
@@ -525,7 +526,7 @@ shown remains true. 0 (default) never collapses; negative fails
 fast; `max >= len` is a no-op. The exporter does NOT use it — the
 bench corpus keeps complete front matter.
 
-## Engine era — release, embed, third engine (0.11.0 → 0.13.0)
+## Engine era — release, embed, third engine (0.11.0 → 0.13.1)
 
 - **0.11.0 — first release from merged `main`** (2026-10-26):
   POSIX `load_preset` fix (a >NAME_MAX string probed as a path
@@ -556,6 +557,10 @@ bench corpus keeps complete front matter.
   list rejection, math-aware emphasis, flowchart `<-->` + `&` fan,
   placeholder-author warning; manuscript-subset docs across
   README/QUICKREF/ARCHITECTURE/skills.
+- **0.13.1 — combining folds**: base+mark pairs fold to text-mode
+  accents in every text emitter (plot titles/legends/ticks, scalar
+  author, preset prose included); math-mode combining fails with
+  the exact accent; verified compiling under pdflatex.
 
 ## Watch: TeXres — a Rust TeX distribution (2026-10-27)
 

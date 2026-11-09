@@ -236,7 +236,7 @@ Manuscripts are ASCII + Latin accents + a transliteration table
 (section signs, dashes, math symbols, sub/superscripts, combining-mark
 folding after ASCII bases) — raw Greek
 or symbols fail the weave with `file:line:` and a replacement hint
-(write `$\lambda$`, never λ). Bullet/ordered lists are rejected
+(Greek auto-maps now). Bullet/ordered lists are rejected
 (write paragraphs); emphasis may span `$…$` math; display-math
 numbering rides inside as `\tag{N}`; the only display-math
 environment is `matrix`. Full table: `docs/QUICKREF.md`.

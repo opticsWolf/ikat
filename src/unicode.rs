@@ -7,7 +7,7 @@
 //! fail-fast doctrine says that must fail here instead, with a
 //! `file:line:` diagnostic naming the character and its replacement.
 //!
-//! Two classes pass: (a) the transliteration table below — the set
+//! Four classes pass: (a) the transliteration table below — the set
 //! the emitters replace (`UNI` + `SYM_TOKENS` keys in `esc.rs` plus
 //! the subscript / superscript characters handled there); (b) raw
 //! pass-through Latin accent ranges the `inputenc` UTF-8 heads
@@ -142,12 +142,65 @@ pub fn fold_marks(s: &str) -> Cow<str> {
 /// the scalar author, preset prose): combining folds plus the
 /// precomposed caron letters. Table-backed emitters (`esc_text`,
 /// `esc_label`) run `fold_marks` and carry their own ẑ entries.
-pub fn transliterate_extra(s: &str) -> Cow<str> {
-    let folded = fold_marks(s);
-    if !folded.contains('Ẑ') && !folded.contains('ẑ') {
-        return folded;
+/// Greek auto-mapping (external-transform follow-up): (letter,
+/// math-inner). Text emitters wrap (`λ` → `$\lambda$`); math contexts
+/// (inline-math stash, display math) use the inner form bare. Omicron
+/// maps to plain `o` — the glyphs are identical, so no font switch.
+/// Uppercase homoglyphs (ΑΒΕ…) map to plain Latin; `ε`/`ς`/variants
+/// follow the long-standing hint vocabulary. ϰ/ϖ stay unmapped
+/// (AMS-only commands) and fail with hints like any other symbol.
+const GREEK: &[(char, &str)] = &[
+    ('α', "\\alpha"), ('β', "\\beta"), ('γ', "\\gamma"), ('δ', "\\delta"),
+    ('ε', "\\varepsilon"), ('ζ', "\\zeta"), ('η', "\\eta"), ('θ', "\\theta"),
+    ('ι', "\\iota"), ('κ', "\\kappa"), ('λ', "\\lambda"), ('μ', "\\mu"),
+    ('ν', "\\nu"), ('ξ', "\\xi"), ('ο', "o"), ('π', "\\pi"),
+    ('ρ', "\\rho"), ('σ', "\\sigma"), ('τ', "\\tau"), ('υ', "\\upsilon"),
+    ('φ', "\\phi"), ('χ', "\\chi"), ('ψ', "\\psi"), ('ω', "\\omega"),
+    ('Α', "A"), ('Β', "B"), ('Γ', "\\Gamma"), ('Δ', "\\Delta"),
+    ('Ε', "E"), ('Ζ', "Z"), ('Η', "H"), ('Θ', "\\Theta"),
+    ('Ι', "I"), ('Κ', "K"), ('Λ', "\\Lambda"), ('Μ', "M"),
+    ('Ν', "N"), ('Ξ', "\\Xi"), ('Ο', "O"), ('Π', "\\Pi"),
+    ('Ρ', "P"), ('Σ', "\\Sigma"), ('Τ', "T"), ('Υ', "\\Upsilon"),
+    ('Φ', "\\Phi"), ('Χ', "X"), ('Ψ', "\\Psi"), ('Ω', "\\Omega"),
+    ('ς', "\\varsigma"), ('ϵ', "\\epsilon"), ('ϑ', "\\vartheta"),
+    ('ϕ', "\\varphi"), ('ϱ', "\\varrho"),
+];
+
+/// Math-inner command for one Greek letter, if mapped.
+fn greek_inner(c: char) -> Option<&'static str> {
+    GREEK.iter().find(|(g, _)| *g == c).map(|(_, m)| *m)
+}
+
+/// Bare Greek commands for math contexts (inline-math stash,
+/// display math): `λ` → `\lambda`, omicron → plain `o`.
+pub fn map_greek_math(s: &str) -> Cow<str> {
+    if !s.chars().any(|c| matches!(c, '\u{370}'..='\u{3ff}')) {
+        return Cow::Borrowed(s);
     }
-    let t = folded.replace('Ẑ', "\\v{Z}").replace('ẑ', "\\v{z}");
+    let mut t = s.to_string();
+    for (g, inner) in GREEK {
+        if t.contains(*g) {
+            t = t.replace(*g, inner);
+        }
+    }
+    Cow::Owned(t)
+}
+
+pub fn transliterate_extra(s: &str) -> Cow<str> {
+    // Fast path: no foldable, extra, or Greek-range characters.
+    if !s.chars().any(|c| {
+        is_combining_mark(c) || c == 'Ẑ' || c == 'ẑ' || matches!(c, '\u{370}'..='\u{3ff}')
+    }) {
+        return Cow::Borrowed(s);
+    }
+    let folded = fold_marks(s);
+    let mut t = folded.into_owned();
+    t = t.replace('Ẑ', "\\v{Z}").replace('ẑ', "\\v{z}");
+    for (g, inner) in GREEK {
+        if t.contains(*g) {
+            t = t.replace(*g, &format!("${inner}$"));
+        }
+    }
     Cow::Owned(t)
 }
 
@@ -156,10 +209,14 @@ pub fn transliterate_extra(s: &str) -> Cow<str> {
 /// their own table (plot ticks, scalar author, preset prose).
 const EXTRA_ALLOWED: &[char] = &['Ẑ', 'ẑ'];
 
-/// ASCII, transliterated, inputenc pass-through Latin, or a
-/// precomposed extra mapped by `transliterate_extra`.
+/// ASCII, transliterated, inputenc pass-through Latin, a precomposed
+/// extra, or a mapped Greek letter (`greek_inner` below).
 pub fn is_allowed(c: char) -> bool {
-    c.is_ascii() || ALLOWED.contains(&c) || EXTRA_ALLOWED.contains(&c) || is_passthrough(c)
+    c.is_ascii()
+        || ALLOWED.contains(&c)
+        || EXTRA_ALLOWED.contains(&c)
+        || greek_inner(c).is_some()
+        || is_passthrough(c)
 }
 
 /// First disallowed character in `s`: (char, char-column-1-based).
@@ -230,7 +287,7 @@ pub fn msg_for(c: char) -> String {
             "unicode character '{c}' ({code}) is not in the pdflatex subset; write {rep} instead"
         ),
         None => format!(
-            "unicode character '{c}' ({code}) is not in the pdflatex subset; write a LaTeX command instead (raw Latin accents pass, Greek and symbols need commands)"
+            "unicode character '{c}' ({code}) is not in the pdflatex subset; write a LaTeX command instead (raw Latin accents pass, unmapped symbols need commands)"
         ),
     }
 }
@@ -422,21 +479,22 @@ mod tests {
     }
 
     #[test]
-    fn greek_fails_with_hint_and_caret() {
-        let e = check("R(λ,θ) spectra", 7).unwrap_err();
-        assert!(e.msg.contains('λ'), "got: {e}");
-        assert!(e.msg.contains("U+03BB"), "got: {e}");
-        assert!(e.msg.contains("\\lambda"), "got: {e}");
-        assert_eq!((e.line, e.col), (7, Some(3)), "got: {e}");
-        assert!(e.echo.contains('λ'), "got: {e}");
+    fn greek_automaps_with_documented_choices() {
+        // Formerly the headline failure; now clean in both modes.
+        assert!(check("R(λ,θ) spectra", 7).is_ok());
+        assert!(check("$λ + ς$", 1).is_ok());
+        assert_eq!(map_greek_math("ς"), "\\varsigma");
+        assert_eq!(map_greek_math("ο"), "o");
+        assert_eq!(transliterate_extra("ε"), "$\\varepsilon$");
     }
 
     #[test]
     fn block_check_names_body_line() {
-        let e = check_block("graph TD\nA[R(λ) spectra]-->B[merit]", 11).unwrap_err();
+        // Greek now maps; an unmapped symbol still names the line.
+        assert!(check_block("graph TD\nA[R(λ) spectra]-->B[merit]", 11).is_ok());
+        let e = check_block("graph TD\nA[R(λ) spectra]-->B[☃]", 11).unwrap_err();
         assert_eq!(e.line, 12, "got: {e}");
-        assert!(e.msg.contains("U+03BB"), "got: {e}");
-        assert!(e.echo.contains('λ'), "got: {e}");
+        assert!(e.msg.contains("U+2603"), "got: {e}");
     }
 
     #[test]
@@ -488,6 +546,17 @@ mod tests {
     fn unmatched_dollar_stays_text() {
         // No closing `$`: text rules, the pair folds.
         assert!(check("price $5 and n\u{302}", 1).is_ok());
+    }
+
+    #[test]
+    #[test]
+    fn greek_alphabet_coverage() {
+        // Every mapped letter passes the gate in text and math.
+        let all = "αβγδεζηθικλμνξοπρστυφχψωΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩςϵϑϕϱ";
+        assert!(check(&all, 1).is_ok());
+        assert!(check_math(&all, 1).is_ok());
+        // AMS-only variants stay loud.
+        assert!(check("ϰ", 1).is_err());
     }
 
     #[test]
