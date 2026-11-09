@@ -7,6 +7,23 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.4 — 2026-11-09
+
+Local-figure auto-embed (host verifies, core stays pure).
+
+- Local `![alt](path)` embeds as a real float when host-verified:
+  exists, PDF/PNG/JPG, single-page PDF (stdlib page scan) or
+  `#page=N` fragment (explicit intent, pdfTeX `page=` option);
+  caption from alt (`Figure N` fallback), `fig:localN` labels
+  collision-checked, picture span, height cap
+- Missing/wrong-format (GIF/SVG hint conversion)/multi-page/
+  unverifiable targets degrade with precise notes, never TeX-log
+  failures; remote hrefs unchanged (bridge downloads register
+  via pre-fillable `local_figures`)
+- Rust core still never touches the filesystem (explicit design
+  rule, now documented)
+- `tests/test_local_figures.py` pins it (206 cargo + 139 pytest)
+
 ## v0.13.3 — 2026-11-09
 
 Warn-and-render compatibility (JATS-shaped manuscripts weave).

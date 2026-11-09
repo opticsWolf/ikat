@@ -240,7 +240,9 @@ fallback records a note, and Greek auto-maps. Only truly
 unrepresentable characters (emoji, CJK) fail the weave with
 `file:line:`. Bullet/ordered lists render as paragraphs;
 reference definitions drop; captionless tables take `Table N`;
-remote figures render as alt-text; footnotes become `\footnote` —
+remote figures render as alt-text; local `![alt](path)` embeds
+as a real float when the host verifies it (exists, PDF/PNG/JPG,
+single-page or `#page=N`); footnotes become `\footnote` —
 every adaptation reported. Emphasis may span `$…$` math;
 display-math numbering rides inside as `\tag{N}`; the only
 display-math environment is `matrix`. Full table: `docs/QUICKREF.md`.

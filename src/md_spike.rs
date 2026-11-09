@@ -173,6 +173,11 @@ fn pdc_parse(md: &str) -> Result<Vec<Block>, crate::error::Error> {
             // Parity with hand_parse: a `$$` paragraph stays one
             // Para there, so the oracle sees the same shape here.
             crate::md::MdKind::DisplayMath(t) => out.push(Block::Para(format!("$${t}$$"))),
+            // Unreachable from `blocks()` (the split into floats
+            // happens in `convert()`); present for exhaustiveness.
+            crate::md::MdKind::LocalFigure { alt, target, .. } => {
+                out.push(Block::Para(format!("![{alt}]({target})")))
+            }
         }
     }
     Ok(out)
