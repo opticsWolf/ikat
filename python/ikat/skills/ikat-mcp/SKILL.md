@@ -33,7 +33,7 @@ descriptions; `legend` is an enum.
 
 | Need | Tool |
 |---|---|
-| Weave markdown → `.tex` | `weave_document(md_text, toml_text, spec_json)` — `spec_json` is BuildSpec JSON, same shape as CLI `--spec` (incl. `authors`/`affiliations`/`author_affils` full front matter and opt-in `authors_max` collapse) |
+| Weave markdown → `.tex` | `weave_document(md_text, toml_text, spec_json)` — `spec_json` is BuildSpec JSON, same shape as CLI `--spec` (incl. `authors`/`affiliations`/`author_affils` full front matter and opt-in `authors_max` collapse); returns `{..., notes}` — READ notes: auto-adapt fixes, fallbacks, embedded figures land there, never in errors |
 | Mermaid fence → tikzpicture | `flowchart_to_tikz(src)` — flowchart, `sequenceDiagram`, or `stateDiagram-v2` (header dispatch), strict subset, errors name the statement |
 | One fence → standalone source | `standalone_figure(md_text)` → `{lang, tex, needs}` — the WRAPPED `fig.tex`, not PDF bytes; the caller compiles (same workdir rule as `compile_pdf`) |
 | Bar / line data → tikzpicture | `barchart_to_tikz(...)` / `lineplot_to_tikz(...)`, `legend=` keyword (`auto` default; unknown words error naming the set), `preset_json=` (preset document string; when set, explicit data args ignored) |
@@ -56,6 +56,9 @@ descriptions; `legend` is an enum.
   where known; no file prefix on string inputs — the Rust
   ` --> line N` form crosses verbatim): dangling citation keys,
   unknown tokens/attrs/legend words, registry misses.
+  Subset adaptations never raise — lists, fallbacks, figures,
+  footnotes, and captionless tables weave with notes (see the
+  `weave_document` row).
 - There is deliberately NO `compile_pdf` tool (workdir-bound,
   minutes-long): weave here, compile via the `ikat build` CLI.
 - Unknown `spec_json` keys are ignored; missing registries fail

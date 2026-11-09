@@ -200,7 +200,7 @@ def _resolve_local_figures(md_text: str, base: Path) -> list[LocalFigure]:
     remote/data/mailto untouched (alt-text path); local candidates
     resolved against `base`, verified (existence + PDF/PNG/JPG),
     PDF page-counted (multi-page or unverifiable never embeds:
-    `\includegraphics` would take page 1 silently); `#page=N`
+    bare includegraphics would take page 1 silently); `#page=N`
     fragments are explicit intent and embed with the page option."""
     out: list[LocalFigure] = []
     seen: set[str] = set()

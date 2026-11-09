@@ -56,6 +56,7 @@ ikat version
   `FILE` + `--preset` together is an error naming both;
   `--legend` overrides the preset's `legend` key.
 - `check` covers float packages too (`placeins/float/dblfloatfix`).
+- Subset issues never fail the weave: lists, unicode fallbacks, figures, footnotes, and captionless tables render with notes on stderr (same channel as the auto-adapt fixes).
 - `skills` manages the bundled agent skill packs: `list` shows names
   and triggers, `show NAME` prints the SKILL.md verbatim, `install`
   copies them into agent skill directories (`~/.claude/skills`,
