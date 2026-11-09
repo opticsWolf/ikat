@@ -47,7 +47,9 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 `author_affils[i]` = 0-based affiliation indices per author)
 + opt-in `authors_max=N` (first N names + ", et al."; 0 = never),
 `preamble_override/preamble_append/skeleton` (level-1 vs level-3,
-mutually exclusive), `graphicspaths`. Renaming a caption cannot
+mutually exclusive), `graphicspaths`, `local_figures=[LocalFigure(target, path, page, embed, note)]`
+(host-verified local `![alt](path)` embeds as floats; bridge downloads pre-fill entries) +
+`figure_dir` (resolution base, default: the md file's parent). Renaming a caption cannot
 desynchronize the document — the spec names it, not the markdown.
 
 ## Legend keyword

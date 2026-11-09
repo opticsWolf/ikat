@@ -3,12 +3,12 @@
 Milestone detail stays here, done or not; the version-by-version
 shipping record lives in `docs/CHANGELOG.md`.
 
-Status 2026-11-09 (0.13.2): through M7.10b done —
+Status 2026-11-09 (0.13.4): through M7.10b done —
 TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
 annotations + instructions + bundled skills + installer + registry
 (M7.9/M7.9b), help verb + registry JSON + bare-invocation help
 (M7.9c), full author front matter + opt-in collapse (M7.10/M7.10b),
-POSIX load_preset fix — 203 cargo + 129 pytest green, hand and
+POSIX load_preset fix — 206 cargo + 139 pytest green, hand and
 auto showcases byte-identical (7 pages,
 0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
 site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
@@ -26,7 +26,11 @@ gate, list rejection, math-aware emphasis, flowchart `<-->` +
 `&` fan, placeholder-author warning. 0.13.1: combining-diacritic
 folds (text accents in text mode, exact-accent errors in math). 0.13.2: figure auto-adapt —
 measured span/pos/width, picture height cap, cluster-fit
-boxes, every fix reported; baselines hold.
+boxes, every fix reported; baselines hold. 0.13.3: warn-and-render
+compatibility (lists to paragraphs, unicode fallbacks, alt-text
+figures, `\footnote`, auto captions — JATS-shaped manuscripts
+weave). 0.13.4: local-figure auto-embed (host verifies existence,
+format, page count; core stays filesystem-free).
 Open: none. See the TeXres watch item below for the next engine
 step.
 
@@ -528,7 +532,7 @@ shown remains true. 0 (default) never collapses; negative fails
 fast; `max >= len` is a no-op. The exporter does NOT use it — the
 bench corpus keeps complete front matter.
 
-## Engine era — release, embed, third engine (0.11.0 → 0.13.2)
+## Engine era — release, embed, third engine (0.11.0 → 0.13.4)
 
 - **0.11.0 — first release from merged `main`** (2026-10-26):
   POSIX `load_preset` fix (a >NAME_MAX string probed as a path
@@ -567,6 +571,15 @@ bench corpus keeps complete front matter.
   measured geometry (explicit attrs win, fixes reported),
   picture-mode height cap, label-fit cluster/router boxes;
   showcase adapts nothing, frozen-paper delta proven no-op.
+- **0.13.3 — warn-and-render compatibility**: lists to paragraphs,
+  unicode fallback table (quotes, U+2212, legend symbols),
+  alt-text figures, `\footnote`, auto `Table N` — every adaptation
+  noted; JATS-shaped manuscripts weave; baselines byte-identical.
+- **0.13.4 — local-figure auto-embed**: `![alt](path)` embeds as a
+  real float when host-verified (PDF/PNG/JPG, stdlib page scan,
+  `#page=N` fragments, `fig:localN` labels, height cap); missing /
+  wrong-format / multi-page targets degrade with precise notes;
+  Rust core still never touches the filesystem.
 
 ## Watch: TeXres — a Rust TeX distribution (2026-10-27)
 
