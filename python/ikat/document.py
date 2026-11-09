@@ -19,6 +19,7 @@ from ._core import build_document as _build_document
 from ._core import parse_config as _parse_config
 
 import re as _re
+import zlib as _zlib
 
 _LINE_RE = _re.compile(r"^([^\n]+)\n --> line (\d+)\n", _re.MULTILINE)
 
@@ -57,6 +58,21 @@ def with_file(path: str | Path | None, head_path: str | Path | None, fn, *args):
 
 
 @dataclass
+@dataclass
+class LocalFigure:
+    """Host-verified local figure (0.13.4): one `![alt](target)`.
+    The Python layer resolves `target` against the manuscript dir,
+    checks existence + format, and records the verdict; the Rust
+    core trusts these entries (it never touches the filesystem).
+    Pre-fill entries to register bridge downloads explicitly."""
+    target: str  # raw `(...)` target as written (match key)
+    path: str = ""  # resolved path to embed (absolute posix)
+    page: int = 0  # `#page=N` fragment (0 = none)
+    embed: bool = False  # host verdict: float, or alt-text + note
+    note: str = ""  # human reason when embed is false
+
+
+@dataclass
 class DiagramEntry:
     key: str
     caption: str
@@ -90,6 +106,11 @@ class BuildSpec:
     skeleton: str = ""  # level-3 whole-document content; exclusive with preamble_override
     bib_style: str = "IEEEtran"
     plot_attrs: dict[str, str] = field(default_factory=dict)
+    # Local-figure policy (0.13.4): explicit base dir for `![alt](path)`
+    # resolution (default: the md file's parent, else CWD).
+    figure_dir: str = ""
+    # Host-verified local figures (bridge downloads go here).
+    local_figures: list[LocalFigure] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
@@ -119,6 +140,11 @@ def spec_from_dict(raw: dict) -> BuildSpec:
         d if isinstance(d, DiagramEntry) else DiagramEntry(**d)
         for d in raw.pop("diagrams", [])
     ]
+    local_figures = [
+        f if isinstance(f, LocalFigure) else LocalFigure(**f)
+        for f in raw.pop("local_figures", [])
+    ]
+    raw["local_figures"] = local_figures
     known = set(BuildSpec.__dataclass_fields__)
     raw = {k: v for k, v in raw.items() if k in known}
     if isinstance(raw.get("bib_keys"), list):
@@ -126,7 +152,106 @@ def spec_from_dict(raw: dict) -> BuildSpec:
     return BuildSpec(diagrams=diagrams, **raw)
 
 
+_IMG_RE = _re.compile(r"!\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+_FRAG_RE = _re.compile(r"#page=(\d+)$", _re.IGNORECASE)
+_REMOTE_RE = _re.compile(r"(?i)^(https?://|mailto:|data:|#)")
+_EMBED_EXTS = {".pdf", ".png", ".jpg", ".jpeg"}
+_CONVERT_HINT = {
+    ".gif": "convert GIF to PNG and re-run",
+    ".svg": "convert SVG to PDF and re-run",
+    ".tif": "convert to PNG and re-run",
+    ".tiff": "convert to PNG and re-run",
+    ".bmp": "convert to PNG and re-run",
+}
+_PAGE_RE = _re.compile(rb"/Type\s*/Page([^sA-Za-z]|$)")
+_PAGES_RE = _re.compile(rb"/Type\s*/Pages([^A-Za-z]|$)")
+
+
+def _pdf_page_count(path: Path) -> int | None:
+    """Conservative PDF page count (stdlib only): counts page dicts
+    in raw objects plus zlib-inflated streams (modern PDFs compress
+    them), with exactly-one catalog root as a sanity gate. Returns
+    None when not evidently a single- or multi-page PDF — callers
+    treat unknown as unembeddable (never guess at content)."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if not data.startswith(b"%PDF"):
+        return None
+    n = len(_PAGE_RE.findall(data))
+    if n == 1 and len(_PAGES_RE.findall(data)) == 1:
+        return 1
+    for m in _re.finditer(rb"stream\r?\n(.*?)endstream", data, _re.S):
+        for blob in (m.group(1), m.group(1).rstrip(b"\r\n")):
+            try:
+                dec = _zlib.decompress(blob)
+            except Exception:
+                continue
+            n += len(_PAGE_RE.findall(dec))
+            break
+    if n >= 1 and len(_PAGES_RE.findall(data)) == 1:
+        return n
+    return None
+
+
+def _resolve_local_figures(md_text: str, base: Path) -> list[LocalFigure]:
+    """Local-figure policy (0.13.4): per `![alt](target)` target —
+    remote/data/mailto untouched (alt-text path); local candidates
+    resolved against `base`, verified (existence + PDF/PNG/JPG),
+    PDF page-counted (multi-page or unverifiable never embeds:
+    `\includegraphics` would take page 1 silently); `#page=N`
+    fragments are explicit intent and embed with the page option."""
+    out: list[LocalFigure] = []
+    seen: set[str] = set()
+    for m in _IMG_RE.finditer(md_text):
+        target = m.group(2)
+        if target in seen or _REMOTE_RE.match(target):
+            continue
+        seen.add(target)
+        frag = _FRAG_RE.search(target)
+        page = int(frag.group(1)) if frag else 0
+        name = target[:frag.start()] if frag else target
+        p = base / name
+        if not p.is_file():
+            out.append(LocalFigure(target, p.as_posix(), 0, False,
+                f"'{target}' not found (searched {base.as_posix()}); rendered as alt-text"))
+            continue
+        ext = p.suffix.lower()
+        if ext not in _EMBED_EXTS:
+            hint = _CONVERT_HINT.get(ext, "unsupported format for pdflatex")
+            out.append(LocalFigure(target, p.as_posix(), 0, False,
+                f"'{target}' not embedded: pdflatex needs PDF/PNG/JPG ({hint})"))
+            continue
+        if ext == ".pdf" and not page:
+            n = _pdf_page_count(p)
+            if n is None:
+                out.append(LocalFigure(target, p.as_posix(), 0, False,
+                    f"'{target}' page count unverifiable; not embedded (register it explicitly to include)"))
+                continue
+            if n > 1:
+                out.append(LocalFigure(target, p.as_posix(), 0, False,
+                    f"'{target}' has {n} pages; not embedded (add #page=N to select, or register a single-page graphic)"))
+                continue
+        out.append(LocalFigure(target, p.as_posix(), page, True, ""))
+    return out
+
+
+def _with_local_figures(spec: BuildSpec, md_text: str, base: Path) -> BuildSpec:
+    """Inject host-verified local figures (pre-filled bridge entries
+    win; auto-resolution covers the rest). Pure-string callers get
+    CWD-relative resolution — still verified, still noted."""
+    existing = {f.target for f in spec.local_figures}
+    fresh = [f for f in _resolve_local_figures(md_text, base) if f.target not in existing]
+    if not fresh:
+        return spec
+    return replace(spec, local_figures=[*spec.local_figures, *fresh])
+
+
 def build_document(md_text: str, toml_src: str, spec: BuildSpec) -> BuildResult:
+    # Absolute base: embedded paths must compile from any CWD.
+    base = Path(spec.figure_dir) if spec.figure_dir else Path(".")
+    spec = _with_local_figures(spec, md_text, base.resolve())
     r = json.loads(_build_document(md_text, toml_src, spec.to_json()))
     return BuildResult(r["title"], r["body"], r["tex"], r["n_diagrams"], r["n_tables"],
                        r.get("notes", []))
@@ -170,6 +295,8 @@ def build_from_paths(md_path: str | Path, toml_path: str | Path, spec: BuildSpec
         skeleton=spec.skeleton or skel,
     )
     md_text = Path(md_path).read_text(encoding="utf-8")
+    base = Path(spec.figure_dir) if spec.figure_dir else Path(md_path).parent
+    spec = _with_local_figures(spec, md_text, base.resolve())
     head_path = None
     if not inline_head:
         cfg = _parse_config(toml_src)

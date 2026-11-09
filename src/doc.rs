@@ -91,6 +91,33 @@ pub struct BuildSpec {
     /// `\bibliographystyle` name (publisher templates override it).
     #[serde(default = "default_bibstyle")]
     pub bib_style: String,
+    /// Host-verified local figures (0.13.4): the Python layer — the
+    /// only layer that sees paths — resolves `![alt](target)` against
+    /// the manuscript dir, checks existence + format, and records one
+    /// entry per target. The core never touches the filesystem; it
+    /// trusts these entries the way it trusts registry figures.
+    #[serde(default)]
+    pub local_figures: Vec<LocalFigure>,
+}
+
+/// One host-verified local figure candidate (0.13.4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalFigure {
+    /// Raw `(...)` target as written (match key, fragment included).
+    #[serde(default)]
+    pub target: String,
+    /// Resolved path to embed (absolute or graphicspath-relative).
+    #[serde(default)]
+    pub path: String,
+    /// `#page=N` fragment (0 = none; explicit user intent).
+    #[serde(default)]
+    pub page: i64,
+    /// Host verdict: embed as a float, or leave for alt-text.
+    #[serde(default)]
+    pub embed: bool,
+    /// Human reason when `embed` is false (noted verbatim once).
+    #[serde(default)]
+    pub note: String,
 }
 
 fn default_plot_dir() -> String {
@@ -248,6 +275,7 @@ fn figure_block(
     caption_bottom: bool,
     notes: &mut Vec<String>,
     cap_height: Option<&str>,
+    page: i64,
 ) -> Result<(String, FloatNeeds), String> {
     let mut needs = FloatNeeds::none();
     let wide = matches!(span, Span::Wide);
@@ -304,10 +332,18 @@ fn figure_block(
         notes.push(format!(
             "external graphic {label}: height capped at {cap} (natural size unknown at weave time)"
         ));
+        // `#page=N` (local figures): pdfTeX selects the page
+        // natively — explicit user intent, trusted like registry.
+        let page_opt = if page > 0 {
+            format!(",page={page}")
+        } else {
+            String::new()
+        };
         format!(
-            "\\includegraphics[width={},height={},keepaspectratio]{{{body_tex}}}",
+            "\\includegraphics[width={},height={},keepaspectratio{}]{{{body_tex}}}",
             width_to_tex(width, span_w),
-            cap
+            cap,
+            page_opt
         )
     } else {
         format!("\\includegraphics[width={}]{{{body_tex}}}", width_to_tex(width, span_w))
@@ -939,6 +975,7 @@ pub fn convert(
     let mut in_abstract = false;
     let mut diagram_idx = 0usize;
     let mut table_idx = 0usize;
+    let mut local_idx = 0usize;
     let mut notes = Vec::new();
     // Original line of the pending para's first line (for flush errors).
     let mut para_line = 0usize;
@@ -962,7 +999,82 @@ pub fn convert(
     // every arm below is the old branch body verbatim on the same
     // inputs. `lines` is rejoined because offsets need one source.
     let md_text = lines.join("\n");
-    for b in crate::md::blocks(&md_text)? {
+    let mut blocks: Vec<crate::md::MdBlock> = Vec::new();
+    // Compat (0.13.4): split host-verified `![alt](target)` images
+    // out of paragraph lines into `LocalFigure` blocks (real
+    // floats); unverified targets keep the alt-text path in
+    // `inline()`, with the host's verdict noted once per target.
+    if spec.local_figures.is_empty() {
+        blocks = crate::md::blocks(&md_text)?;
+    } else {
+        let figs: HashMap<&str, &LocalFigure> =
+            spec.local_figures.iter().map(|f| (f.target.as_str(), f)).collect();
+        let mut noted: HashSet<String> = HashSet::new();
+        for b in crate::md::blocks(&md_text)? {
+            let bl = b.line;
+            match b.kind {
+                MdKind::Para(ls) => {
+                    let mut run: Vec<String> = Vec::new();
+                    let mut segs: Vec<crate::md::MdBlock> = Vec::new();
+                    for l in &ls {
+                        let mut pos = 0usize;
+                        let mut split = false;
+                        for cap in crate::esc::image_re().captures_iter(l) {
+                            let m = cap.get(0).unwrap();
+                            let (alt, tgt) = (cap[1].to_string(), cap[2].to_string());
+                            match figs.get(tgt.as_str()) {
+                                Some(f) if f.embed => {
+                                    if pos < m.start() {
+                                        run.push(l[pos..m.start()].to_string());
+                                    }
+                                    if !run.is_empty() {
+                                        segs.push(crate::md::MdBlock {
+                                            line: bl,
+                                            kind: MdKind::Para(std::mem::take(&mut run)),
+                                        });
+                                    }
+                                    segs.push(crate::md::MdBlock {
+                                        line: bl,
+                                        kind: MdKind::LocalFigure {
+                                            alt,
+                                            path: f.path.clone(),
+                                            page: f.page,
+                                            line: bl,
+                                            target: tgt,
+                                        },
+                                    });
+                                    pos = m.end();
+                                    split = true;
+                                }
+                                Some(f) => {
+                                    if noted.insert(tgt.clone()) {
+                                        crate::notes::push(f.note.clone());
+                                    }
+                                }
+                                None => {}
+                            }
+                        }
+                        if split {
+                            if pos < l.len() {
+                                run.push(l[pos..].to_string());
+                            }
+                        } else {
+                            run.push(l.clone());
+                        }
+                    }
+                    if !run.is_empty() {
+                        segs.push(crate::md::MdBlock {
+                            line: bl,
+                            kind: MdKind::Para(std::mem::take(&mut run)),
+                        });
+                    }
+                    blocks.extend(segs);
+                }
+                _ => blocks.push(b),
+            }
+        }
+    }
+    for b in blocks {
         let line = b.line;
         match b.kind {
             MdKind::Fence { info: s, body: fence_body } => {
@@ -1062,6 +1174,7 @@ pub fn convert(
                         caption_bottom,
                         &mut notes,
                         cap,
+                        0,
                     )
                     .map_err(|e| Error::new(format!("mermaid fence #{diagram_idx}: {e}"), line, s.clone()))?;
                     needs.add(n);
@@ -1170,6 +1283,48 @@ pub fn convert(
             }
             MdKind::Title(t) => {
                 title = inline(&t, keys, line)?;
+            }
+            MdKind::LocalFigure { alt, path, page, line: fline, target } => {
+                flush(&mut out, &mut para, para_line)?;
+                // Local-figure policy (0.13.4): caption from alt-text
+                // (numbered fallback, same rule as tables); label
+                // `fig:localN` collision-checked against the
+                // registries; picture span + default pos; the height
+                // cap always binds (bounded output).
+                local_idx += 1;
+                let mut key = format!("local{local_idx}");
+                while spec.diagrams.iter().any(|d| d.key == key)
+                    || spec.plots.iter().any(|(k, _)| k == &key)
+                {
+                    local_idx += 1;
+                    key = format!("local{local_idx}");
+                }
+                let caption = if alt.trim().is_empty() {
+                    format!("Figure {local_idx}")
+                } else {
+                    inline(&alt, keys, fline)?
+                };
+                let span = cfg.spans.for_kind("picture");
+                let pos = cfg.floats.pos_default;
+                let cap = cfg.floats.figure_max_height.as_str();
+                let (fig, n) = figure_block(
+                    &path,
+                    &caption,
+                    &format!("fig:{key}"),
+                    span,
+                    pos,
+                    None,
+                    true,
+                    &mut notes,
+                    Some(cap),
+                    page,
+                )
+                .map_err(|e| Error::new(format!("local figure {target}: {e}"), fline, path.clone()))?;
+                needs.add(n);
+                out.push(fig);
+                crate::notes::push(format!(
+                    "local figure '{target}' embedded from {path} (caption '{caption}')"
+                ));
             }
             MdKind::Para(ls) => {
                 // Consecutive Para blocks are always blank-separated
@@ -1358,6 +1513,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
                 caption_bottom,
                 &mut notes,
                 None,
+                0,
             )
             .map_err(|e| crate::error::Error::new(format!("plot {key}: {e}"), 0, key.clone()))?;
             needs.add(n);
@@ -1563,7 +1719,44 @@ mod tests {
             preamble_append: Vec::new(),
             skeleton: String::new(),
             bib_style: "IEEEtran".to_string(),
+            local_figures: vec![],
         }
+    }
+
+    #[test]
+    fn local_figure_embeds_with_numbered_label() {
+        let mut s = spec();
+        s.diagrams = vec![];
+        s.table_captions = vec![];
+        s.local_figures = vec![LocalFigure {
+            target: "a.png".into(),
+            path: "figs/a.png".into(),
+            page: 0,
+            embed: true,
+            note: String::new(),
+        }];
+        let md = "# T\n\n![Cap here](a.png)\n";
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.body.contains("\\includegraphics[width=\\textwidth"), "{}", r.body);
+        assert!(r.body.contains("\\label{fig:local1}"), "{}", r.body);
+        assert!(r.notes.iter().any(|n| n.contains("embedded from figs/a.png")), "{:?}", r.notes);
+    }
+
+    #[test]
+    fn local_figure_page_fragment_selects() {
+        let mut s = spec();
+        s.diagrams = vec![];
+        s.table_captions = vec![];
+        s.local_figures = vec![LocalFigure {
+            target: "s.pdf#page=2".into(),
+            path: "figs/s.pdf".into(),
+            page: 2,
+            embed: true,
+            note: String::new(),
+        }];
+        let md = "# T\n\n![Supp](s.pdf#page=2)\n";
+        let r = build_document(md, "", &s).unwrap();
+        assert!(r.body.contains("page=2"), "{}", r.body);
     }
 
     #[test]
@@ -1779,6 +1972,7 @@ mod tests {
             true,
             &mut notes,
             Some("0.85\\textheight"),
+            0,
         )
         .unwrap();
         assert!(f.contains("height=0.85\\textheight,keepaspectratio"));
@@ -1789,7 +1983,7 @@ mod tests {
     #[test]
     fn figure_width_with_existing_options() {
         let tikz = "\\begin{tikzpicture}[>=Stealth]\n\\node{a};\\end{tikzpicture}";
-        let (f, _) = figure_block(tikz, "C", "l", Span::Column, Pos::Top, Some("0.9"), true, &mut Vec::new(), None).unwrap();
+        let (f, _) = figure_block(tikz, "C", "l", Span::Column, Pos::Top, Some("0.9"), true, &mut Vec::new(), None, 0).unwrap();
         assert!(f.contains("\\begin{tikzpicture}[scale=0.9,>=Stealth]"));
         assert!(!f.contains("]["));
     }
@@ -1797,21 +1991,21 @@ mod tests {
     #[test]
     fn figure_placements_and_needs() {
         let tikz = "\\begin{tikzpicture}\\node{a};\\end{tikzpicture}";
-        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Both, None, true, &mut Vec::new(), None).unwrap();
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Both, None, true, &mut Vec::new(), None, 0).unwrap();
         assert!(f.contains("\\begin{figure}[!tb]"));
         assert_eq!(n, FloatNeeds::none());
-        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Force, None, true, &mut Vec::new(), None).unwrap();
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Force, None, true, &mut Vec::new(), None, 0).unwrap();
         assert!(f.contains("\\begin{figure}[H]"));
         assert!(n.float_h);
-        let (f, n) = figure_block("pic.pdf", "C", "l", Span::Wide, Pos::Barrier, Some("0.8"), false, &mut Vec::new(), None).unwrap();
+        let (f, n) = figure_block("pic.pdf", "C", "l", Span::Wide, Pos::Barrier, Some("0.8"), false, &mut Vec::new(), None, 0).unwrap();
         assert!(f.contains("\\FloatBarrier\n\\begin{figure*}[t]"));
         assert!(f.contains("\\includegraphics[width=0.8\\textwidth]{pic.pdf}"));
         assert!(f.contains("\\caption{C}\n\\label{l}\n\\includegraphics"));
         assert!(n.barrier);
-        let (_, n) = figure_block("p.pdf", "C", "l", Span::Wide, Pos::Bottom, None, true, &mut Vec::new(), None).unwrap();
+        let (_, n) = figure_block("p.pdf", "C", "l", Span::Wide, Pos::Bottom, None, true, &mut Vec::new(), None, 0).unwrap();
         assert!(n.dblfloat);
-        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Force, None, true, &mut Vec::new(), None).is_err());
-        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Here, None, true, &mut Vec::new(), None).is_err());
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Force, None, true, &mut Vec::new(), None, 0).is_err());
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Here, None, true, &mut Vec::new(), None, 0).is_err());
     }
 
     #[test]

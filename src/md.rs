@@ -60,6 +60,15 @@ pub enum MdKind {
     /// span (M7.8). The weaver emits `\[...\]`, widening to a
     /// full-width `strip` when the span exceeds the column.
     DisplayMath(String),
+    /// Host-verified local figure (0.13.4): `![alt](target)` with a
+    /// `local_figures` entry — renders as a real float.
+    LocalFigure {
+        alt: String,
+        path: String,
+        page: i64,
+        line: usize,
+        target: String,
+    },
 }
 
 /// `1. ` / `1) ` ordered-list marker (byte scan: digits are ASCII,

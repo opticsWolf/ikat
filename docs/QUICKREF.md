@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.13.3 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.4 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 204 Rust tests
-.venv/Scripts/pytest tests/              # 131 pytest (pytest tests/ elsewhere)
+cargo test                               # 206 Rust tests
+.venv/Scripts/pytest tests/              # 139 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)
@@ -206,7 +206,10 @@ inline); bullet/ordered lists (`- `, `* `, `+ `, `1. `, `1) `) render
 as paragraphs with one note per run (bullets strip, numbers stay);
 captionless tables take an automatic `Table N` with a note; remote
 `![alt](url)` figures render as alt-text, alt-less images drop, all
-tallied into one figures note; `[^l]` footnotes become `\footnote`
+tallied into one figures note; local `![alt](path)` embeds as a
+real float when host-verified (exists, PDF/PNG/JPG, single-page or
+`#page=N`; caption from alt, `fig:localN` label, height cap) —
+missing/wrong-format/multi-page targets degrade with precise notes; `[^l]` footnotes become `\footnote`
 (definitions are collected in the prepass); `<sub>` / `<sup>` become
 `$_{}$` / `$^{}$` chemistry; `~~~` fences, indented code, HTML
 blocks, setext headings, and H4+ feed their raw lines as paragraph

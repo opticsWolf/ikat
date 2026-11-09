@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.13.3 · 2026-11-09 · 204 cargo + 131 pytest green.
+Version 0.13.4 · 2026-11-09 · 206 cargo + 139 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -276,7 +276,7 @@ walks the manuscript exactly the way `convert()` pairs fences
 with registry entries (same subset mapping — compat notes instead
 of subset errors since 0.13.3 — with lines), measures each float, and returns per-fence
 `(span, pos, width)` with a one-line reason carrying numbers.
-`--apply` (Python side) rewrites fence attrs. Since 0.13.2 `convert()` auto-applies span/pos/width to inline diagrams (explicit attrs win, each decision noted), caps picture heights, and expands cluster boxes to fit labels — the showcase paper is byte-identical before/after (baseline test), the frozen paper's only delta is the cap string (proven no-op). Since 0.13.3 the subset is warn-and-render (lists to paragraphs, refdef drops, auto captions, figure/footnote handling, unicode fallbacks — every adaptation noted); only unrepresentable characters still fail.
+`--apply` (Python side) rewrites fence attrs. Since 0.13.2 `convert()` auto-applies span/pos/width to inline diagrams (explicit attrs win, each decision noted), caps picture heights, and expands cluster boxes to fit labels — the showcase paper is byte-identical before/after (baseline test), the frozen paper's only delta is the cap string (proven no-op). Since 0.13.3 the subset is warn-and-render (lists to paragraphs, refdef drops, auto captions, figure/footnote handling, unicode fallbacks — every adaptation noted); only unrepresentable characters still fail. Since 0.13.4 host-verified local figures embed as real floats (caption from alt, `fig:localN` labels, `#page=N` support, height cap); the core still never touches the filesystem.
 
 Measurement sources: diagrams scan their own emitted TikZ
 (`tikz_bbox` over `(x,y)` numerics — node ids and `axis cs:`

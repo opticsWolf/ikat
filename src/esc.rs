@@ -16,7 +16,7 @@ fn cite_inner_re() -> &'static Regex {
     R.get_or_init(|| Regex::new(r"^(?:(.*?):\s*)?`([^`]+)`$").unwrap())
 }
 
-fn image_re() -> &'static Regex {
+pub(crate) fn image_re() -> &'static Regex {
     static R: OnceLock<Regex> = OnceLock::new();
     R.get_or_init(|| Regex::new("!\\[([^\\]]*)\\]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)").unwrap())
 }
