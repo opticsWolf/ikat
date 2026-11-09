@@ -209,7 +209,9 @@ captionless tables take an automatic `Table N` with a note; remote
 tallied into one figures note; local `![alt](path)` embeds as a
 real float when host-verified (exists, PDF/PNG/JPG, single-page or
 `#page=N`; caption from alt, `fig:localN` label, height cap) —
-missing/wrong-format/multi-page targets degrade with precise notes; `[^l]` footnotes become `\footnote`
+missing/wrong-format/multi-page targets degrade with precise notes
+(`figure_dir` overrides the base dir; pre-fill `local_figures` to
+register bridge downloads); `[^l]` footnotes become `\footnote`
 (definitions are collected in the prepass); `<sub>` / `<sup>` become
 `$_{}$` / `$^{}$` chemistry; `~~~` fences, indented code, HTML
 blocks, setext headings, and H4+ feed their raw lines as paragraph

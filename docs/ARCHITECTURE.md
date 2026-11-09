@@ -40,6 +40,12 @@ mini.md + ikat.toml
   are glue: thin, readable, replaceable. Strings cross the PyO3
   boundary; decisions do not — except through `BuildSpec`, the one
   shared model (see §4).
+- **Rust never touches the filesystem.** Path resolution and
+  verification live on the host side (Python sees the manuscript
+  dir); the core trusts structured, verified entries
+  (`local_figures` the way it trusts registry figures). Existence,
+  format, and page counts are host facts, never core guesses — a
+  missing graphic is a `file:line:` note, never a TeX-log mystery.
 - **No matplotlib, ever.** Data graphics compile inside the document's
   own TeX run (pgfplots), so figure fonts are document fonts by
   construction. The pipeline cannot produce a font-mismatched figure.
