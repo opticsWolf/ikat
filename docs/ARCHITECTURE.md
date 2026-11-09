@@ -276,7 +276,7 @@ walks the manuscript exactly the way `convert()` pairs fences
 with registry entries (same strict-subset and registry errors,
 with lines), measures each float, and returns per-fence
 `(span, pos, width)` with a one-line reason carrying numbers.
-`--apply` (Python side) rewrites fence attrs. Since 0.13.2 `convert()` auto-applies span/pos/width to inline diagrams (explicit attrs win, each decision noted), caps picture heights, and expands cluster boxes to fit labels — the showcase paper adapts nothing (baseline test), the frozen paper's only delta is the cap string (proven no-op).
+`--apply` (Python side) rewrites fence attrs. Since 0.13.2 `convert()` auto-applies span/pos/width to inline diagrams (explicit attrs win, each decision noted), caps picture heights, and expands cluster boxes to fit labels — the showcase paper is byte-identical before/after (baseline test), the frozen paper's only delta is the cap string (proven no-op).
 
 Measurement sources: diagrams scan their own emitted TikZ
 (`tikz_bbox` over `(x,y)` numerics — node ids and `axis cs:`
