@@ -20,7 +20,7 @@ first: `VIRTUAL_ENV=$PWD/.venv maturin develop`.
 
 | Need | Call |
 |---|---|
-| Full document (numbering, captions, bib) | `build_document(md_text, toml_src, spec)` or `build_from_paths(md, toml, spec)` → `BuildResult(tex, ...)` |
+| Full document (numbering, captions, bib) | `build_document(md_text, toml_src, spec)` or `build_from_paths(md, toml, spec)` → `BuildResult(tex, ..., notes=[...])` — `.notes` carries every adaptation (fixes, fallbacks, embeds) |
 | Single figure, no registries | `weave_fragment(md, toml_src)` → `[Element]` |
 | Flowchart → tikzpicture | `flowchart_to_tikz(src)` — `graph TD/LR` subset + `subgraph` clusters; longest-path layers; crossing edges auto-reroute |
 | Build the spec | `spec_from_dict(raw)` — the ONE constructor (CLI `--spec` and MCP `spec_json` share it); unknown keys ignored |
@@ -73,15 +73,16 @@ Validation: rectangular series, `min ≤ value ≤ max` elementwise,
 
 ## Doctrine (do not work around)
 
-- Strict subset, fail-fast: dangling citation keys, unknown
+- Warn-and-render subset: dangling citation keys, unknown
   template/skeleton tokens, wide+here floats, unknown attrs/keys,
-  line-starting `[label]: ...` reference definitions, bullet/ordered
-  lists, and non-ASCII outside the transliteration table + Latin
-  pass-through (raw Greek/symbols raise with a replacement hint)
-  all raise — never catch-and-continue into a TeX log mystery.
-  Errors render `msg` + ` --> line N` + echo (+ `^` caret where
-  the grammar knows the token); `build_from_paths` upgrades to
-  `file:line:` (head file for template errors).
+  and unrepresentable characters (emoji, CJK) raise — never
+  catch-and-continue into a TeX log mystery. Everything else
+  degrades with a note: lists to paragraphs, refdef drops, auto
+  `Table N`, alt-text figures, local-figure embeds, `\footnote`,
+  unicode fallbacks. Read `BuildResult.notes` (every adaptation
+  lands there); `build_from_paths` upgrades errors to `file:line:`
+  (head file for template errors), and the CLI prints notes on
+  stderr.
 - No invented numbers in figures: plot data comes from measurement
   (grep/wc/benches), marked `[NOT YET MEASURED]` otherwise.
 - `compile_pdf` is workdir-bound and slow: batch builds, don't

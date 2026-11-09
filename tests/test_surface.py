@@ -599,6 +599,7 @@ def test_mcp_weave_and_template():
 
     r = mcp_server.weave_document(MD, "", '{"bib_style": "plain"}')
     assert r["tex"].count("\\documentclass") == 1
+    assert isinstance(r["notes"], list)
     assert "\\bibliographystyle{plain}" in r["tex"]
     t = mcp_server.get_template("aps")
     assert t["bib_style"] == "apsrev4-2"

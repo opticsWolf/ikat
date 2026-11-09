@@ -136,8 +136,11 @@ def weave_document(md_text: str, toml_text: str, spec_json: str) -> dict:
     from ikat import build_document, spec_from_dict
 
     r = build_document(md_text, toml_text, spec_from_dict(_json.loads(spec_json)))
+    # notes included: adaptations (auto-adapt fixes, fallbacks,
+    # embedded figures) must reach agents, not just CLI stderr.
     return {"title": r.title, "body": r.body, "tex": r.tex,
-            "n_diagrams": r.n_diagrams, "n_tables": r.n_tables}
+            "n_diagrams": r.n_diagrams, "n_tables": r.n_tables,
+            "notes": r.notes}
 
 
 def standalone_figure(md_text: str) -> dict:

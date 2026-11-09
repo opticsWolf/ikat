@@ -24,7 +24,7 @@ Use ikat when a task involves building a Markdown manuscript with LaTeX-native d
 ## Supported inputs and boundaries
 
 - Mermaid support is a strict flowchart subset (`graph TD` / `graph LR`); do not invent support for other diagram types or syntax. Let ikat reject unsupported syntax.
-- Manuscripts are ASCII + Latin accents + the transliteration table (section signs, dashes, math symbols, sub/superscripts): raw Greek or symbols fail the weave with a replacement hint — write `$\lambda$`, never λ. Bullet/ordered lists are rejected (write paragraphs). Emphasis may span `$…$` math; display-math numbering rides inside as `\tag{N}`; the only display-math environment is `matrix`.
+- Manuscripts are ASCII + Latin accents + transliteration plus compat fallbacks (smart quotes, legend symbols, Greek auto-map — write `$\lambda$` for math, bare λ also weaves in text); only unrepresentable characters fail. Bullet/ordered lists render as paragraphs; reference definitions drop; captionless tables take `Table N`; remote figures render as alt-text; local `![alt](path)` embeds when host-verified; footnotes become `\footnote`. Every adaptation is reported (result notes / stderr) — read them, never assume silence. Emphasis may span `$…$` math; display-math numbering rides inside as `\tag{N}`; the only display-math environment is `matrix`.
 - Bar and line plot helpers emit editable pgfplots/TikZ source; preserve their input data and generated source rather than substituting screenshots.
 - Use the shipped templates and skeletons when their documented requirements fit. Check TeX dependencies before compiling when needed.
 - `compile_pdf` is a Python/CLI operation, not an MCP tool; use the CLI for workdir-bound PDF compilation.

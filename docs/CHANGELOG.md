@@ -7,6 +7,17 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.5 — 2026-11-09
+
+MCP parity + skill audit (agents see adaptations too).
+
+- `weave_document` returns `notes`: auto-adapt fixes, fallbacks,
+  embedded figures reach MCP agents, not just CLI stderr
+- All four skill packs audited: warn-and-render doctrine in
+  `ikat` + `ikat-api`, notes channel in `ikat-cli` + `ikat-mcp`
+  (the general + API doctrine still described fail-fast)
+- No weave-behavior change (206 cargo + 139 pytest)
+
 ## v0.13.4 — 2026-11-09
 
 Local-figure auto-embed (host verifies, core stays pure).

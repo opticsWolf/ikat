@@ -3,7 +3,7 @@
 Milestone detail stays here, done or not; the version-by-version
 shipping record lives in `docs/CHANGELOG.md`.
 
-Status 2026-11-09 (0.13.4): through M7.10b done —
+Status 2026-11-09 (0.13.5): through M7.10b done —
 TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
 annotations + instructions + bundled skills + installer + registry
 (M7.9/M7.9b), help verb + registry JSON + bare-invocation help
@@ -532,7 +532,7 @@ shown remains true. 0 (default) never collapses; negative fails
 fast; `max >= len` is a no-op. The exporter does NOT use it — the
 bench corpus keeps complete front matter.
 
-## Engine era — release, embed, third engine (0.11.0 → 0.13.4)
+## Engine era — release, embed, third engine (0.11.0 → 0.13.5)
 
 - **0.11.0 — first release from merged `main`** (2026-10-26):
   POSIX `load_preset` fix (a >NAME_MAX string probed as a path
@@ -580,6 +580,9 @@ bench corpus keeps complete front matter.
   `#page=N` fragments, `fig:localN` labels, height cap); missing /
   wrong-format / multi-page targets degrade with precise notes;
   Rust core still never touches the filesystem.
+- **0.13.5 — MCP parity + skill audit**: `weave_document` returns
+  `notes`; all four skill packs describe warn-and-render (no weave-
+  behavior change).
 
 ## Watch: TeXres — a Rust TeX distribution (2026-10-27)
 
