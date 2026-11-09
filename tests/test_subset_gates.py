@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from ikat import BuildSpec, DiagramEntry, build_document, build_from_paths, flowchart_to_tikz
+from ikat import BuildSpec, DiagramEntry, barchart_to_tikz, build_document, build_from_paths, flowchart_to_tikz
 
 
 def _spec(**kw):
@@ -20,15 +20,15 @@ def _spec(**kw):
     return BuildSpec(**kw)
 
 
-def test_unicode_body_error_is_file_line(tmp_path):
+def test_greek_automaps_in_body(tmp_path):
     (tmp_path / "doc.md").write_text("# T\n\nR(λ,θ) spectra.\n", encoding="utf-8")
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"doc\.md:3:.*U\+03BB") as ei:
-        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
-    assert "lambda" in str(ei.value)
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
+    assert "$\\lambda$" in r.body
+    assert "$\\theta$" in r.body
 
 
-def test_unicode_mermaid_inline_error_is_file_line(tmp_path):
+def test_greek_automaps_in_mermaid_label(tmp_path):
     md = ("# T\n\n```mermaid {inline}\n"
           "graph TD\n"
           "A[R(λ) spectra]-->B[merit]\n"
@@ -36,15 +36,13 @@ def test_unicode_mermaid_inline_error_is_file_line(tmp_path):
     (tmp_path / "doc.md").write_text(md, encoding="utf-8")
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
     spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="inline")])
-    with pytest.raises(ValueError, match=r"doc\.md:5:.*U\+03BB") as ei:
-        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
-    assert "lambda" in str(ei.value)
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
+    assert "$\\lambda$" in r.body
 
 
-def test_unicode_flowchart_api_keeps_rust_rendering():
-    with pytest.raises(ValueError, match=re.escape(" --> line 2")) as ei:
-        flowchart_to_tikz("graph TD\nA[R(λ) spectra]-->B[merit]")
-    assert "U+03BB" in str(ei.value)
+def test_greek_flowchart_api_wraps():
+    tikz = flowchart_to_tikz("graph TD\nA[R(λ) spectra]-->B[merit]")
+    assert "$\\lambda$" in tikz
 
 
 def test_unicode_precompiled_labels_do_not_reach_tex():
@@ -63,9 +61,10 @@ def test_latin_accents_pass_through():
     assert "Šafařík" in r.body
 
 
-def test_unicode_display_math_errors():
-    with pytest.raises(ValueError, match="U\\+03BB"):
-        build_document("# T\n\n$$R(λ) = x^2$$\n", "", _spec())
+def test_greek_automaps_in_display_math():
+    r = build_document("# T\n\n$$R(λ) = x^2$$\n", "", _spec())
+    assert "\\lambda" in r.body
+    assert "$$" not in r.body
 
 
 def test_lists_fail_fast(tmp_path):
@@ -103,6 +102,42 @@ def test_explicit_author_stays_silent(tmp_path, capsys):
     md.write_text("# T\n\nBody.\n", encoding="utf-8")
     assert cli_main(["weave", str(md), "--author", "Ada Lovelace"]) == 0
     assert capsys.readouterr().err == ""
+
+
+def test_combining_diacritics_weave_clean(tmp_path):
+    md = ("# T\n\nThe n\u0302 profile over \u1e91.\n\n```mermaid {inline}\n"
+          "graph TD\n"
+          "A[n\u0302 spectra]-->B[merit]\n"
+          "```\n")
+    (tmp_path / "doc.md").write_text(md, encoding="utf-8")
+    (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
+    spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="inline")])
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
+    assert "\\^{n}" in r.body
+    assert "\\v{z}" in r.body
+
+
+def test_combining_in_math_hints_hat(tmp_path):
+    (tmp_path / "doc.md").write_text("# T\n\nEnergy $n\u0302$ here.\n", encoding="utf-8")
+    (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"\\hat\{n\}") as ei:
+        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
+    assert "math mode" in str(ei.value)
+
+
+def test_combining_plot_label_weaves():
+    tikz = barchart_to_tikz(
+        "\u1e91 rate",
+        "latency (ms)",
+        True,
+        ["R1"],
+        ["trunk"],
+        [[7.4]],
+        [[6.9]],
+        [[8.1]],
+        (2.8, 3.2, 66.0, "zero-write fork"),
+    )
+    assert "\\v{z} rate" in tikz
 
 
 def test_bold_across_math_supported():

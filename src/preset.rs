@@ -62,7 +62,9 @@ fn with_footnote(mut tikz: String, footnote: &Option<String>) -> Result<String, 
     if let Some(f) = footnote {
         // Unicode gate (probe #2): footnotes reach TeX verbatim.
         crate::unicode::check_data(f)?;
-        tikz.push_str(&format!("{{\\footnotesize {}\\par}}\n", esc_prose(f)));
+        // Combining folds + precomposed extras (probe follow-up).
+        let prose = crate::unicode::transliterate_extra(&esc_prose(f)).into_owned();
+        tikz.push_str(&format!("{{\\footnotesize {}\\par}}\n", prose));
     }
     Ok(tikz)
 }

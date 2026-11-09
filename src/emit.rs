@@ -61,7 +61,9 @@ pub fn esc_label(s: &str) -> String {
     ] {
         s = s.replace(ch, rep);
     }
-    s
+    // Combining folds + precomposed extras (probe follow-up): the
+    // gate allows them, so the emitter must render them.
+    crate::unicode::transliterate_extra(&s).into_owned()
 }
 
 /// `\node (id) at (x,y) [style] {label};` — one box on the canvas.

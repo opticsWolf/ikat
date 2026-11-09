@@ -27,10 +27,14 @@ fn fmt_num(x: f64) -> String {
 }
 
 fn esc_tick(s: &str) -> String {
-    s.replace('&', "\\&")
+    let s = s
+        .replace('&', "\\&")
         .replace('%', "\\%")
         .replace('#', "\\#")
-        .replace('_', "\\_")
+        .replace('_', "\\_");
+    // Combining folds + precomposed extras (probe follow-up): the
+    // gate allows them, so the tick emitter must render them.
+    crate::unicode::transliterate_extra(&s).into_owned()
 }
 
 /// Legend placement keyword. `auto` (the default) tries the four
@@ -201,8 +205,11 @@ pub fn barchart(
 
     let mut out = String::new();
     out.push_str("\\begin{tikzpicture}\n\\begin{axis}[\n");
-    out.push_str(&format!("  title={{{title}}},\n"));
-    out.push_str(&format!("  ylabel={{{ylabel}}},\n"));
+    // Probe follow-up: the gate allows combining folds + ẑ here,
+    // so every text path renders them (group ticks ride esc_tick).
+    let xtra = crate::unicode::transliterate_extra;
+    out.push_str(&format!("  title={{{}}},\n", xtra(title)));
+    out.push_str(&format!("  ylabel={{{}}},\n", xtra(ylabel)));
     out.push_str("  ybar, bar width=0.32,\n  enlarge x limits=0.25,\n");
     if log_y {
         out.push_str("  ymode=log, log origin=infty,\n");
@@ -299,7 +306,10 @@ pub fn barchart(
                 fmt_num(hi.max(0.0))
             ));
         }
-        out.push_str(&format!("  }};\n  \\addlegendentry{{{name}}}\n"));
+        out.push_str(&format!(
+            "  }};\n  \\addlegendentry{{{}}}\n",
+            crate::unicode::transliterate_extra(name)
+        ));
     }
     // Legend entries are supplied by the caller layer (series names live
     // in Python, where the benchmark harness already names them).
@@ -347,7 +357,15 @@ pub fn lineplot(
     }
     let mut out = String::new();
     out.push_str("\\begin{tikzpicture}\n\\begin{axis}[\n");
-    out.push_str(&format!("  title={{{title}}},\n  xlabel={{{xlabel}}},\n  ylabel={{{ylabel}}},\n"));
+    // Probe follow-up: render the gate-allowed folds + ẑ on every
+    // text path (same rule as the barchart above).
+    let xtra = crate::unicode::transliterate_extra;
+    out.push_str(&format!(
+        "  title={{{}}},\n  xlabel={{{}}},\n  ylabel={{{}}},\n",
+        xtra(title),
+        xtra(xlabel),
+        xtra(ylabel)
+    ));
     let (mut xmin, mut xmax) = (xs[0], xs[0]);
     for x in xs {
         xmin = xmin.min(*x);
@@ -396,7 +414,10 @@ pub fn lineplot(
                 fmt_num(e.max(0.0))
             ));
         }
-        out.push_str(&format!("  }};\n  \\addlegendentry{{{name}}}\n"));
+        out.push_str(&format!(
+            "  }};\n  \\addlegendentry{{{}}}\n",
+            crate::unicode::transliterate_extra(name)
+        ));
     }
     out.push_str("\\end{axis}\n\\end{tikzpicture}\n");
     Ok(out)

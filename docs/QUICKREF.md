@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.13.0 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.1 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 187 Rust tests
-.venv/Scripts/pytest tests/              # 119 pytest (pytest tests/ elsewhere)
+cargo test                               # 201 Rust tests
+.venv/Scripts/pytest tests/              # 122 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)
@@ -197,7 +197,11 @@ sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; raw Latin accents
 headings, captions, table cells, display math, author names, plot
 labels, and inline/standalone diagram labels (precompiled diagram
 PDFs are external — their labels never reach TeX). Manuscripts are
-ASCII + Latin accents + table, never raw Greek or symbols.
+ASCII + Latin accents + table, never raw symbols. Greek auto-maps
+(λ → $\lambda$ in text, \lambda in math; omicron → plain `o`). Combining marks
+fold after ASCII bases (`n` + U+0302 weaves as n-circumflex; ẑ/Ẑ map to
+caron-z); inside `$…$` math they fail with the exact accent (`$\hat{n}$`) —
+text accents would break math mode.
 
 Emphasis may span `$…$` math: `**$P(z)$ depends on $n(z)$**` emits
 `\textbf{…$…$…}` (valid LaTeX) instead of literal stars.

@@ -106,7 +106,9 @@ pub fn esc_text(s: &str) -> String {
     s = cub_re()
         .replace_all(&s, |cap: &regex::Captures| format!("${}^{{3}}$", &cap[1]))
         .into_owned();
-    s
+    // Combining folds + precomposed extras (probe follow-up): the
+    // gate allows them, so the emitter must render them.
+    crate::unicode::transliterate_extra(&s).into_owned()
 }
 
 pub fn esc_code(s: &str) -> String {
@@ -117,7 +119,8 @@ pub fn esc_code(s: &str) -> String {
     for (ch, rep) in UNI.iter().chain(SYM_TOKENS.iter()) {
         s = s.replace(*ch, rep);
     }
-    s
+    // Combining folds + precomposed extras (probe follow-up).
+    crate::unicode::transliterate_extra(&s).into_owned()
 }
 
 /// Split into (is_math, segment) on `$...$` spans.
@@ -204,7 +207,9 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
     let mut mixed = String::new();
     for (is_math, seg) in protect_math(&text) {
         if is_math {
-            mixed.push_str(&stash(ph, format!("${seg}$")));
+            // Greek auto-map (probe follow-up): math restores
+            // verbatim, so mapped letters render bare here.
+            mixed.push_str(&stash(ph, format!("${}$", crate::unicode::map_greek_math(&seg))));
         } else {
             mixed.push_str(&seg);
         }
@@ -282,6 +287,27 @@ mod tests {
         assert!(inline("[`nope`]", Some(&keys), 3).is_err());
         // Without a keyset there is nothing to validate against.
         assert!(inline("[`nope`]", None, 3).is_ok());
+    }
+
+    #[test]
+    #[test]
+    #[test]
+    fn greek_wraps_in_text_maps_bare_in_math() {
+        let got = inline("R(λ) spectra", no_keys().as_ref(), 1).unwrap();
+        assert!(got.contains("$\\lambda$"), "got: {got}");
+        let got = inline("val $σ + π$", no_keys().as_ref(), 1).unwrap();
+        assert!(got.contains("\\sigma + \\pi"), "got: {got}");
+        assert!(!got.contains("$$"), "no nested math: {got}");
+    }
+
+    #[test]
+    fn combining_folds_to_text_accents() {
+        let got = inline("n\u{302} over \u{1e91}", no_keys().as_ref(), 1).unwrap();
+        assert!(got.contains("\\^{n}"), "got: {got}");
+        assert!(got.contains("\\v{z}"), "got: {got}");
+        // ... but not inside math.
+        let e = inline("val $n\u{302}$", no_keys().as_ref(), 1).unwrap_err();
+        assert!(e.msg.contains("\\hat{n}"), "got: {e}");
     }
 
     #[test]
