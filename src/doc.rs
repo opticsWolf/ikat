@@ -399,7 +399,7 @@ pub fn author_front(spec: &BuildSpec) -> Result<String, Error> {
         // Unicode gate (probe #2/#9): the legacy scalar reaches
         // `\author{...}` verbatim — raw non-ASCII would die in TeX.
         crate::unicode::check_data(&spec.author)?;
-        return Ok(spec.author.clone());
+        return Ok(crate::unicode::transliterate_extra(&spec.author).into_owned());
     }
     // Unicode gate: raw names/affiliations are spec data (no
     // manuscript line); mapped characters pass, the rest fail here.
@@ -1036,7 +1036,9 @@ pub fn convert(
                 flush(&mut out, &mut para, para_line)?;
                 // Unicode gate (probe #2): raw non-ASCII in display
                 // math dies in pdflatex too — fail here with the line.
-                crate::unicode::check(&t, line)?;
+                // Display math is verbatim math: combining marks fail
+                // with math-accent hints (text accents break math).
+                crate::unicode::check_math(&t, line)?;
                 if t.contains("$$") {
                     return Err(Error::new(
                         format!("line {line}: display math holds a second `$$`; one span per paragraph"),

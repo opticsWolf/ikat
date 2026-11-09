@@ -233,7 +233,8 @@ byte-identically.
 ## Manuscript subset (fail-fast, never a TeX-log mystery)
 
 Manuscripts are ASCII + Latin accents + a transliteration table
-(section signs, dashes, math symbols, sub/superscripts) — raw Greek
+(section signs, dashes, math symbols, sub/superscripts, combining-mark
+folding after ASCII bases) — raw Greek
 or symbols fail the weave with `file:line:` and a replacement hint
 (write `$\lambda$`, never λ). Bullet/ordered lists are rejected
 (write paragraphs); emphasis may span `$…$` math; display-math

@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from ikat import BuildSpec, DiagramEntry, build_document, build_from_paths, flowchart_to_tikz
+from ikat import BuildSpec, DiagramEntry, barchart_to_tikz, build_document, build_from_paths, flowchart_to_tikz
 
 
 def _spec(**kw):
@@ -103,6 +103,42 @@ def test_explicit_author_stays_silent(tmp_path, capsys):
     md.write_text("# T\n\nBody.\n", encoding="utf-8")
     assert cli_main(["weave", str(md), "--author", "Ada Lovelace"]) == 0
     assert capsys.readouterr().err == ""
+
+
+def test_combining_diacritics_weave_clean(tmp_path):
+    md = ("# T\n\nThe n\u0302 profile over \u1e91.\n\n```mermaid {inline}\n"
+          "graph TD\n"
+          "A[n\u0302 spectra]-->B[merit]\n"
+          "```\n")
+    (tmp_path / "doc.md").write_text(md, encoding="utf-8")
+    (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
+    spec = _spec(diagrams=[DiagramEntry(key="x", caption="C.", mode="inline")])
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", spec)
+    assert "\\^{n}" in r.body
+    assert "\\v{z}" in r.body
+
+
+def test_combining_in_math_hints_hat(tmp_path):
+    (tmp_path / "doc.md").write_text("# T\n\nEnergy $n\u0302$ here.\n", encoding="utf-8")
+    (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"\\hat\{n\}") as ei:
+        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
+    assert "math mode" in str(ei.value)
+
+
+def test_combining_plot_label_weaves():
+    tikz = barchart_to_tikz(
+        "\u1e91 rate",
+        "latency (ms)",
+        True,
+        ["R1"],
+        ["trunk"],
+        [[7.4]],
+        [[6.9]],
+        [[8.1]],
+        (2.8, 3.2, 66.0, "zero-write fork"),
+    )
+    assert "\\v{z} rate" in tikz
 
 
 def test_bold_across_math_supported():

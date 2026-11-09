@@ -197,7 +197,10 @@ sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; raw Latin accents
 headings, captions, table cells, display math, author names, plot
 labels, and inline/standalone diagram labels (precompiled diagram
 PDFs are external — their labels never reach TeX). Manuscripts are
-ASCII + Latin accents + table, never raw Greek or symbols.
+ASCII + Latin accents + table, never raw Greek or symbols. Combining marks
+fold after ASCII bases (`n` + U+0302 weaves as n-circumflex; ẑ/Ẑ map to
+caron-z); inside `$…$` math they fail with the exact accent (`$\hat{n}$`) —
+text accents would break math mode.
 
 Emphasis may span `$…$` math: `**$P(z)$ depends on $n(z)$**` emits
 `\textbf{…$…$…}` (valid LaTeX) instead of literal stars.

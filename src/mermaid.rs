@@ -766,6 +766,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn combining_label_folds() {
+        // Probe follow-up: needle-math labels weave clean.
+        let tikz =
+            flowchart_to_tikz("graph TD\nA[n\u{302} spectra]-->B[merit]", 1).unwrap();
+        assert!(tikz.contains("\\^{n}"), "folded accent, got:\n{tikz}");
+    }
+
+    #[test]
     fn short_linear_chain_stays_clean() {
         // Probe #7 repro: single-char ids with a longish label,
         // a diamond, and a tail — no crossing is visible, so no
