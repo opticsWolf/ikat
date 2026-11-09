@@ -23,7 +23,7 @@ Figure auto-adapt: less warning, more fixing (probe report II).
   past the default for them (short labels route byte-identically)
 - Every applied adaptation reports into `BuildResult.notes`
   (stderr on the CLI); plots/tables untouched
-- Baselines hold: showcase adapts nothing (7 pages, 0 overfulls),
+- Baselines hold: showcase `.tex` byte-identical before/after (7 pages, 0 overfulls),
   frozen paper's only delta is the cap string (MediaBox-proven
   no-op on all four PDFs); `tests/test_figure_baseline.py` pins it
 

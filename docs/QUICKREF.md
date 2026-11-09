@@ -155,7 +155,8 @@ reports into `BuildResult.notes` (stderr on the CLI, e.g.
 `mermaid fence #2: tall diagram ... -> dedicated page`).
 `[layout] auto_adapt = false` restores hand-only behavior.
 Plots/tables are untouched (bounded axes; frozen track). The
-showcase paper adapts nothing (pinned by
+showcase paper is byte-identical before/after (pre-0.13.2 vs
+0.13.2 `.tex` diff empty; 7 pages, 0 overfulls — pinned by
 `tests/test_figure_baseline.py`); the frozen paper's only
 delta is the cap option string (MediaBox-proven no-op on all
 four PDFs).
