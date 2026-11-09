@@ -14,6 +14,7 @@ mod esc;
 mod mathwidth;
 mod md_spike;
 mod mermaid;
+mod notes;
 mod plot;
 mod layout;
 mod preset;

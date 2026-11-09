@@ -1,9 +1,9 @@
 """Probe-issue gates end to end (issues #1-#4).
 
-Unicode outside the transliteration table + Latin pass-through must
-fail at weave time with file:line: (never inside a TeX log); bullet
-lists must fail instead of silently flattening; emphasis spanning
-$...$ math must emit textbf around verbatim math.
+Unrepresentable unicode must fail at weave time with file:line:
+(never inside a TeX log); bullet lists render as paragraphs with a
+note instead of failing; emphasis spanning $...$ math must emit
+textbf around verbatim math.
 """
 
 import re
@@ -67,12 +67,13 @@ def test_greek_automaps_in_display_math():
     assert "$$" not in r.body
 
 
-def test_lists_fail_fast(tmp_path):
-    (tmp_path / "doc.md").write_text("# T\n\n- item\n", encoding="utf-8")
+def test_lists_render_as_paragraphs(tmp_path):
+    (tmp_path / "doc.md").write_text("# T\n\n- item\n\n1. kept\n", encoding="utf-8")
     (tmp_path / "ikat.toml").write_text("", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"doc\.md:3:.*lists are not in the subset") as ei:
-        build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
-    assert "- item" in str(ei.value)
+    r = build_from_paths(tmp_path / "doc.md", tmp_path / "ikat.toml", _spec())
+    assert "item" in r.body
+    assert "1. kept" in r.body
+    assert any("rendered as paragraph" in n for n in r.notes)
 
 
 def test_bidir_and_fan():

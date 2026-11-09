@@ -16,6 +16,21 @@ fn cite_inner_re() -> &'static Regex {
     R.get_or_init(|| Regex::new(r"^(?:(.*?):\s*)?`([^`]+)`$").unwrap())
 }
 
+fn image_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new("!\\[([^\\]]*)\\]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)").unwrap())
+}
+
+fn sub_html_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new("<sub>([^<>]*)</sub>").unwrap())
+}
+
+fn sup_html_re() -> &'static Regex {
+    static R: OnceLock<Regex> = OnceLock::new();
+    R.get_or_init(|| Regex::new("<sup>([^<>]*)</sup>").unwrap())
+}
+
 fn code_re() -> &'static Regex {
     static R: OnceLock<Regex> = OnceLock::new();
     R.get_or_init(|| Regex::new(r"`([^`]+)`").unwrap())
@@ -234,8 +249,34 @@ pub fn inline(text: &str, keys: Option<&HashSet<String>>, line: usize) -> Result
     // non-ASCII errors (math segments included — raw unicode is
     // fatal in pdflatex math too).
     crate::unicode::check(text, line)?;
+    let mut text = text.to_string();
+    // Compat (0.13.3): figures render as their alt-text (remote
+    // graphics are not embedded) or drop when alt-less (equation
+    // images) — literal `![](...)` in the PDF was silent
+    // corruption. Runs before citations (which would match `[..]`).
+    text = image_re()
+        .replace_all(&text, |cap: &regex::Captures| {
+            let alt = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+            crate::notes::record_image(alt.is_empty());
+            alt.to_string()
+        })
+        .into_owned();
+    // Compat (0.13.3): `<sub>`/`<sup>` become chemistry math
+    // (`H$_{2}$O` renders); other inline HTML stays verbatim.
+    text = sub_html_re()
+        .replace_all(&text, |cap: &regex::Captures| {
+            crate::notes::record_tag(true);
+            format!("$_{{{}}}$", &cap[1])
+        })
+        .into_owned();
+    text = sup_html_re()
+        .replace_all(&text, |cap: &regex::Captures| {
+            crate::notes::record_tag(false);
+            format!("$^{{{}}}$", &cap[1])
+        })
+        .into_owned();
     let mut ph = Vec::new();
-    let mut text = inline_inner(text, keys, &mut ph)
+    let mut text = inline_inner(&text, keys, &mut ph)
         .map_err(|(m, key)| {
             // Caret on the key's backticked occurrence (char
             // columns — the echo may hold multibyte text).

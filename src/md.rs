@@ -18,8 +18,10 @@
 //!   `(table_seq, attrs, orig_line)`; `Directive` blocks splice
 //!   positionally before their table. A dangling `%% table` stays
 //!   paragraph text, as before.
-//! - Link reference definitions `[label]: ...` are a hard error
-//!   naming the line (the stream would swallow them silently).
+//! - Link reference definitions `[label]: ...` drop with a note
+//!   (compat: invisible in rendered markdown, so dropping is
+//!   faithful); footnote `[^l]: ...` definitions are collected
+//!   for `\footnote` renders.
 //! - ATX `#`/`##`/`###` (+ `## Appendix`/`## Abstract` prefixes):
 //!   headings as before. Setext, H4+, `#NoSpace`: raw lines as
 //!   paragraph text (closed `## X ##` keeps its closers).
@@ -75,15 +77,22 @@ fn ordered_list_marker(s: &str) -> bool {
     (b[i] == b'.' || b[i] == b')') && b[i + 1] == b' '
 }
 
-/// Fence-aware pre-pass: drop `>` quote lines, extract
+/// Fence-aware pre-pass: drop `>` quote markers, extract
 /// `%% table`-before-table directives keyed by the table sequence
-/// they precede, reject lists and link reference definitions. Returns the
-/// stripped lines, their 1-based original line numbers, and
-/// `(table_seq, attrs, orig_line)` directives.
+/// they precede, rewrite lists as paragraphs, drop link reference
+/// definitions, collect footnote definitions. Returns the stripped
+/// (possibly rewritten) lines, their 1-based original line numbers,
+/// and `(table_seq, attrs, orig_line)` directives. Every rewrite
+/// records into the compat notes channel (see `crate::notes`).
 pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String, usize)>), Error> {
     let lines: Vec<&str> = md.lines().collect();
     let mut kept: Vec<bool> = vec![true; lines.len()];
     let mut directives: Vec<(usize, String, usize)> = Vec::new();
+    // Compat rewrites (0.13.3): list items become paragraph lines.
+    let mut fixed: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    // Current contiguous list run (1-based original lines).
+    let mut list_start: Option<usize> = None;
+    let mut list_end: usize = 0;
     let mut infence = false;
     for (n, l) in lines.iter().enumerate() {
         let s = l.trim();
@@ -121,40 +130,89 @@ pub fn prepass(md: &str) -> Result<(Vec<String>, Vec<usize>, Vec<(usize, String,
             }
             continue;
         }
-        // Lists are not in the subset (probe #3): a `- ` / `* ` /
-        // `+ ` / `1. ` line would silently flatten into the paragraph
-        // (the stream emits no list events in this mapping) — error
-        // loudly instead, naming the line. Emphasis (`*italic*`) has
-        // no space after the marker, so it never matches.
+        // Blank lines neither close nor extend a list run (loose
+        // lists earn one note, not one per item).
+        if s.is_empty() {
+            continue;
+        }
+        // Compat (0.13.3): lists render as paragraphs instead of
+        // failing (probe #3 revisited — JATS emits lists for
+        // reagents, steps, and references). Bullets strip;
+        // ordered markers stay (numbers are content). Emphasis
+        // (`*italic*`) has no space after the marker, so it never
+        // matches.
         if s.starts_with("- ") || s.starts_with("* ") || s.starts_with("+ ")
             || ordered_list_marker(s)
         {
-            return Err(Error::new(
-                "lists are not in the subset (write paragraphs instead)",
-                n + 1,
-                s.to_string(),
-            ).with_col(Some(1)));
+            let line = if ordered_list_marker(s) {
+                s.to_string()
+            } else {
+                s[2..].to_string()
+            };
+            fixed.insert(n, line);
+            if list_start.is_none() {
+                list_start = Some(n + 1);
+            }
+            list_end = n + 1;
+            continue;
         }
-        // Link reference definition (`[label]: dest`, not `[^..]:`):
-        // the event stream swallows these with no event — the text
-        // would vanish. Error loudly instead, naming the line.
+        if let Some(st) = list_start.take() {
+            if st == list_end {
+                crate::notes::push(format!(
+                    "line {st}: list item rendered as a paragraph (compat)"
+                ));
+            } else {
+                crate::notes::push(format!(
+                    "lines {st}-{list_end}: list rendered as paragraphs (compat)"
+                ));
+            }
+        }
+        // Compat (0.13.3): footnote definitions are collected for
+        // `\footnote` renders at flush time (see `doc.rs`); the
+        // definition lines themselves never reach TeX.
+        if s.starts_with("[^") {
+            if let Some(col) = s.find("]:") {
+                let label = &s[2..col];
+                if !label.is_empty() && !label.contains([' ', '\n', '[', ']']) {
+                    crate::notes::set_fn(label.to_string(), s[col + 2..].trim().to_string());
+                    kept[n] = false;
+                    continue;
+                }
+            }
+        }
+        // Compat (0.13.3): link reference definitions are invisible
+        // in rendered markdown, so dropping them is faithful — note
+        // it (links must be inline to survive).
         if !s.starts_with("[^") && s.starts_with('[') {
             if let Some(col) = s.find("]:") {
                 if !s[1..col].contains([' ', '\n', '[']) {
-                    return Err(Error::new(
-                        "reference definitions `[label]: ...` are not in the subset (write the text inline)",
-                        n + 1,
-                        s.to_string(),
-                    ).with_col(Some(1)));
+                    kept[n] = false;
+                    crate::notes::push(format!(
+                        "line {}: reference definition dropped (compat; write links inline)",
+                        n + 1
+                    ));
+                    continue;
                 }
             }
+        }
+    }
+    // A list run may reach end-of-file: close it here.
+    if let Some(st) = list_start.take() {
+        if st == list_end {
+            crate::notes::push(format!(
+                "line {st}: list item rendered as a paragraph (compat)"
+            ));
+        } else {
+            crate::notes::push(format!(
+                "lines {st}-{list_end}: list rendered as paragraphs (compat)"
+            ));
         }
     }
     let mut stripped = Vec::new();
     let mut orig = Vec::new();
     for (n, l) in lines.iter().enumerate() {
         if kept[n] {
-            stripped.push(l.to_string());
+            stripped.push(fixed.remove(&n).unwrap_or_else(|| l.to_string()));
             orig.push(n + 1);
         }
     }
@@ -449,28 +507,43 @@ mod tests {
     }
 
     #[test]
-    fn error_refdef_names_line() {
-        let e = blocks("# T\n\n[lab]: /url\n").unwrap_err();
-        assert!(e.msg.contains("reference definitions"), "got: {e}");
-        assert_eq!(e.line, 3, "got: {e}");
-        assert!(e.echo.contains("[lab]: /url"), "got: {e}");
+    fn refdef_dropped_with_note() {
+        // Compat (0.13.3): reference definitions vanish (as in
+        // rendered markdown) with a note instead of an error.
+        crate::notes::clear();
+        let bs = blocks("# T\n\n[lab]: /url\n").unwrap();
+        assert!(!bs.iter().any(|b| format!("{b:?}").contains("[lab]")));
+        let mut notes = Vec::new();
+        crate::notes::drain_into(&mut notes);
+        assert!(notes.iter().any(|n| n.contains("reference definition dropped")), "{notes:?}");
     }
 
     #[test]
-    fn lists_fail_fast_with_line() {
-        // Probe #3: bullets and ordered markers error instead of
-        // silently flattening into the paragraph.
-        for md in [
-            "# T\n\n- item\n",
-            "# T\n\n* item\n",
-            "# T\n\n+ item\n",
-            "# T\n\n1. item\n",
-            "# T\n\n2) item\n",
-            "# T\n\n  - indented\n",
+    fn lists_render_as_paragraphs() {
+        // Compat (0.13.3, probe #3 revisited): bullets strip and
+        // ordered markers stay (numbers are content), each run
+        // earning one note — never an error, never silent.
+        for (md, want) in [
+            ("# T\n\n- item\n", "item"),
+            ("# T\n\n* item\n", "item"),
+            ("# T\n\n+ item\n", "item"),
+            ("# T\n\n1. item\n", "1. item"),
+            ("# T\n\n2) item\n", "2) item"),
+            ("# T\n\n  - indented\n", "indented"),
         ] {
-            let e = blocks(md).unwrap_err();
-            assert!(e.msg.contains("lists are not in the subset"), "got: {e}");
-            assert_eq!(e.line, 3, "got: {e}");
+            crate::notes::clear();
+            let bs = blocks(md).unwrap();
+            let paras: Vec<String> = bs
+                .iter()
+                .filter_map(|b| match &b.kind {
+                    MdKind::Para(p) => Some(p.join(" ")),
+                    _ => None,
+                })
+                .collect();
+            assert!(paras.iter().any(|p| p == want), "{md:?} -> {paras:?}");
+            let mut notes = Vec::new();
+            crate::notes::drain_into(&mut notes);
+            assert!(notes.iter().any(|n| n.contains("rendered as a paragraph")), "{notes:?}");
         }
         // Emphasis is not a list (no space after the marker).
         assert!(blocks("# T\n\n*italic* and **bold**\n").is_ok());

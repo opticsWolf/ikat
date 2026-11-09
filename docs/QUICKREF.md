@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.13.2 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.3 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 203 Rust tests
-.venv/Scripts/pytest tests/              # 129 pytest (pytest tests/ elsewhere)
+cargo test                               # 204 Rust tests
+.venv/Scripts/pytest tests/              # 131 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)
@@ -199,22 +199,26 @@ hand attrs: size unknown. Full table: `textheight_cm` 23.0,
 `min_width` 0.4, `late_wide_lines` 15, `top_frac` 0.7 (the LaTeX
 `topfraction`/`dbltopfraction` default), `tail_lines` 6.
 
-Markdown subset notes (the parser is CommonMark-shaped, the subset
-is strict): line-starting `[label]: ...` reference definitions are
-a build error (the text would vanish silently — write it inline);
-bullet/ordered lists (`- `, `* `, `+ `, `1. `, `1) `) are a build
-error naming the line (they used to flatten silently into the
-paragraph — write blank-line-separated paragraphs instead);
-`~~~` fences, indented code, HTML blocks, setext headings, and H4+
-feed their raw lines as paragraph text (as the old scanner did);
-`>` quote lines are dropped without breaking paragraphs.
+Markdown subset notes (the parser is CommonMark-shaped; missing
+pieces degrade with notes, never silently): line-starting
+`[label]: ...` reference definitions drop with a note (write links
+inline); bullet/ordered lists (`- `, `* `, `+ `, `1. `, `1) `) render
+as paragraphs with one note per run (bullets strip, numbers stay);
+captionless tables take an automatic `Table N` with a note; remote
+`![alt](url)` figures render as alt-text, alt-less images drop, all
+tallied into one figures note; `[^l]` footnotes become `\footnote`
+(definitions are collected in the prepass); `<sub>` / `<sup>` become
+`$_{}$` / `$^{}$` chemistry; `~~~` fences, indented code, HTML
+blocks, setext headings, and H4+ feed their raw lines as paragraph
+text (as the old scanner did); `>` quote markers are dropped
+without breaking paragraphs.
 
-Unicode gate (fail-fast, not in the TeX log): the heads are pdflatex
+Unicode gate (fail-fast only for unrepresentable characters, never in the TeX log): the heads are pdflatex
 + `inputenc`/`lmodern`/`textcomp`, so any non-ASCII character outside
 the transliteration table fails the weave with `file:line:` + caret
 naming the character (U+ code) and its replacement (Greek hints like
 $\lambda$ for λ). The table covers § — – … ≈ ∅ ≤ × → ≥ µ
-sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; raw Latin accents
+sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; the fallback table covers smart quotes (``...'' ligatures), U+2212 minus, legend symbols (ASCII art or base-LaTeX math), and subscripts ₄–₉ — applied fallbacks aggregate into one `unicode fallbacks:` note; raw Latin accents
 (Böhlen, Šafařík) pass through via `inputenc`. Applies to body text,
 headings, captions, table cells, display math, author names, plot
 labels, and inline/standalone diagram labels (precompiled diagram
