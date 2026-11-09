@@ -7,6 +7,23 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.3 — 2026-11-09
+
+Warn-and-render compatibility (JATS-shaped manuscripts weave).
+
+- Lists render as paragraphs (bullets strip, ordered numbers
+  stay), one note per run — no more `lists are not in the subset`
+- Unicode fallback table (smart quotes, U+2212 minus, legend
+  symbols, subscripts ₄–₉): applications aggregate into one
+  `unicode fallbacks:` note; only unrepresentable characters fail
+- Reference definitions drop with a note; captionless tables take
+  `Table N`; remote figures render as alt-text (alt-less omit);
+  `[^l]` footnotes become `\footnote`; `<sub>`/`<sup>` become
+  chemistry math — every adaptation in `BuildResult.notes`
+- Baselines hold: showcase + frozen paper byte-identical;
+  `tests/test_jats_compat.py` pins the new behavior (204 cargo +
+  131 pytest)
+
 ## v0.13.2 — 2026-11-09
 
 Figure auto-adapt: less warning, more fixing (probe report II).

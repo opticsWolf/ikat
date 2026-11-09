@@ -230,16 +230,20 @@ heads (validated). Document-wide tuning lives in `[floats]`
 emitted only when non-default — default documents weave
 byte-identically.
 
-## Manuscript subset (fail-fast, never a TeX-log mystery)
+## Manuscript subset (warn-and-render, never a TeX-log mystery)
 
 Manuscripts are ASCII + Latin accents + a transliteration table
 (section signs, dashes, math symbols, sub/superscripts, combining-mark
-folding after ASCII bases) — raw Greek
-or symbols fail the weave with `file:line:` and a replacement hint
-(Greek auto-maps now). Bullet/ordered lists are rejected
-(write paragraphs); emphasis may span `$…$` math; display-math
-numbering rides inside as `\tag{N}`; the only display-math
-environment is `matrix`. Full table: `docs/QUICKREF.md`.
+folding after ASCII bases) plus compat fallbacks (smart quotes,
+U+2212 minus, table-legend symbols, late subscripts) — each applied
+fallback records a note, and Greek auto-maps. Only truly
+unrepresentable characters (emoji, CJK) fail the weave with
+`file:line:`. Bullet/ordered lists render as paragraphs;
+reference definitions drop; captionless tables take `Table N`;
+remote figures render as alt-text; footnotes become `\footnote` —
+every adaptation reported. Emphasis may span `$…$` math;
+display-math numbering rides inside as `\tag{N}`; the only
+display-math environment is `matrix`. Full table: `docs/QUICKREF.md`.
 
 ## Templates
 

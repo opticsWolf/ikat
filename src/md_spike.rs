@@ -12,12 +12,12 @@
 //! the slice is the truth. Constructs the hand scanner never knew
 //! (lists, HTML blocks, setext, `~~~`, indented code, H4+) feed
 //! their raw slice lines back as paragraph text — exactly what the
-//! hand scanner did with them. Two deliberate exceptions, both
-//! loud: `>` quote lines are pre-deleted (the hand scanner dropped
-//! them without even breaking paragraphs — deletion replicates
-//! that exactly), and link reference definitions are a hard error
-//! (pulldown consumes them silently; silent text loss is worse
-//! than a loud rejection, and they are outside the subset).
+//! hand scanner did with them. Two deliberate exceptions: `>` quote
+//! lines are pre-deleted (the hand scanner dropped them without
+//! even breaking paragraphs — deletion replicates that exactly),
+//! and link reference definitions drop with a compat note
+//! (pulldown consumes them silently; they are invisible in
+//! rendered markdown, so dropping is faithful).
 
 // (pulldown-cmark now ships in production: see `crate::md`)
 
@@ -288,8 +288,11 @@ mod tests {
         // Emphasis/code stay raw inside paras on both sides.
         let md = "# T\n\nA *b* and `c` line.\n";
         assert_eq!(hand_parse(md), pdc_parse(md).unwrap());
-        // Reference definitions are a loud error, never silent loss.
+        // Reference definitions drop with a note (compat); the
+        // retired hand scanner kept them literal — deliberate
+        // divergence, pinned here.
         let md = "# T\n\n[lab]: /url\n";
-        assert!(pdc_parse(md).is_err());
+        assert!(pdc_parse(md).is_ok());
+        assert_eq!(pdc_parse(md).unwrap(), vec![Block::Title("T".to_string())]);
     }
 }

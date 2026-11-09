@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::esc::inline;
 use crate::mathwidth::display_math_width_cm;
 use crate::md::MdKind;
-use crate::mermaid::{flowchart_to_tikz, flowchart_to_tikz_impl};
+use crate::mermaid::flowchart_to_tikz_impl;
 use crate::table::table_block;
 
 /// One mermaid fence, in source order.
@@ -863,12 +863,73 @@ pub fn tex_requirements(has_tikz: bool, has_plots: bool) -> Vec<String> {
     req
 }
 
+/// Compat (0.13.3): footnote references become `\footnote`
+/// (definitions were collected in the prepass). Runs on the
+/// inline-rendered paragraph, so it matches the *escaped* form:
+/// `inline()` turns `[^a_b]` into `[\textasciicircum{}a\_b]`
+/// (caret + underscore escapes). Labels are unescaped (`\_` back
+/// to `_`) before lookup; anything else exotic stays literal.
+/// Labels without definitions stay literal with a note.
+fn render_footnotes(
+    text: &str,
+    keys: Option<&HashSet<String>>,
+    line: usize,
+) -> Result<String, Error> {
+    // Escaped caret marker, as emitted by `esc_text`.
+    const MARK: &str = "[\\textasciicircum{}";
+    if !text.contains(MARK) {
+        // Fast path that also covers footnote-free paragraphs.
+        if !text.contains("[^") {
+            return Ok(text.to_string());
+        }
+    }
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(i) = rest.find(MARK) {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + MARK.len()..];
+        match after.find(']') {
+            Some(j) => {
+                let label = after[..j].replace("\\_", "_");
+                if !label.is_empty() && !label.contains([' ', '\n', '[', ']', '\\']) {
+                    match crate::notes::read_fn(&label) {
+                        Some(def) => {
+                            let rendered = crate::esc::inline(&def, keys, line)?;
+                            crate::notes::record_footnote();
+                            out.push_str(&format!("\\footnote{{{rendered}}}"));
+                        }
+                        None => {
+                            crate::notes::push(format!(
+                                "line {line}: footnote [^{label}] has no definition (kept literal)"
+                            ));
+                            out.push_str(&rest[i..i + MARK.len() + j + 1]);
+                        }
+                    }
+                    rest = &after[j + 1..];
+                } else {
+                    out.push_str(MARK);
+                    rest = after;
+                }
+            }
+            None => {
+                out.push_str(MARK);
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    Ok(out)
+}
+
 pub fn convert(
     lines: &[String],
     spec: &BuildSpec,
     cfg: &Config,
 ) -> Result<(String, String, usize, usize, FloatNeeds, Vec<String>), crate::error::Error> {
     use crate::error::Error;
+    // Compat channel: every public entry starts clean (the emitters
+    // record into thread-local tallies; drained below).
+    crate::notes::clear();
     let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
     let mut out: Vec<String> = Vec::new();
     let mut needs = FloatNeeds::none();
@@ -885,6 +946,8 @@ pub fn convert(
     let flush = |out: &mut Vec<String>, para: &mut Vec<String>, pline: usize| -> Result<(), Error> {
         if !para.is_empty() {
             let mut text = inline(&para.join(" "), keys, pline)?;
+            // Compat (0.13.3): footnote refs render here (see above).
+            text = render_footnotes(&text, keys, pline)?;
             if text.starts_with("\\dag{}") {
                 text = format!("\\textit{{Note: }}{}", &text["\\dag{}".len()..]);
             }
@@ -1024,9 +1087,20 @@ pub fn convert(
             }
             MdKind::Table(rows) => {
                 flush(&mut out, &mut para, para_line)?;
-                if table_idx >= spec.table_captions.len() {
-                    return Err(Error::new(format!("table #{table_idx} has no caption"), line, rows.first().cloned().unwrap_or_default()));
-                }
+                // Compat (0.13.3): tables without a registry caption
+                // take an automatic `Table N` instead of failing
+                // (JATS tables arrive captionless from the kernel).
+                let auto_cap;
+                let caption: &str = if table_idx >= spec.table_captions.len() {
+                    auto_cap = format!("Table {}", table_idx + 1);
+                    crate::notes::push(format!(
+                        "table #{table_idx} rendered with automatic caption 'Table {}' (compat)",
+                        table_idx + 1
+                    ));
+                    &auto_cap
+                } else {
+                    &spec.table_captions[table_idx]
+                };
                 let tattrs = pending_table.take().unwrap_or_default();
                 let tspan = tattrs.span.unwrap_or_else(|| cfg.spans.for_kind("table"));
                 let tpos = tattrs.pos.unwrap_or(cfg.floats.pos_default);
@@ -1036,7 +1110,7 @@ pub fn convert(
                 // classes compact against their own widths.
                 let (tab, n) = table_block(
                     &rows,
-                    &spec.table_captions[table_idx],
+                    caption,
                     keys,
                     spec.table_specs.get(&table_idx.to_string()).map(String::as_str),
                     tspan,
@@ -1237,6 +1311,7 @@ pub fn convert(
     if in_abstract {
         out.push("\\end{abstract}\n".to_string());
     }
+    crate::notes::drain_into(&mut notes);
     Ok((title, out.join("\n"), diagram_idx, table_idx, needs, notes))
 }
 
@@ -1250,10 +1325,14 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             String::new(),
         ));
     }
-    if n_tables != spec.table_captions.len() {
-        return Err(crate::error::Error::data(
-            format!("{n_tables} tables vs {} captions", spec.table_captions.len()),
-            String::new(),
+    // Compat (0.13.3): extra tables took automatic captions in
+    // `convert()`; surplus registry captions earn a note (same
+    // rule as unused footnote definitions).
+    if n_tables < spec.table_captions.len() {
+        notes.push(format!(
+            "{} table captions unused ({} tables; compat)",
+            spec.table_captions.len() - n_tables,
+            n_tables
         ));
     }
     if !spec.plots.is_empty() {

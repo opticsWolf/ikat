@@ -187,10 +187,8 @@ pub fn map_greek_math(s: &str) -> Cow<str> {
 }
 
 pub fn transliterate_extra(s: &str) -> Cow<str> {
-    // Fast path: no foldable, extra, or Greek-range characters.
-    if !s.chars().any(|c| {
-        is_combining_mark(c) || c == 'Ẑ' || c == 'ẑ' || matches!(c, '\u{370}'..='\u{3ff}')
-    }) {
+    // Fast path: pure ASCII with no precomposed extras.
+    if s.is_ascii() && !s.contains('Ẑ') && !s.contains('ẑ') {
         return Cow::Borrowed(s);
     }
     let folded = fold_marks(s);
@@ -201,6 +199,18 @@ pub fn transliterate_extra(s: &str) -> Cow<str> {
             t = t.replace(*g, &format!("${inner}$"));
         }
     }
+    // Compat fallbacks: applied last (replacements carry `$`,
+    // backslashes, and backticks that earlier passes must not see
+    // as markdown), each occurrence recorded for the notes drain.
+    for (g, rep) in GRACEFUL {
+        if t.contains(*g) {
+            let n = t.matches(*g).count();
+            for _ in 0..n {
+                crate::notes::record_sub(*g);
+            }
+            t = t.replace(*g, rep);
+        }
+    }
     Cow::Owned(t)
 }
 
@@ -208,6 +218,51 @@ pub fn transliterate_extra(s: &str) -> Cow<str> {
 /// caron letters, mapped by `transliterate_extra` in emitters without
 /// their own table (plot ticks, scalar author, preset prose).
 const EXTRA_ALLOWED: &[char] = &['Ẑ', 'ẑ'];
+
+/// Compat fallbacks (0.13.3): manuscript characters with an exact or
+/// near-exact LaTeX rendering, applied with a recorded note instead
+/// of failing (JATS full text is full of smart quotes, U+2212
+/// minus, and table-legend symbols). Replacements are valid TeX in
+/// both text mode and TikZ labels: ``...'' ligatures for quotes,
+/// base-LaTeX math for symbols (`\surd`, `\star`, `\bullet` take
+/// no arguments), ASCII art where TeX has no glyph (`[#]`, `[ ]`).
+/// Anything outside this table plus the allowlists still fails
+/// loudly (emoji, CJK, unassigned: no safe rendering exists).
+pub const GRACEFUL: &[(char, &str)] = &[
+    ('“', "``"),
+    ('”', "''"),
+    ('‘', "`"),
+    ('’', "'"),
+    ('−', "-"),
+    ('∎', "[{\\#}]"),
+    ('□', "[ ]"),
+    ('✗', "x"),
+    ('★', "$\\star$"),
+    ('●', "$\\bullet$"),
+    ('△', "$\\triangle$"),
+    ('∞', "$\\infty$"),
+    ('∑', "$\\sum$"),
+    ('∫', "$\\int$"),
+    ('√', "$\\surd$"),
+    ('≠', "$\\neq$"),
+    ('←', "$\\leftarrow$"),
+    ('↔', "$\\leftrightarrow$"),
+    ('⋆', "$\\star$"),
+    ('∘', "$\\circ$"),
+    ('•', "\\textbullet{}"),
+    ('€', "EUR"),
+    ('₄', "$_{4}$"),
+    ('₅', "$_{5}$"),
+    ('₆', "$_{6}$"),
+    ('₇', "$_{7}$"),
+    ('₈', "$_{8}$"),
+    ('₉', "$_{9}$"),
+];
+
+/// Fallback rendering for a graceful char (note aggregation).
+pub fn graceful_rep(c: char) -> Option<&'static str> {
+    GRACEFUL.iter().find(|(g, _)| *g == c).map(|(_, r)| *r)
+}
 
 /// ASCII, transliterated, inputenc pass-through Latin, a precomposed
 /// extra, or a mapped Greek letter (`greek_inner` below).
@@ -217,6 +272,7 @@ pub fn is_allowed(c: char) -> bool {
         || EXTRA_ALLOWED.contains(&c)
         || greek_inner(c).is_some()
         || is_passthrough(c)
+        || GRACEFUL.iter().any(|(g, _)| *g == c)
 }
 
 /// First disallowed character in `s`: (char, char-column-1-based).
@@ -476,6 +532,24 @@ mod tests {
         assert!(check("plain ASCII $x^2$ -- here", 1).is_ok());
         // Every transliterated character passes.
         assert!(check("§ — – … ≈ ∅ ≤ × → ≥ µ ₂₁₃ ✓ ○ ◐ † ₀ₙᵢ ³", 1).is_ok());
+    }
+
+    #[test]
+    fn graceful_fallbacks_render_with_notes() {
+        // Compat (0.13.3): representable characters map with one
+        // aggregated note instead of failing.
+        crate::notes::clear();
+        assert!(check("“hi” ’ − ∎ □ ✗ ★ ● △ ∞ ∑ ∫ √ ≠ ← ↔ ⋆ ∘ • € ₄₅₆₇₈₉", 1).is_ok());
+        assert_eq!(transliterate_extra("“hi”").into_owned(), "``hi''");
+        assert_eq!(transliterate_extra("−").into_owned(), "-");
+        assert_eq!(transliterate_extra("∞").into_owned(), "$\\infty$");
+        assert_eq!(transliterate_extra("•").into_owned(), "\\textbullet{}");
+        assert_eq!(transliterate_extra("₄").into_owned(), "$_{4}$");
+        let mut notes = Vec::new();
+        crate::notes::drain_into(&mut notes);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(notes[0].starts_with("unicode fallbacks:"), "{}", notes[0]);
+        assert!(notes[0].contains("->``"), "{}", notes[0]);
     }
 
     #[test]

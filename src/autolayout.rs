@@ -593,6 +593,9 @@ pub fn suggest_layout(
     spec: &BuildSpec,
 ) -> Result<Vec<Suggestion>, Error> {
     use crate::md::{blocks, MdKind};
+    // Advisor shares `blocks()` (compat tallies): start clean and
+    // discard at the end — suggestions carry no notes channel.
+    crate::notes::clear();
     let cfg = crate::config::Config::from_toml(toml_src)
         .map_err(|e| Error::new(e, 1, String::new()))?;
     let p = &cfg.layout;
@@ -704,13 +707,9 @@ pub fn suggest_layout(
                 }
             }
             MdKind::Table(rows) => {
-                if table_idx >= spec.table_captions.len() {
-                    return Err(Error::new(
-                        format!("table #{table_idx} has no caption"),
-                        line,
-                        rows.first().cloned().unwrap_or_default(),
-                    ));
-                }
+                // Compat (0.13.3): the weaver auto-captions uncaptioned
+                // tables, so the advisor measures them all — caption
+                // text never enters the geometry.
                 let (tattrs, dline) = pending_table.take().map(|(a, l)| (a, l)).unwrap_or((crate::doc::ElemAttrs::default(), line));
                 let (w1, h1) = measure_table(&rows);
                 let cur_span = tattrs.span.map(|s| span_str(&s).to_string()).unwrap_or_else(|| "default".to_string());
@@ -890,6 +889,7 @@ pub fn suggest_layout(
             reason,
         });
     }
+    crate::notes::clear();
     Ok(out)
 }
 
