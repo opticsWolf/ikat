@@ -529,6 +529,33 @@ pub(crate) fn layered_xy(g: &Graph, depth: &[usize]) -> Vec<(f64, f64)> {
 /// of the body's first line (fence line + 1 from `convert()`, 1
 /// for bare snippets) — every error below resolves against it.
 pub fn flowchart_to_tikz(src: &str, base_line: usize) -> Result<String, crate::error::Error> {
+    let mut sink = Vec::new();
+    flowchart_to_tikz_impl(src, base_line, &mut sink)
+}
+
+/// Estimated label width (cm): longest `\\`-separated line of the
+/// emitted (escaped) label — what TikZ actually measures.
+fn est_width(label: &str) -> f64 {
+    crate::autolayout::label_len(&crate::emit::esc_label(label)) as f64
+        * crate::autolayout::NODE_CHAR_CM
+}
+
+/// Estimated label half-width (cm) for fit decisions: half the
+/// width plus inner-sep headroom, floored at the router default by
+/// the caller — short labels keep byte-identical boxes.
+fn est_half(label: &str) -> f64 {
+    est_width(label) / 2.0 + 0.3
+}
+
+/// Full `tikzpicture` with adaptation notes: cluster-fit expansions
+/// report here (the caller prefixes fence context). Direct callers
+/// (`flowchart_to_tikz`, the Python binding, `ikat layout`) keep the
+/// quiet signature; `build` threads its notes through.
+pub(crate) fn flowchart_to_tikz_impl(
+    src: &str,
+    base_line: usize,
+    notes: &mut Vec<String>,
+) -> Result<String, crate::error::Error> {
     use crate::error::Error;
     // Unicode gate (probe #1): diagram labels reach TikZ text mode
     // verbatim — raw non-ASCII outside the transliteration table
@@ -559,25 +586,54 @@ pub fn flowchart_to_tikz(src: &str, base_line: usize) -> Result<String, crate::e
     // Subgraph boxes second (layout frozen), edges last so lines
     // overlay box borders instead of hiding under them.
     for sg in &boxes {
-        let pts: Vec<(f64, f64)> = sg
+        let placed: Vec<(f64, f64, f64)> = sg
             .members
             .iter()
-            .filter_map(|m| g.node_idx.get(m).map(|&i| xy[i]))
+            .filter_map(|m| {
+                g.node_idx
+                    .get(m)
+                    .map(|&i| (xy[i].0, xy[i].1, est_half(&g.nodes[i].label)))
+            })
             .collect();
-        let Some((r, at)) = crate::layout::cluster_box(&pts) else {
+        let pts: Vec<(f64, f64)> = placed.iter().map(|p| (p.0, p.1)).collect();
+        let half_ws: Vec<f64> = placed.iter().map(|p| p.2).collect();
+        let Some((r, at)) =
+            crate::layout::cluster_box_fit(&pts, &half_ws, est_width(&sg.title))
+        else {
             return Err(Error::new(
                 format!("subgraph `{}` has no placed members", sg.id),
                 sg.line,
                 sg.stmt.clone(),
             ));
         };
+        // Report only genuine expansion: default-margin rects come
+        // out byte-identical, so quiet graphs stay quiet.
+        let same = crate::layout::cluster_box(&pts).is_some_and(|(d, a)| {
+            (d.0 - r.0).abs() < 1e-9
+                && (d.1 - r.1).abs() < 1e-9
+                && (d.2 - r.2).abs() < 1e-9
+                && (d.3 - r.3).abs() < 1e-9
+                && (a.0 - at.0).abs() < 1e-9
+                && (a.1 - at.1).abs() < 1e-9
+        });
+        if !same {
+            notes.push(format!(
+                "line {}: subgraph `{}` widened to fit labels",
+                sg.line, sg.id
+            ));
+        }
         out.push_str(&crate::emit::cluster_rect(&sg.title, r, at));
     }
     let node_boxes: Vec<(String, (f64, f64, f64, f64))> = g
         .nodes
         .iter()
         .enumerate()
-        .map(|(i, n)| (n.id.clone(), crate::layout::node_box(xy[i].0, xy[i].1)))
+        .map(|(i, n)| {
+            (
+                n.id.clone(),
+                crate::layout::node_box_w(xy[i].0, xy[i].1, est_width(&n.label)),
+            )
+        })
         .collect();
     for e in &g.edges {
         let style = match e.style {

@@ -60,8 +60,8 @@ use serde::Serialize;
 /// plus edge-label air above. Coordinates mark node centers; text
 /// sticks out past them, and the 2.4pt overfull on the showcase
 /// sequence at width=0.60 proved 0.6 too tight.
-const TIKZ_MARGIN_X: f64 = 1.7;
-const TIKZ_MARGIN_Y: f64 = 0.8;
+pub(crate) const TIKZ_MARGIN_X: f64 = 1.7;
+pub(crate) const TIKZ_MARGIN_Y: f64 = 0.8;
 
 /// pgfplots default axis geometry in cm (`width=240pt`,
 /// `height=207pt`), plus title above and axis labels. The emitters
@@ -284,7 +284,7 @@ pub(crate) fn label_len(label: &str) -> usize {
 
 /// Per-character width for node labels (cm). Calibrated on the
 /// showcase sequence: 0.52-width boxes touch, 0.57 clears.
-const NODE_CHAR_CM: f64 = 0.21;
+pub(crate) const NODE_CHAR_CM: f64 = 0.21;
 
 /// Crowding floor: the narrowest `width=` that keeps same-rank node
 /// labels apart. Pairwise over placed nodes: two labels need
@@ -313,12 +313,20 @@ pub(crate) fn crowd_floor(nodes: &[(f64, f64, usize)]) -> f64 {
 /// the crowding floor (0.0 when nothing constrains it).
 pub(crate) fn measure_diagram(src: &str, base: usize) -> Result<(f64, f64, f64), Error> {
     let tikz = crate::mermaid::flowchart_to_tikz(src, base)?;
-    let (x0, y0, x1, y1) = tikz_bbox(&tikz)
-        .ok_or_else(|| Error::new("diagram has no measurable coordinates", base, String::new()))?;
-    Ok((
+    measure_tikz(&tikz)
+        .ok_or_else(|| Error::new("diagram has no measurable coordinates", base, String::new()))
+}
+
+/// Natural (unscaled) content size of already-emitted TikZ plus the
+/// crowding floor. The weave-time auto-adapt path measures the body
+/// it just generated (no re-parse) and feeds `suggest_for` directly;
+/// the advisor keeps using `measure_diagram` (same math, one home).
+pub(crate) fn measure_tikz(tikz: &str) -> Option<(f64, f64, f64)> {
+    let (x0, y0, x1, y1) = tikz_bbox(tikz)?;
+    Some((
         (x1 - x0 + 2.0 * TIKZ_MARGIN_X).max(1.0),
         (y1 - y0 + 2.0 * TIKZ_MARGIN_Y).max(1.0),
-        crowd_floor(&node_labels(&tikz)),
+        crowd_floor(&node_labels(tikz)),
     ))
 }
 
@@ -561,7 +569,7 @@ fn span_str(s: &Span) -> &'static str {
     }
 }
 
-fn pos_str(p: &Pos) -> &'static str {
+pub(crate) fn pos_str(p: &Pos) -> &'static str {
     match p {
         Pos::Top => "top",
         Pos::Bottom => "bottom",
@@ -979,6 +987,7 @@ mod tests {
             late_wide_lines: 15,
             top_frac: 0.7,
             tail_lines: 10,
+            auto_adapt: true,
         }
     }
 

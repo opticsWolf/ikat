@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::esc::inline;
 use crate::mathwidth::display_math_width_cm;
 use crate::md::MdKind;
-use crate::mermaid::flowchart_to_tikz;
+use crate::mermaid::{flowchart_to_tikz, flowchart_to_tikz_impl};
 use crate::table::table_block;
 
 /// One mermaid fence, in source order.
@@ -116,6 +116,12 @@ pub struct BuildResult {
     pub tex: String,
     pub n_diagrams: usize,
     pub n_tables: usize,
+    /// Weave-time figure auto-adaptations, in fence order (empty
+    /// when the manuscript needed nothing or `[layout] auto_adapt
+    /// = false`). Notes describe bytes already emitted — reporting
+    /// never changes the `.tex`; the CLI prints these to stderr.
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 /// Render a validated width against a span width: fractions scale
@@ -240,6 +246,8 @@ fn figure_block(
     pos: Pos,
     width: Option<&str>,
     caption_bottom: bool,
+    notes: &mut Vec<String>,
+    cap_height: Option<&str>,
 ) -> Result<(String, FloatNeeds), String> {
     let mut needs = FloatNeeds::none();
     let wide = matches!(span, Span::Wide);
@@ -287,6 +295,20 @@ fn figure_block(
         }
     } else if body_tex.trim_start().starts_with("\\includegraphics") {
         body_tex.to_string()
+    } else if let Some(cap) = cap_height {
+        // Picture height guard (figure auto-adapt): external layout
+        // output is unbounded, so cap the height unconditionally —
+        // tall figures scale instead of clipping off the page. The
+        // cap only binds past the limit; the longer option string
+        // is the only change for shorter figures.
+        notes.push(format!(
+            "external graphic {label}: height capped at {cap} (natural size unknown at weave time)"
+        ));
+        format!(
+            "\\includegraphics[width={},height={},keepaspectratio]{{{body_tex}}}",
+            width_to_tex(width, span_w),
+            cap
+        )
     } else {
         format!("\\includegraphics[width={}]{{{body_tex}}}", width_to_tex(width, span_w))
     };
@@ -845,7 +867,7 @@ pub fn convert(
     lines: &[String],
     spec: &BuildSpec,
     cfg: &Config,
-) -> Result<(String, String, usize, usize, FloatNeeds), crate::error::Error> {
+) -> Result<(String, String, usize, usize, FloatNeeds, Vec<String>), crate::error::Error> {
     use crate::error::Error;
     let keys = if spec.bib_keys.is_empty() { None } else { Some(&spec.bib_keys) };
     let mut out: Vec<String> = Vec::new();
@@ -856,6 +878,7 @@ pub fn convert(
     let mut in_abstract = false;
     let mut diagram_idx = 0usize;
     let mut table_idx = 0usize;
+    let mut notes = Vec::new();
     // Original line of the pending para's first line (for flush errors).
     let mut para_line = 0usize;
 
@@ -897,26 +920,85 @@ pub fn convert(
                         entry.mode.as_str()
                     };
                     let kind = if mode == "inline" { "diagram" } else { "picture" };
-                    let span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
-                    let pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
+                    let mut span = attrs.span.unwrap_or_else(|| cfg.spans.for_kind(kind));
+                    let mut pos = attrs.pos.unwrap_or(cfg.floats.pos_default);
+                    let mut width = attrs.width.clone();
                     let body = if mode == "inline" {
-                        flowchart_to_tikz(&fence_body, line + 1).map_err(|e| Error {
+                        flowchart_to_tikz_impl(&fence_body, line + 1, &mut notes).map_err(|e| Error {
                             msg: format!("mermaid fence #{diagram_idx}: {}", e.msg),
                             ..e
                         })?
                     } else {
                         format!("{}{}", entry.path_prefix, entry.key)
                     };
+                    // Figure auto-adapt: measured geometry fills
+                    // un-set attrs (explicit attrs always win; each
+                    // applied decision reports with its reason).
+                    // Picture mode keeps hand span/pos (external size
+                    // unknown at weave time) — only the height cap
+                    // applies, inside figure_block.
+                    if cfg.layout.auto_adapt && mode == "inline" {
+                        if let Some((w1, h1, floor)) = crate::autolayout::measure_tikz(&body) {
+                            let lead = diagram_idx == 0 && table_idx == 0;
+                            let (s_span, s_pos, s_width, reason) =
+                                crate::autolayout::suggest_for(
+                                    &cfg.layout,
+                                    "diagram",
+                                    w1,
+                                    h1,
+                                    if span == Span::Wide { "wide" } else { "column" },
+                                    crate::autolayout::pos_str(&pos),
+                                    lead,
+                                    floor,
+                                );
+                            let new_span =
+                                if s_span == "column" { Span::Column } else { Span::Wide };
+                            let new_pos = match s_pos.as_str() {
+                                "top" => Pos::Top,
+                                "bottom" => Pos::Bottom,
+                                "both" => Pos::Both,
+                                "page" => Pos::Page,
+                                "here" => Pos::Here,
+                                "force" => Pos::Force,
+                                _ => pos,
+                            };
+                            let mut changed = false;
+                            if attrs.span.is_none() && new_span != span {
+                                span = new_span;
+                                changed = true;
+                            }
+                            if attrs.pos.is_none() && new_pos != pos {
+                                pos = new_pos;
+                                changed = true;
+                            }
+                            if attrs.width.is_none() {
+                                if let Some(w) = s_width {
+                                    width = Some(format!("{w:.2}"));
+                                    changed = true;
+                                }
+                            }
+                            if changed {
+                                notes.push(format!("mermaid fence #{diagram_idx}: {reason}"));
+                            }
+                        }
+                    }
                     let caption_bottom =
                         attrs.captionpos.map(|c| c == CaptionPos::Bottom).unwrap_or(true);
+                    // Picture cap for unbounded external layout
+                    // output (plots pass None: bounded axes, author
+                    // widths — the guard would only add noise).
+                    let cap = (mode != "inline" && cfg.layout.auto_adapt)
+                        .then(|| cfg.floats.figure_max_height.as_str());
                     let (fig, n) = figure_block(
                         &body,
                         &inline(&entry.caption, keys, line)?,
                         &format!("fig:{}", entry.key),
                         span,
                         pos,
-                        attrs.width.as_deref(),
+                        width.as_deref(),
                         caption_bottom,
+                        &mut notes,
+                        cap,
                     )
                     .map_err(|e| Error::new(format!("mermaid fence #{diagram_idx}: {e}"), line, s.clone()))?;
                     needs.add(n);
@@ -1155,13 +1237,13 @@ pub fn convert(
     if in_abstract {
         out.push("\\end{abstract}\n".to_string());
     }
-    Ok((title, out.join("\n"), diagram_idx, table_idx, needs))
+    Ok((title, out.join("\n"), diagram_idx, table_idx, needs, notes))
 }
 
 pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result<BuildResult, crate::error::Error> {
     let cfg = Config::from_toml(toml_src).map_err(|e| crate::error::Error::data(e, String::new()))?;
     let lines: Vec<String> = md_text.lines().map(|l| l.to_string()).collect();
-    let (title, mut body, n_diagrams, n_tables, mut needs) = convert(&lines, spec, &cfg)?;
+    let (title, mut body, n_diagrams, n_tables, mut needs, mut notes) = convert(&lines, spec, &cfg)?;
     if n_diagrams != spec.diagrams.len() {
         return Err(crate::error::Error::data(
             format!("{n_diagrams} fences vs {} registry entries", spec.diagrams.len()),
@@ -1195,6 +1277,8 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
                 ppos,
                 pattrs.width.as_deref(),
                 caption_bottom,
+                &mut notes,
+                None,
             )
             .map_err(|e| crate::error::Error::new(format!("plot {key}: {e}"), 0, key.clone()))?;
             needs.add(n);
@@ -1283,6 +1367,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
             tex: rendered + "\n",
             n_diagrams,
             n_tables,
+            notes,
         });
     } else if spec.preamble_override.is_empty() {
         let mut generated = vec![
@@ -1364,6 +1449,7 @@ pub fn build_document(md_text: &str, toml_src: &str, spec: &BuildSpec) -> Result
         tex: doc,
         n_diagrams,
         n_tables,
+        notes,
     })
 }
 
@@ -1601,9 +1687,30 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn picture_height_cap_reports() {
+        let mut notes = Vec::new();
+        let (f, _) = figure_block(
+            "figs/tikz/tall.pdf",
+            "C",
+            "fig:tall",
+            Span::Wide,
+            Pos::Top,
+            None,
+            true,
+            &mut notes,
+            Some("0.85\\textheight"),
+        )
+        .unwrap();
+        assert!(f.contains("height=0.85\\textheight,keepaspectratio"));
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains("fig:tall"));
+    }
+
+    #[test]
     fn figure_width_with_existing_options() {
         let tikz = "\\begin{tikzpicture}[>=Stealth]\n\\node{a};\\end{tikzpicture}";
-        let (f, _) = figure_block(tikz, "C", "l", Span::Column, Pos::Top, Some("0.9"), true).unwrap();
+        let (f, _) = figure_block(tikz, "C", "l", Span::Column, Pos::Top, Some("0.9"), true, &mut Vec::new(), None).unwrap();
         assert!(f.contains("\\begin{tikzpicture}[scale=0.9,>=Stealth]"));
         assert!(!f.contains("]["));
     }
@@ -1611,21 +1718,21 @@ mod tests {
     #[test]
     fn figure_placements_and_needs() {
         let tikz = "\\begin{tikzpicture}\\node{a};\\end{tikzpicture}";
-        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Both, None, true).unwrap();
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Both, None, true, &mut Vec::new(), None).unwrap();
         assert!(f.contains("\\begin{figure}[!tb]"));
         assert_eq!(n, FloatNeeds::none());
-        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Force, None, true).unwrap();
+        let (f, n) = figure_block(tikz, "C", "l", Span::Column, Pos::Force, None, true, &mut Vec::new(), None).unwrap();
         assert!(f.contains("\\begin{figure}[H]"));
         assert!(n.float_h);
-        let (f, n) = figure_block("pic.pdf", "C", "l", Span::Wide, Pos::Barrier, Some("0.8"), false).unwrap();
+        let (f, n) = figure_block("pic.pdf", "C", "l", Span::Wide, Pos::Barrier, Some("0.8"), false, &mut Vec::new(), None).unwrap();
         assert!(f.contains("\\FloatBarrier\n\\begin{figure*}[t]"));
         assert!(f.contains("\\includegraphics[width=0.8\\textwidth]{pic.pdf}"));
         assert!(f.contains("\\caption{C}\n\\label{l}\n\\includegraphics"));
         assert!(n.barrier);
-        let (_, n) = figure_block("p.pdf", "C", "l", Span::Wide, Pos::Bottom, None, true).unwrap();
+        let (_, n) = figure_block("p.pdf", "C", "l", Span::Wide, Pos::Bottom, None, true, &mut Vec::new(), None).unwrap();
         assert!(n.dblfloat);
-        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Force, None, true).is_err());
-        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Here, None, true).is_err());
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Force, None, true, &mut Vec::new(), None).is_err());
+        assert!(figure_block(tikz, "C", "l", Span::Wide, Pos::Here, None, true, &mut Vec::new(), None).is_err());
     }
 
     #[test]

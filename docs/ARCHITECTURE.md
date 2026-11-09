@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.13.1 · 2026-11-09 · 201 cargo + 122 pytest green.
+Version 0.13.2 · 2026-11-09 · 203 cargo + 129 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -271,14 +271,12 @@ at parse time, not at TeX time.
 
 ### 3.6 `autolayout.rs` — measure floats, suggest `span`/`pos` (M7.1, Phase H — 0.9.2)
 
-Advisory only: nothing here rewrites anything. `suggest_layout`
+Advisory only at the `ikat layout` layer (the weaver auto-applies since 0.13.2 — see below). `suggest_layout`
 walks the manuscript exactly the way `convert()` pairs fences
 with registry entries (same strict-subset and registry errors,
 with lines), measures each float, and returns per-fence
 `(span, pos, width)` with a one-line reason carrying numbers.
-`--apply` (Python side) rewrites fence attrs; the weaver is
-untouched, so the golden paper is byte-identical with the feature
-present but uncalled.
+`--apply` (Python side) rewrites fence attrs. Since 0.13.2 `convert()` auto-applies span/pos/width to inline diagrams (explicit attrs win, each decision noted), caps picture heights, and expands cluster boxes to fit labels — the showcase paper adapts nothing (baseline test), the frozen paper's only delta is the cap string (proven no-op).
 
 Measurement sources: diagrams scan their own emitted TikZ
 (`tikz_bbox` over `(x,y)` numerics — node ids and `axis cs:`

@@ -7,6 +7,26 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.2 — 2026-11-09
+
+Figure auto-adapt: less warning, more fixing (probe report II).
+
+- Weave-time auto-adaptation for inline mermaid diagrams: measured
+  geometry fills un-set span/pos/width (narrow goes column, tall
+  takes a dedicated page, column overflow shrinks above the
+  label-crowding floor); explicit attrs always win
+- Picture-mode height cap (`[width,height=0.85\textheight,
+  keepaspectratio]`, `[floats] figure_max_height`): tall standalone
+  PDFs scale instead of clipping; kill-switch `[layout]
+  auto_adapt = false`
+- Cluster boxes expand to fit long labels; routing clearance widens
+  past the default for them (short labels route byte-identically)
+- Every applied adaptation reports into `BuildResult.notes`
+  (stderr on the CLI); plots/tables untouched
+- Baselines hold: showcase adapts nothing (7 pages, 0 overfulls),
+  frozen paper's only delta is the cap string (MediaBox-proven
+  no-op on all four PDFs); `tests/test_figure_baseline.py` pins it
+
 ## v0.13.1 — 2026-11-09
 
 Combining diacritics fold (needle-math follow-up, one minor feature).

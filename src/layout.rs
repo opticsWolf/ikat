@@ -51,6 +51,15 @@ pub(crate) fn node_box(x: f64, y: f64) -> (f64, f64, f64, f64) {
     (x - 1.7, y - 0.45, x + 1.7, y + 0.45)
 }
 
+/// Label-aware box: the estimate (full label width + inner-sep
+/// headroom) widens routing clearance past the conservative default
+/// for long labels; short labels keep the exact old box, so clean
+/// graphs route byte-identically.
+pub(crate) fn node_box_w(x: f64, y: f64, label_w: f64) -> (f64, f64, f64, f64) {
+    let hw = (label_w / 2.0 + 0.3).max(1.7);
+    (x - hw, y - 0.45, x + hw, y + 0.45)
+}
+
 /// Route one edge around non-endpoint node boxes.
 ///
 /// Returns `None` when the straight segment is already clear — the
@@ -123,6 +132,34 @@ pub(crate) fn cluster_box(pts: &[(f64, f64)]) -> Option<((f64, f64, f64, f64), (
         pts.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max) + 1.1,
         pts.iter().map(|p| p.1).fold(f64::INFINITY, f64::min) - 0.7,
     );
+    Some(((x0, yt, x1, yb), (x0 + 0.1, yt - 0.1)))
+}
+
+/// Label-aware cluster box: member half-widths (label estimates, not
+/// bare centers) plus the inside-top title width set the rect, so
+/// overlong labels land inside the drawn box instead of over its
+/// edge. Members without estimates keep the 1.2 default margin;
+/// vertical margins match `cluster_box` exactly.
+pub(crate) fn cluster_box_fit(
+    pts: &[(f64, f64)],
+    half_ws: &[f64],
+    title_w: f64,
+) -> Option<((f64, f64, f64, f64), (f64, f64))> {
+    if pts.is_empty() {
+        return None;
+    }
+    let (mut x0, mut x1) = (f64::INFINITY, f64::NEG_INFINITY);
+    for (i, p) in pts.iter().enumerate() {
+        let hw = half_ws.get(i).copied().unwrap_or(1.2).max(1.2);
+        x0 = x0.min(p.0 - hw);
+        x1 = x1.max(p.0 + hw);
+    }
+    let (yt, yb) = (
+        pts.iter().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max) + 1.1,
+        pts.iter().map(|p| p.1).fold(f64::INFINITY, f64::min) - 0.7,
+    );
+    // Inside-top title runs right from x0: stretch for it too.
+    x1 = x1.max(x0 + 0.1 + title_w + 0.2);
     Some(((x0, yt, x1, yb), (x0 + 0.1, yt - 0.1)))
 }
 
