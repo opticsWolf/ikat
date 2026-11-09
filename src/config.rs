@@ -395,8 +395,16 @@ pub struct Floats {
     /// default weaves stay byte-identical.
     #[serde(default)]
     pub barrier_before_refs: bool,
+    /// Height cap for picture-mode (external-graphic) figures:
+    /// `[width=W,height=H,keepaspectratio]`, so tall standalone PDFs
+    /// scale instead of clipping off the page. TeX length.
+    #[serde(default = "floats_max_height")]
+    pub figure_max_height: String,
 }
 
+fn floats_max_height() -> String {
+    "0.85\\textheight".to_string()
+}
 fn pos_top() -> Pos {
     Pos::Top
 }
@@ -431,6 +439,7 @@ impl Default for Floats {
             bottomnumber: 1,
             barrier_sections: false,
             barrier_before_refs: false,
+            figure_max_height: floats_max_height(),
         }
     }
 }
@@ -478,6 +487,7 @@ impl Floats {
 /// late_wide_lines = 15
 /// top_frac = 0.7
 /// tail_lines = 6
+/// auto_adapt = true
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutPolicy {
@@ -539,6 +549,14 @@ pub struct LayoutPolicy {
     /// sent it to a dedicated page instead).
     #[serde(default = "layout_top_frac")]
     pub top_frac: f64,
+    /// Master kill-switch for weave-time figure auto-adaptation
+    /// (span/pos/width from measured geometry, picture height cap,
+    /// cluster-fit expansion). Default true: explicit fence attrs
+    /// always win, and every applied adaptation reports into
+    /// `BuildResult.notes` (stderr on the CLI). False restores
+    /// hand-only behavior.
+    #[serde(default = "layout_auto_adapt")]
+    pub auto_adapt: bool,
 }
 
 fn layout_textheight() -> f64 {
@@ -581,6 +599,9 @@ fn layout_tail_lines() -> usize {
 fn layout_top_frac() -> f64 {
     0.7
 }
+fn layout_auto_adapt() -> bool {
+    true
+}
 
 impl Default for LayoutPolicy {
     fn default() -> Self {
@@ -597,6 +618,7 @@ impl Default for LayoutPolicy {
             late_wide_lines: layout_late_wide(),
             top_frac: layout_top_frac(),
             tail_lines: layout_tail_lines(),
+            auto_adapt: layout_auto_adapt(),
         }
     }
 }

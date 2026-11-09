@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.13.1 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.2 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -13,8 +13,8 @@ pip install ikat                     # users: published wheel (add "ikat[mcp]" f
 # contributors, from source:
 uv venv .venv && uv pip install -p .venv maturin pytest "mcp>=1,<2"
 VIRTUAL_ENV=$PWD/.venv maturin develop   # builds ikat._core in place
-cargo test                               # 201 Rust tests
-.venv/Scripts/pytest tests/              # 122 pytest (pytest tests/ elsewhere)
+cargo test                               # 203 Rust tests
+.venv/Scripts/pytest tests/              # 129 pytest (pytest tests/ elsewhere)
 ```
 
 ## CLI (`ikat`)
@@ -138,6 +138,27 @@ Advisory, not automatic: measures every float and suggests
 plots are report-only (they ride `plot_attrs`, owned by the caller).
 Strict-subset and registry errors propagate with manuscript lines —
 a file that cannot weave cannot be measured.
+
+### Weave-time auto-adapt (0.13.2)
+
+`build`/`weave` auto-applies the advisor to inline mermaid
+diagrams: measured geometry fills un-set `span`/`pos`/`width`
+(narrow goes column, tall takes a dedicated page, column
+overflow shrinks above the label-crowding floor). Picture-mode
+(external PDF) figures get an unconditional height cap
+(`[width=W,height=0.85\textheight,keepaspectratio]`, via
+`[floats] figure_max_height`) — tall PDFs scale instead of
+clipping. Subgraph boxes expand to fit long labels; routing
+clearance widens past the default for them. Explicit fence
+attrs always win and stay silent; every applied adaptation
+reports into `BuildResult.notes` (stderr on the CLI, e.g.
+`mermaid fence #2: tall diagram ... -> dedicated page`).
+`[layout] auto_adapt = false` restores hand-only behavior.
+Plots/tables are untouched (bounded axes; frozen track). The
+showcase paper adapts nothing (pinned by
+`tests/test_figure_baseline.py`); the frozen paper's only
+delta is the cap option string (MediaBox-proven no-op on all
+four PDFs).
 
 Policy (`[layout]` knobs, IEEE-ish defaults): short tables and
 plots pin with `force` ([H] prints at the paragraph); short

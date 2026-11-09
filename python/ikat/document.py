@@ -106,6 +106,9 @@ class BuildResult:
     tex: str
     n_diagrams: int
     n_tables: int
+    # Weave-time figure auto-adaptations, in fence order (empty
+    # when nothing adapted). The CLI prints these to stderr.
+    notes: list[str] = field(default_factory=list)
 
 
 def spec_from_dict(raw: dict) -> BuildSpec:
@@ -125,7 +128,8 @@ def spec_from_dict(raw: dict) -> BuildSpec:
 
 def build_document(md_text: str, toml_src: str, spec: BuildSpec) -> BuildResult:
     r = json.loads(_build_document(md_text, toml_src, spec.to_json()))
-    return BuildResult(r["title"], r["body"], r["tex"], r["n_diagrams"], r["n_tables"])
+    return BuildResult(r["title"], r["body"], r["tex"], r["n_diagrams"], r["n_tables"],
+                       r.get("notes", []))
 
 
 def read_template(toml_dir: str | Path, toml_src: str) -> tuple[str, list[str]]:

@@ -121,6 +121,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     tex_path = outdir / f"{stem}.tex"
     tex_path.write_text(r.tex, encoding="utf-8")
     print(f"tex: {tex_path} (diagrams={r.n_diagrams} tables={r.n_tables})")
+    for note in r.notes:
+        print(f"ikat build: {note}", file=sys.stderr)
     if a.no_pdf:
         return 0
     try:
@@ -154,6 +156,8 @@ def cmd_weave(a: argparse.Namespace) -> int:
         print(e, file=sys.stderr)
         return 1
     sys.stdout.write(r.tex + ("\n" if not r.tex.endswith("\n") else ""))
+    for note in r.notes:
+        print(f"ikat weave: {note}", file=sys.stderr)
     return 0
 
 
