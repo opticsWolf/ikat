@@ -1,6 +1,6 @@
 # ikat — Quick Reference
 
-**v0.13.5 · md → tex/pdf pipeline, Rust core + thin Python**
+**v0.13.6 · md → tex/pdf pipeline, Rust core + thin Python**
 
 ## Showcase paper
 
@@ -139,7 +139,7 @@ plots are report-only (they ride `plot_attrs`, owned by the caller).
 Strict-subset and registry errors propagate with manuscript lines —
 a file that cannot weave cannot be measured.
 
-### Weave-time auto-adapt (0.13.2)
+### Weave-time auto-adapt (0.13.2, tables 0.13.6)
 
 `build`/`weave` auto-applies the advisor to inline mermaid
 diagrams: measured geometry fills un-set `span`/`pos`/`width`
@@ -154,12 +154,20 @@ attrs always win and stay silent; every applied adaptation
 reports into `BuildResult.notes` (stderr on the CLI, e.g.
 `mermaid fence #2: tall diagram ... -> dedicated page`).
 `[layout] auto_adapt = false` restores hand-only behavior.
-Plots/tables are untouched (bounded axes; frozen track). The
-showcase paper is byte-identical before/after (pre-0.13.2 vs
-0.13.2 `.tex` diff empty; 7 pages, 0 overfulls — pinned by
-`tests/test_figure_baseline.py`); the frozen paper's only
-delta is the cap option string (MediaBox-proven no-op on all
-four PDFs).
+Plots are untouched (bounded axes; frozen track). Tables get a
+height ladder since 0.13.6: the wrapped height is estimated per
+level (real `\baselineskip` pitch), `\small` → `\footnotesize`
+→ `\scriptsize` step down, a table that only fits at text width
+is promoted to `table*`, and one too tall for any page is split
+across page-sized floats with the header repeated and the number
+continued (`Table N (continued)`). Cells whose longest
+hyphen-separated fragment cannot fit the column at any size
+promote too, instead of printing on top of the next column. A
+table that already fits is untouched, byte for byte. The
+showcase paper is byte-identical since 0.13.2 for figures; the
+0.13.6 table pass regenerated it once (58 → 1 overfull box,
+page count unchanged) and it is pinned again by
+`tests/test_paper.py`.
 
 Policy (`[layout]` knobs, IEEE-ish defaults): short tables and
 plots pin with `force` ([H] prints at the paragraph); short
@@ -223,7 +231,9 @@ Unicode gate (fail-fast only for unrepresentable characters, never in the TeX lo
 the transliteration table fails the weave with `file:line:` + caret
 naming the character (U+ code) and its replacement (Greek hints like
 $\lambda$ for λ). The table covers § — – … ≈ ∅ ≤ × → ≥ µ
-sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; the fallback table covers smart quotes (``...'' ligatures), U+2212 minus, legend symbols (ASCII art or base-LaTeX math), and subscripts ₄–₉ — applied fallbacks aggregate into one `unicode fallbacks:` note; raw Latin accents
+sub/superscripts ₀₁₂₃ₙᵢ ³ and ✓ ○ ◐ †; the fallback table covers smart quotes (``...'' ligatures), U+2212 minus, legend symbols (ASCII art or base-LaTeX math), subscripts ₄–₉, superscripts
+⁰⁴⁵⁶⁷⁸⁹ⁿ⁺⁻⁼⁽⁾ (runs collapse: `10⁻⁵` → `10$^{-5}$`), and the math
+symbols ∂ ∇ ∏ ∀ ∃ ∈ ⊂ ∪ ∩ ⊗ ⊕ ⊥ ∼ ∝ — applied fallbacks aggregate into one `unicode fallbacks:` note; raw Latin accents
 (Böhlen, Šafařík) pass through via `inputenc`. Applies to body text,
 headings, captions, table cells, display math, author names, plot
 labels, and inline/standalone diagram labels (precompiled diagram
@@ -231,8 +241,9 @@ PDFs are external — their labels never reach TeX). Manuscripts are
 ASCII + Latin accents + table, never raw symbols. Greek auto-maps
 (λ → $\lambda$ in text, \lambda in math; omicron → plain `o`). Combining marks
 fold after ASCII bases (`n` + U+0302 weaves as n-circumflex; ẑ/Ẑ map to
-caron-z); inside `$…$` math they fail with the exact accent (`$\hat{n}$`) —
-text accents would break math mode.
+caron-z); inside `$…$` and display math they fold to the math accent
+(`n̂` → `\hat{n}`, `ñ` → `\tilde{n}`), and a mark with no atom to
+accent (`+̂`) still fails with the exact replacement hint.
 
 Emphasis may span `$…$` math: `**$P(z)$ depends on $n(z)$**` emits
 `\textbf{…$…$…}` (valid LaTeX) instead of literal stars.

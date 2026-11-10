@@ -1234,6 +1234,9 @@ pub fn convert(
                     cfg.layout.textwidth_cm,
                     cfg.tables.compact_tables,
                     cfg.layout.here_max_cm,
+                    cfg.layout.textheight_cm,
+                    cfg.layout.auto_adapt,
+                    &mut notes,
                     line,
                 )
                 .map_err(|e| Error {
@@ -1347,8 +1350,10 @@ pub fn convert(
                 flush(&mut out, &mut para, para_line)?;
                 // Unicode gate (probe #2): raw non-ASCII in display
                 // math dies in pdflatex too — fail here with the line.
-                // Display math is verbatim math: combining marks fail
-                // with math-accent hints (text accents break math).
+                // Combining marks fold to their math accent first
+                // (`n̂` → `\hat{n}`); anything without a base atom
+                // still fails with the accent hint.
+                let t = crate::unicode::fold_math(&t).into_owned();
                 crate::unicode::check_math(&t, line)?;
                 // Greek auto-map (probe follow-up): mapped letters
                 // render bare here (also feeds the width model text

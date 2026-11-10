@@ -1,6 +1,6 @@
 # ikat architecture
 
-Version 0.13.5 · 2026-11-09 · 206 cargo + 139 pytest green.
+Version 0.13.6 · 2026-11-09 · 212 cargo + 144 pytest green.
 
 Per-module test counts are deliberately not recorded here — they go
 stale every release that adds a test, which is every release.
@@ -184,7 +184,13 @@ argument structs.
 
 - `table.rs`: pipe tables → `tabularx` with per-table column
   specs (the appendix `Xcl` style), caption registry, TABLE
-  numbering.
+  numbering, and the two fit ladders: **width** (longest
+  hyphen-separated fragment vs the column share → `\footnotesize`,
+  `\scriptsize`, `table*`, `sidewaystable`) and **height** (wrapped
+  lines × the level's real baselineskip vs the page budget → step
+  down, promote to `table*`, or split across page-sized floats with
+  the header repeated). Both feed `BuildResult.notes`; a table that
+  fits passes through untouched.
 - `esc.rs`: the Unicode→LaTeX map, `$…$` math protection (math
   passes through untouched), code/emphasis spans, IEEE section-
   number stripping. Custom and kept even if the block parser ever

@@ -186,6 +186,58 @@ pub fn map_greek_math(s: &str) -> Cow<str> {
     Cow::Owned(t)
 }
 
+/// Superscript characters and their in-math ASCII form. Runs are
+/// collapsed into one span (`10⁻⁵` -> `10$^{-5}$`), because one
+/// `$..$` per character typesets as `$^{-}$$^{5}$` — correct but
+/// ugly, and it breaks copy-paste of the value.
+const SUPERSCRIPT: &[(char, char)] = &[
+    ('\u{2070}', '0'),
+    ('\u{00b9}', '1'),
+    ('\u{00b2}', '2'),
+    ('\u{00b3}', '3'),
+    ('\u{2074}', '4'),
+    ('\u{2075}', '5'),
+    ('\u{2076}', '6'),
+    ('\u{2077}', '7'),
+    ('\u{2078}', '8'),
+    ('\u{2079}', '9'),
+    ('\u{207a}', '+'),
+    ('\u{207b}', '-'),
+    ('\u{207c}', '='),
+    ('\u{207d}', '('),
+    ('\u{207e}', ')'),
+    ('\u{207f}', 'n'),
+];
+
+fn superscript_inner(c: char) -> Option<char> {
+    SUPERSCRIPT.iter().find(|(s, _)| *s == c).map(|(_, i)| *i)
+}
+
+/// Collapse every run of superscript characters into `$^{…}$`.
+fn collapse_superscripts(t: &str) -> String {
+    let mut out = String::with_capacity(t.len());
+    let mut run = String::new();
+    for c in t.chars() {
+        if let Some(inner) = superscript_inner(c) {
+            run.push(inner);
+            continue;
+        }
+        if !run.is_empty() {
+            out.push_str("$^{");
+            out.push_str(&run);
+            out.push_str("}$");
+            run.clear();
+        }
+        out.push(c);
+    }
+    if !run.is_empty() {
+        out.push_str("$^{");
+        out.push_str(&run);
+        out.push_str("}$");
+    }
+    out
+}
+
 pub fn transliterate_extra(s: &str) -> Cow<str> {
     // Fast path: pure ASCII with no precomposed extras.
     if s.is_ascii() && !s.contains('Ẑ') && !s.contains('ẑ') {
@@ -198,6 +250,9 @@ pub fn transliterate_extra(s: &str) -> Cow<str> {
         if t.contains(*g) {
             t = t.replace(*g, &format!("${inner}$"));
         }
+    }
+    if t.chars().any(|c| superscript_inner(c).is_some()) {
+        t = collapse_superscripts(&t);
     }
     // Compat fallbacks: applied last (replacements carry `$`,
     // backslashes, and backticks that earlier passes must not see
@@ -257,6 +312,36 @@ pub const GRACEFUL: &[(char, &str)] = &[
     ('₇', "$_{7}$"),
     ('₈', "$_{8}$"),
     ('₉', "$_{9}$"),
+    // Superscripts outside Latin-1 (1/2/3 pass through `inputenc`).
+    // Manuscripts write `10⁻⁵`, `X⁽¹⁾`, `[0,1)ⁿ` in prose — the same
+    // shapes JATS `<sup>` produces.
+    ('⁰', "$^{0}$"),
+    ('⁴', "$^{4}$"),
+    ('⁵', "$^{5}$"),
+    ('⁶', "$^{6}$"),
+    ('⁷', "$^{7}$"),
+    ('⁸', "$^{8}$"),
+    ('⁹', "$^{9}$"),
+    ('ⁿ', "$^{n}$"),
+    ('⁺', "$^{+}$"),
+    ('⁻', "$^{-}$"),
+    ('⁼', "$^{=}$"),
+    ('⁽', "$^{($"),
+    ('⁾', "$^{)}$"),
+    ('∂', "$\\partial$"),
+    ('∇', "$\\nabla$"),
+    ('∏', "$\\prod$"),
+    ('∀', "$\\forall$"),
+    ('∃', "$\\exists$"),
+    ('∈', "$\\in$"),
+    ('⊂', "$\\subset$"),
+    ('∪', "$\\cup$"),
+    ('∩', "$\\cap$"),
+    ('⊗', "$\\otimes$"),
+    ('⊕', "$\\oplus$"),
+    ('⊥', "$\\perp$"),
+    ('∼', "$\\sim$"),
+    ('∝', "$\\propto$"),
 ];
 
 /// Fallback rendering for a graceful char (note aggregation).
@@ -492,6 +577,119 @@ pub fn check_math(text: &str, line: usize) -> Result<(), crate::error::Error> {
         return Err(crate::error::Error::new(msg_for_math(b.c, b.base), line, text.to_string()).with_col(Some(b.col)));
     }
     Ok(())
+}
+
+/// Math-mode fold for combining marks (0.13.6): a display span is
+/// verbatim math, but `n` + U+0302 has an exact math spelling. The
+/// fold wraps the preceding *atom* — a single char, `{…}`, or
+/// `\cmd` — in the accent command (`n̂` → `\hat{n}`), which is what
+/// an author would have written. Anything without a base atom still
+/// fails through `check_math`'s hint, so no ambiguous text is
+/// half-transformed.
+pub fn fold_math(s: &str) -> Cow<str> {
+    if !s.chars().any(is_combining_mark) && !s.contains('Ẑ') && !s.contains('ẑ') {
+        return Cow::Borrowed(s);
+    }
+    // Precomposed extras first (they are single chars, not marks):
+    // a text emitter would transliterate them, so math must fold them
+    // too instead of passing a raw `ẑ` into the TeX log.
+    let s = &s.replace('Ẑ', "Z\u{302}").replace('ẑ', "z\u{302}");
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::with_capacity(s.len() + 16);
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if !is_combining_mark(c) {
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        let Some(cmd) = math_accent(c) else {
+            out.push(c);
+            i += 1;
+            continue;
+        };
+        // Split the atom already emitted (trailing `{…}` group,
+        // `\cmd`, or single char) off `out` and wrap it.
+        if let Some((head, atom)) = split_trailing_atom(&out) {
+            let mut next = String::with_capacity(out.len() + cmd.len() + 4);
+            next.push_str(&head);
+            next.push_str(cmd);
+            next.push('{');
+            next.push_str(&atom);
+            next.push('}');
+            out = next;
+        } else {
+            out.push(c);
+        }
+        i += 1;
+    }
+    Cow::Owned(out)
+}
+
+/// Split the last math atom off `out`: `{…}` (balanced), `\cmd`,
+/// or one char. `None` when there is nothing to accent (start of
+/// string, or a closing delimiter that would swallow structure).
+fn split_trailing_atom(out: &str) -> Option<(String, String)> {
+    if out.is_empty() {
+        return None;
+    }
+    if out.ends_with('}') {
+        // Walk back to the matching `{` (nested-aware).
+        let bytes = out.as_bytes();
+        let mut depth = 0i32;
+        let mut at = None;
+        for i in (0..bytes.len()).rev() {
+            match bytes[i] {
+                b'}' => depth += 1,
+                b'{' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        at = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let at = at?;
+        // A brace group that is itself an argument of a command
+        // (`\frac{a}{b}`) must not be re-wrapped alone: include the
+        // command word so the accent applies to the whole atom.
+        let mut head_end = at;
+        if head_end > 0 {
+            let hb = out.as_bytes();
+            let mut j = head_end;
+            while j > 0 && (hb[j - 1].is_ascii_alphabetic()) {
+                j -= 1;
+            }
+            if j < head_end && j > 0 && hb[j - 1] == b'\\' {
+                head_end = j - 1;
+            }
+        }
+        return Some((out[..head_end].to_string(), out[head_end..].to_string()));
+    }
+    // `\cmd` (letters) or a single char.
+    if out.ends_with(|c: char| c.is_ascii_alphabetic()) {
+        let mut j = out.len();
+        let bytes = out.as_bytes();
+        while j > 0 && bytes[j - 1].is_ascii_alphabetic() {
+            j -= 1;
+        }
+        if j > 0 && bytes[j - 1] == b'\\' {
+            return Some((out[..j - 1].to_string(), out[j - 1..].to_string()));
+        }
+    }
+    let last = out.chars().next_back()?;
+    // Only a real atom may be accented. An operator or delimiter
+    // (`+ n̂`, `= ẑ`) is ambiguous — leave the mark in place so the
+    // gate fails with its math-accent hint instead of silently
+    // producing `\hat{+}`.
+    if !last.is_alphanumeric() {
+        return None;
+    }
+    let cut = out.len() - last.len_utf8();
+    Some((out[..cut].to_string(), out[cut..].to_string()))
 }
 
 /// Check spec/CLI data with no manuscript line (author names,

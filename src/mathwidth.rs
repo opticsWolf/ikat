@@ -274,6 +274,14 @@ pub(crate) fn display_math_width_cm(tex: &str) -> f64 {
         .unwrap_or(0.0)
 }
 
+/// Byte length of the char starting at `i` (1 when `i` is past the
+/// end). Keeps every scan above on char boundaries: manuscripts carry
+/// UTF-8 math (`ẑ`, `λ`), and stepping byte-by-byte would slice
+/// through a multi-byte char and panic.
+fn char_len(s: &str, i: usize) -> usize {
+    s[i..].chars().next().map_or(1, char::len_utf8)
+}
+
 /// Split a display on `\\\\` row breaks, ignoring `\\\\` inside
 /// `matrix` environments (their rows size inside-out via `row_cm`;
 /// splitting there would measure shards).
@@ -294,7 +302,7 @@ fn split_display_rows(tex: &str) -> Vec<&str> {
             start = i;
             continue;
         }
-        i += 1;
+        i += char_len(tex, i);
     }
     rows.push(&tex[start..]);
     rows
@@ -304,7 +312,7 @@ fn split_display_rows(tex: &str) -> Vec<&str> {
 /// the full token length, whether it is a `\begin`, and the bracket
 /// overhead of the flavor.
 fn matrix_token_at(s: &str, i: usize) -> Option<(usize, bool, f64)> {
-    if !s[i..].starts_with('\\') {
+    if !s.is_char_boundary(i) || !s[i..].starts_with('\\') {
         return None;
     }
     let rest = &s[i + 1..];
@@ -828,6 +836,11 @@ fn bb_cm(c: char, style: Style) -> f64 {
 fn find_matrix(s: &str) -> Option<(f64, usize, String, usize)> {
     let mut i = 0usize;
     while i < s.len() {
+        if !s.is_char_boundary(i) {
+            // Mid-char: step to the next boundary before any slicing.
+            i += 1;
+            continue;
+        }
         let Some((len, true, brack)) = matrix_token_at(s, i) else {
             // Advance to the next backslash (byte-level: a backslash
             // byte never occurs inside a multi-byte UTF-8 char),
@@ -864,7 +877,7 @@ fn find_matrix(s: &str) -> Option<(f64, usize, String, usize)> {
                 }
                 continue;
             }
-            k += 1;
+            k += char_len(s, k);
         }
         let close_start = close_start?;
         let inner = s[inner_start..close_start].to_string();
