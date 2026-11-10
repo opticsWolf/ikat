@@ -3,12 +3,12 @@
 Milestone detail stays here, done or not; the version-by-version
 shipping record lives in `docs/CHANGELOG.md`.
 
-Status 2026-11-09 (0.13.5): through M7.10b done —
+Status 2026-11-09 (0.13.6): through M7.10b done —
 TeX-calibrated display-math width (M7.8b), MCP schema fidelity +
 annotations + instructions + bundled skills + installer + registry
 (M7.9/M7.9b), help verb + registry JSON + bare-invocation help
 (M7.9c), full author front matter + opt-in collapse (M7.10/M7.10b),
-POSIX load_preset fix — 206 cargo + 139 pytest green, hand and
+POSIX load_preset fix — 206 cargo + 144 pytest green, hand and
 auto showcases byte-identical (7 pages,
 0 overfulls), bench cache downloadable via `examples/bench_fetch.py`,
 site asset = the auto-layout build. Shipped: tag `v0.11.0` pushed,
@@ -532,7 +532,7 @@ shown remains true. 0 (default) never collapses; negative fails
 fast; `max >= len` is a no-op. The exporter does NOT use it — the
 bench corpus keeps complete front matter.
 
-## Engine era — release, embed, third engine (0.11.0 → 0.13.5)
+## Engine era — release, embed, third engine (0.11.0 → 0.13.6)
 
 - **0.11.0 — first release from merged `main`** (2026-10-26):
   POSIX `load_preset` fix (a >NAME_MAX string probed as a path
@@ -583,6 +583,12 @@ bench corpus keeps complete front matter.
 - **0.13.5 — MCP parity + skill audit**: `weave_document` returns
   `notes`; all four skill packs describe warn-and-render (no weave-
   behavior change).
+- **0.13.6 — manuscripts that fit**: table height ladder (step down,
+  promote to `table*`, split across page-sized floats) on top of the
+  width ladder, hyphen-aware width ruler, superscript/symbol
+  fallbacks, math combining-accent folding, and a `mathwidth`
+  char-boundary panic fix. Showcase regenerated: 58 → 1 overfull,
+  same page count.
 
 ## Watch: TeXres — a Rust TeX distribution (2026-10-27)
 

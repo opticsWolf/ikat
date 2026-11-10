@@ -223,8 +223,19 @@ fn inline_inner(text: &str, keys: Option<&HashSet<String>>, ph: &mut Vec<String>
     for (is_math, seg) in protect_math(&text) {
         if is_math {
             // Greek auto-map (probe follow-up): math restores
+            // combining marks fold to math accents first (`$ẑ$` →
+            // `$\hat{z}$`), then Greek maps bare. Folding before the
+            // gate keeps the accent hint for un-baseable marks.
+            let folded = crate::unicode::fold_math(&seg);
+            if let Some((c, col)) = crate::unicode::find_bad(&folded) {
+                return Err((
+                    crate::unicode::msg_for_math(c, None),
+                    text.to_string(),
+                ));
+            }
+            let math = crate::unicode::map_greek_math(&folded);
             // verbatim, so mapped letters render bare here.
-            mixed.push_str(&stash(ph, format!("${}$", crate::unicode::map_greek_math(&seg))));
+            mixed.push_str(&stash(ph, format!("${math}$")));
         } else {
             mixed.push_str(&seg);
         }

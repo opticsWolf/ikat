@@ -194,7 +194,7 @@ python -m ikat.mcp_server
 | bar chart | `barchart_to_tikz` / `load_preset` | `ikat barchart` (JSON or `--preset`, `--legend`) | `barchart_to_tikz` (`preset_json=`) |
 | line plot | `lineplot_to_tikz` / `load_preset` | `ikat lineplot` (JSON or `--preset`, `--legend`) | `lineplot_to_tikz` (`preset_json=`) |
 | standalone | `compile_standalone` / `wrap_standalone` / `fence_to_tikz` | `ikat standalone` | `standalone_figure` (.tex only) |
-| auto-layout | `suggest_layout` / `apply_layout` / `layout_report` | `ikat layout [--apply]` | `suggest_layout` (advisory; plots report-only); weaver auto-adapts inline diagrams since 0.13.2, fixes report on stderr; showcase .tex byte-identical before/after |
+| auto-layout | `suggest_layout` / `apply_layout` / `layout_report` | `ikat layout [--apply]` | `suggest_layout` (advisory; plots report-only); weaver auto-adapts inline diagrams since 0.13.2 and table fit (size / `table*` / split) since 0.13.6, fixes report on stderr; showcase .tex byte-identical before/after |
 | check packages | `check_tex_env` | `ikat check` | `check_tex_packages` |
 | install packages | `ensure_tex_packages` | `ikat check --install` | `ensure_tex_packages` |
 | templates | `list_templates` / `template_path` / `template_preset` | `ikat templates` / `template` | `list_templates` / `get_template` |

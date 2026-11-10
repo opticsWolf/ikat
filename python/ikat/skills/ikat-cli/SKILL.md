@@ -35,6 +35,7 @@ ikat lineplot --preset fig.json [--legend WORD]
 ikat standalone FIG.md --out fig.pdf [--engine ...]        # one mermaid|chart fence → PDF
 ikat layout DOC.md [--toml T] [--spec S.json] [--json] [--apply]  # suggest span/pos/width, no TeX
 # build/weave auto-adapt figure geometry (span/pos/width from measured size, picture height cap); each fix reports on stderr ([layout] auto_adapt=false disables)
+# tables too tall for the page step down in size, promote to table*, or split across page-sized floats (header repeated, number continued) — every decision printed on stderr; tables that fit are untouched
 # local ![alt](path) embeds as a float when verified (PDF/PNG/JPG, single-page or #page=N; fig:localN labels); missing/wrong-format/multi-page degrades to alt-text + stderr note
 ikat skills list | show NAME | install [--dest DIR…] [--project]
      [--skill NAME…] [--force]      # bundled agent skills (SKILL.md packs)

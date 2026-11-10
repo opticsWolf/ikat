@@ -7,6 +7,42 @@ per released version. Phase/milestone names (M-x.y, Phases A–H)
 are the roadmap's — history lives here now, planning in
 `ROADMAP.md`.
 
+## v0.13.6 — 2026-11-09
+
+Submitted-manuscript fixes: tables fit the page, symbols stop failing,
+and a core panic on UTF-8 math is gone. Driven by
+`Navette_GA/literature/PAPER_ga_thinfilm_strategies_v3.md` (IEEEtran,
+26-row ledger table, `10⁻⁵`/`X⁽¹⁾` prose, `∂`, `n̂` in display math).
+
+- **Panic fixed**: `mathwidth` sliced by byte and panicked inside a
+  multi-byte char (`start byte index 64 is not a char boundary; it is
+  inside 'ẑ'`). All scans now step on char boundaries.
+- **Tables fit vertically** (`[layout] auto_adapt`): the ladder had a
+  width test and a pin-height test but no page-height test, so a prose
+  table with no long token could not fit any page and LaTeX reported
+  `Float too large for page by 520pt`. New estimate (wrapped lines ×
+  real `\baselineskip` per level) picks `\small`/`\footnotesize`/
+  `\scriptsize`, promotes to `table*` when the text width is the only
+  way to fit, and splits into page-sized floats with the header
+  repeated and the number continued (`\addtocounter{table}{-1}`) when
+  even that is too tall. Every decision lands in `BuildResult.notes`.
+- **Cells that no column can hold go wide** instead of printing on top
+  of the next column; the width ruler now measures the longest
+  hyphen/dash-separated fragment (TeX breaks there) with a 3% guard.
+- **Superscripts, `∂`, and friends**: `⁰⁴⁵⁶⁷⁸⁹ⁿ⁺⁻⁼⁽⁾` collapse into
+  one span (`10⁻⁵` → `10$^{-5}$`, `[0,1)ⁿ` → `[0,1)$^{n}$`); `∂ ∇ ∏ ∀
+  ∃ ∈ ⊂ ∪ ∩ ⊗ ⊕ ⊥ ∼ ∝` map to their math commands, all under the one
+  aggregated `unicode fallbacks` note.
+- **Combining accents fold in math**: `n̂`/`ẑ`/`ñ` inside `$$…$$` and
+  `$…$` become `\hat{n}`/`\hat{z}`/`\tilde{n}`. A mark with no atom to
+  accent still fails with the accent hint — no silent `\hat{+}`.
+- **Estimator calibration**: row pitch from the class's real
+  baselineskip (0.40/0.35/0.30cm) and a prose-accurate ruler; the old
+  padded pitch over-predicted height ~25% and shrank tables a level
+  too far.
+- **Showcase paper**: regenerated `paper-2026-10-05.tex` — 58 → 1
+  overfull box, page count unchanged (24), 212 cargo + 144 pytest.
+
 ## v0.13.5 — 2026-11-09
 
 MCP parity + skill audit (agents see adaptations too).

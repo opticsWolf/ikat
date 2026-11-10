@@ -57,6 +57,20 @@ pub fn is_sep(line: &str) -> bool {
 /// (lowercase averages less) — the ladder must not miss real
 /// numeric overflow, and prose overestimates only compact early.
 const TABLE_TOKEN_CM: f64 = 0.16;
+/// Rounding/hyphen slack on the width ladder: the ruler measures
+/// glyph averages, and the last fragment of a hyphenated token
+/// carries its hyphen. 3\% is enough to reject the marginal
+/// `kurobako/mahf-coco` case (6pt overfull at ootnotesize in an
+/// 8.9cm column) without demoting tables that clear their share.
+const WIDTH_SAFETY: f64 = 1.03;
+/// Height-model rulers (0.13.6). The width ladder must be
+/// conservative (a *missed* overflow prints on top of the next
+/// column), but height has a LaTeX-side backstop: over-estimating
+/// only shrinks a table a level too far. These are the measured
+/// lmodern averages for prose at \small (lowercase ≈ 0.45em,
+/// space ≈ 0.33em), i.e. ~0.145cm and ~0.117cm on a 9pt table.
+const HEIGHT_TOKEN_CM: f64 = 0.145;
+const HEIGHT_SPACE_CM: f64 = 0.117;
 const FOOT_FACTOR: f64 = 0.89;
 const SCRIPT_FACTOR: f64 = 0.78;
 const TABCOLSEP_CM: f64 = 0.21;
@@ -77,9 +91,9 @@ pub(crate) fn table_compact(span_cm: f64, ncols: usize, worst_cm: f64) -> TableL
     let share = span_cm / ncols.max(1) as f64;
     if worst_cm <= share - 2.0 * TABCOLSEP_CM {
         TableLevel::Fit
-    } else if worst_cm * FOOT_FACTOR <= share - 2.0 * TABCOLSEP_SMALL_CM {
+    } else if worst_cm * FOOT_FACTOR * WIDTH_SAFETY <= share - 2.0 * TABCOLSEP_SMALL_CM {
         TableLevel::Compact
-    } else if worst_cm * SCRIPT_FACTOR <= share - 2.0 * TABCOLSEP_TINY_CM {
+    } else if worst_cm * SCRIPT_FACTOR * WIDTH_SAFETY <= share - 2.0 * TABCOLSEP_TINY_CM {
         // Portrait at `\scriptsize`: the PLOS-original density for
         // dense regression tables (7pt type, relative to the span,
         // matches the originals' 7.5pt on their wider measure).
@@ -134,11 +148,41 @@ pub(crate) fn table_token_len(tok: &str) -> f64 {
 /// Widest unbreakable token (whitespace-delimited run) across raw
 /// cells, in cm. `label_len` folds `$..$` math and `\X` escapes to
 /// one glyph each — the same ruler as the crowding floor.
+/// Longest unbreakable *segment* of a token: TeX breaks prose
+/// compounds at explicit hyphens and dashes
+/// (`Noise/multi-parent/island-framing`, `Levenberg–Marquardt`),
+/// so measuring the whole run over-reports
+/// the crowding floor
+/// and compacts a table that sets fine. Numeric runs stay whole (a
+/// leading sign is not a breakpoint), which keeps the regression-table
+/// protection the ladder was built for.
+pub(crate) fn longest_segment(tok: &str) -> f64 {
+    let chars: Vec<char> = tok.chars().collect();
+    let mut worst: f64 = 0.0;
+    let mut cur = String::new();
+    for (i, c) in chars.iter().enumerate() {
+        let breakable = matches!(*c, '-' | '\u{2013}' | '\u{2014}')
+            && i > 0
+            && chars[i - 1].is_alphanumeric()
+            && chars.get(i + 1).map(|n| n.is_alphanumeric()).unwrap_or(false)
+            && chars[..i].iter().any(|p| p.is_alphabetic());
+        if breakable {
+            // TeX keeps the hyphen on the first line's fragment.
+            cur.push(*c);
+            worst = worst.max(table_token_len(&cur));
+            cur.clear();
+            continue;
+        }
+        cur.push(*c);
+    }
+    worst.max(table_token_len(&cur))
+}
+
 pub(crate) fn worst_token_cm(rows: &[Vec<String>]) -> f64 {
     rows.iter()
         .flat_map(|r| r.iter())
         .flat_map(|c| c.split_whitespace())
-        .map(table_token_len)
+        .map(longest_segment)
         .reduce(f64::max)
         .unwrap_or(0.0)
         * TABLE_TOKEN_CM
@@ -168,6 +212,16 @@ pub(crate) fn split_est_se(cell: &str) -> Option<String> {
     if !paren.chars().any(|c| c.is_ascii_digit()) {
         return None;
     }
+    // The group must be *numeric*: `(SQL:2011, BCDM)` is prose in
+    // parentheses, and stacking it would inject a line break into a
+    // sentence (`Bitemporal foundations (SQL:2011, BCDM)`).
+    let inner = paren.trim_start_matches('(').trim_end_matches(')');
+    if !inner
+        .chars()
+        .all(|c| c.is_ascii_digit() || matches!(c, '.' | ',' | '%' | '*' | '+' | '-' | ' '))
+    {
+        return None;
+    }
     Some(format!("{head}{stars}{STACK_MARK}{paren}"))
 }
 
@@ -180,12 +234,12 @@ pub(crate) fn worst_stacked_cm(rows: &[Vec<String>]) -> f64 {
             Some(stacked) => stacked
                 .split(STACK_MARK)
                 .flat_map(|line| line.split_whitespace())
-                .map(table_token_len)
+                .map(longest_segment)
                 .reduce(f64::max)
                 .unwrap_or(0.0),
             None => c
                 .split_whitespace()
-                .map(table_token_len)
+                .map(longest_segment)
                 .reduce(f64::max)
                 .unwrap_or(0.0),
         })
@@ -226,6 +280,89 @@ pub(crate) fn table_pin_height(rows: &[Vec<String>], level: TableLevel) -> f64 {
     lines as f64 * pitch + 1.0
 }
 
+/// Estimated wrapped line count for one row at a given column width
+/// (`avail_cm` usable, padding already removed) on `level`.
+///
+/// Prose wraps in X columns, so the width ladder's unbreakable-token
+/// test says nothing about height: a 24-row prose table has no long
+/// token at all and still outgrows the page. This is the missing
+/// vertical measure. The same 0.16cm/char ruler, scaled per level,
+/// plus one word space per gap; a 0.92 factor stands in for
+/// hyphenation and justification (conservative: it *underestimates*
+/// lines, so a table that fits by this estimate always fits in TeX).
+fn row_lines(cells: &[String], avail_cm: f64, level: TableLevel) -> f64 {
+    let scale = match level {
+        TableLevel::Fit => 1.0,
+        TableLevel::Compact => FOOT_FACTOR,
+        TableLevel::Tiny | TableLevel::Rotate => SCRIPT_FACTOR,
+    };
+    let avail = (avail_cm * (1.0 / scale)).max(0.3);
+    let mut worst: f64 = 1.0;
+    for c in cells {
+        let mut w = 0.0;
+        let mut toks = 0.0;
+        for tok in c.split_whitespace() {
+            if tok.is_empty() {
+                continue;
+            }
+            if toks > 0.0 {
+                w += HEIGHT_SPACE_CM; // inter-word space
+            }
+            // Stack cells break deliberately: count each shard.
+            w += table_token_len(tok) * HEIGHT_TOKEN_CM;
+            toks += 1.0;
+        }
+        let lines = (w / avail).ceil().max(1.0);
+        if lines > worst {
+            worst = lines;
+        }
+    }
+    worst
+}
+
+/// Estimated float height in cm for `rows` at `span_cm`/`ncols` on
+/// `level`: wrapped lines at the level's pitch plus a fixed overhead
+/// (rules, header spacing, caption). The pitch values match
+/// `table_pin_height`.
+fn est_height_cm(rows: &[Vec<String>], span_cm: f64, ncols: usize, level: TableLevel) -> f64 {
+    // Row pitch = the class's real `aselineskip` at that size, not
+    // the pin heuristic's padded figure: 10pt article/IEEEtran gives
+    // \small 9pt -> 11pt (0.39cm), ootnotesize 8pt -> 9.5pt
+    // (0.34cm), \scriptsize 7pt -> 8pt (0.28cm). The old 0.5/0.45/0.4
+    // triple over-predicted height by ~25% and shrank tables a level
+    // too far (calibrated against the Navette ledger table, which
+    // sets at \small in a 22cm budget).
+    let pitch = match level {
+        TableLevel::Fit => 0.40,
+        TableLevel::Compact => 0.35,
+        TableLevel::Tiny => 0.30,
+        TableLevel::Rotate => 0.30,
+    };
+    let pad = match level {
+        TableLevel::Fit => TABCOLSEP_CM,
+        TableLevel::Compact => TABCOLSEP_SMALL_CM,
+        TableLevel::Tiny | TableLevel::Rotate => TABCOLSEP_TINY_CM,
+    };
+    let avail = span_cm / ncols.max(1) as f64 - 2.0 * pad;
+    let lines: f64 = rows
+        .iter()
+        .map(|r| row_lines(r, avail, level))
+        .sum();
+    lines * pitch + 1.0
+}
+
+/// Largest level whose estimate fits `budget_cm` at this span, if any.
+fn fit_level(
+    rows: &[Vec<String>],
+    span_cm: f64,
+    ncols: usize,
+    budget_cm: f64,
+) -> Option<TableLevel> {
+    [TableLevel::Fit, TableLevel::Compact, TableLevel::Tiny]
+        .into_iter()
+        .find(|l| est_height_cm(rows, span_cm, ncols, *l) <= budget_cm)
+}
+
 pub(crate) fn decide_table(
     col_cm: f64,
     text_cm: f64,
@@ -235,12 +372,80 @@ pub(crate) fn decide_table(
     compact: bool,
     here_max_cm: f64,
 ) -> (bool, TableLevel, Vec<Vec<String>>, bool) {
+    let p = plan_table(
+        col_cm, text_cm, wide, ncols, data, compact, here_max_cm, 0.0, false,
+    );
+    (p.wide, p.level, p.data, p.tall)
+}
+
+/// A table's emitted shape: span, level, rows, and the row counts of
+/// each float when the table had to be split across pages.
+pub(crate) struct TablePlan {
+    pub wide: bool,
+    pub level: TableLevel,
+    pub data: Vec<Vec<String>>,
+    pub tall: bool,
+    /// `None` = one float; `Some(counts)` = that many floats, header
+    /// row repeated, captions marked `(continued)`.
+    pub chunks: Option<Vec<usize>>,
+    pub note: Option<String>,
+}
+
+/// Width ladder (M7.5/M7.6) plus the vertical ladder (0.13.6):
+/// measure the wrapped height at each level, promote to `wide` when
+/// even `scriptsize` is too tall in the column, and split into
+/// page-sized floats when the text height cannot hold even the wide
+/// `scriptsize` table. `budget_cm` is the usable height for one
+/// float (text height for `[t]`/`[p]`, `here_max_cm` for `[H]`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_table(
+    col_cm: f64,
+    text_cm: f64,
+    wide: bool,
+    ncols: usize,
+    data: Vec<Vec<String>>,
+    compact: bool,
+    budget_cm: f64,
+    page_budget_cm: f64,
+    auto_adapt: bool,
+) -> TablePlan {
+    let simple = |wide: bool, data: Vec<Vec<String>>| TablePlan {
+        wide,
+        level: TableLevel::Fit,
+        data,
+        tall: false,
+        chunks: None,
+        note: None,
+    };
+    // Byte-identity guard: with the vertical ladder off (or no
+    // height budget known) the pre-0.13.6 path is taken verbatim.
+    let vertical = auto_adapt && page_budget_cm > 0.0;
+    // Width trigger (0.13.6): `compact_tables` stays the explicit
+    // knock, but auto-adapt runs the same ladder when a cell token
+    // genuinely overflows its column share (`\hbox too wide`,
+    // print-on-print). A `Fit` verdict means no change, so fitted
+    // documents stay byte-identical.
+    let compact = compact
+        || (auto_adapt
+            && table_compact(
+                if wide { text_cm } else { col_cm },
+                ncols,
+                worst_token_cm(&data),
+            ) != TableLevel::Fit);
+    if !compact && !vertical {
+        return simple(wide, data);
+    }
     if !compact {
-        return (wide, TableLevel::Fit, data, false);
+        // Width ladder disabled: keep the width verdict, but the
+        // vertical gate still owns page fitting.
+        return vertical_plan(text_cm, col_cm, wide, ncols, data, budget_cm, page_budget_cm, None);
     }
     let span_cm = if wide { text_cm } else { col_cm };
     if table_compact(span_cm, ncols, worst_token_cm(&data)) == TableLevel::Fit {
-        return (wide, TableLevel::Fit, data, false);
+        if !vertical {
+            return simple(wide, data);
+        }
+        return vertical_plan(text_cm, col_cm, wide, ncols, data, budget_cm, page_budget_cm, None);
     }
     // Stacking attempt (M7.6): estimate/SE cells break over two
     // lines like the PLOS originals, halving the longest token.
@@ -261,18 +466,148 @@ pub(crate) fn decide_table(
         // pinned 10 stacked rows `[H]`). Width alone approves the
         // column; height vetoes the pin.
         let col_level = table_compact(col_cm, ncols, worst);
-        if table_pin_height(&data, col_level) > here_max_cm {
+        if table_pin_height(&data, col_level) > budget_cm {
             eff_wide = true;
             tall = true;
         }
     }
     let span_cm = if eff_wide { text_cm } else { col_cm };
-    (
-        eff_wide,
-        table_compact(span_cm, ncols, worst),
+    let level = table_compact(span_cm, ncols, worst);
+    if !vertical || level == TableLevel::Rotate {
+        // A rotated table already leaves portrait: its height is
+        // the (rotated) text width, and turning it back would undo
+        // the width verdict. Height work would only shrink it.
+        return TablePlan {
+            wide: eff_wide,
+            level,
+            data,
+            tall,
+            chunks: None,
+            note: if auto_adapt && eff_wide && !wide {
+                Some(format!(
+                    "table cell wider than the {col_cm:.1}cm column at any size; promoted to wide ({text_cm:.1}cm)"
+                ))
+            } else {
+                None
+            },
+        };
+    }
+    let promoted_by_width = eff_wide && !wide;
+    let mut plan = vertical_plan(
+        text_cm, col_cm, eff_wide, ncols, data, budget_cm, page_budget_cm, Some(level),
+    );
+    if plan.note.is_none() && promoted_by_width {
+        plan.note = Some(format!(
+            "table cell wider than the {col_cm:.1}cm column at any size; promoted to wide ({text_cm:.1}cm)"
+        ));
+    }
+    plan
+}
+
+/// The vertical ladder proper: keep the width verdict, then fit the
+/// wrapped height — level down, promote to `wide`, finally split.
+/// Returns `Fit` at the given span when the table already fits, so
+/// every pre-0.13.6 document weaves byte-identically.
+/// A pinned table (`[H]`, the table default) may only use
+/// `here_max_cm`; a floating one may take a page, so promotion to
+/// `wide` buys the full `textheight_cm`.
+fn vertical_plan(
+    text_cm: f64,
+    col_cm: f64,
+    wide: bool,
+    ncols: usize,
+    data: Vec<Vec<String>>,
+    budget_cm: f64,
+    page_budget_cm: f64,
+    width_level: Option<TableLevel>,
+) -> TablePlan {
+    let page_budget = page_budget_cm.max(1.0);
+    let span_cm = if wide { text_cm } else { col_cm };
+    let budget = if wide { page_budget } else { budget_cm.max(1.0) };
+    let mut level = fit_level(&data, span_cm, ncols, budget);
+    let mut out_wide = wide;
+    let mut note = None;
+    if level.is_none() && !wide && text_cm > col_cm {
+        if let Some(l) = fit_level(&data, text_cm, ncols, page_budget) {
+            level = Some(l);
+            out_wide = true;
+            note = Some(format!(
+                "table is {:.1}cm tall at the {col_cm:.1}cm column width (budget {budget:.1}cm); promoted to wide ({text_cm:.1}cm) and sized {l:?}",
+                est_height_cm(&data, span_cm, ncols, TableLevel::Tiny)
+            ))
+            .map(|s| s.replace("Fit", "\\small").replace("Compact", "\\footnotesize").replace("Tiny", "\\scriptsize"));
+        }
+    }
+    let Some(mut level) = level else {
+        // Even wide+scriptsize is too tall: split into page-sized
+        // floats, header repeated, captions marked (continued).
+        let chunk_budget = page_budget;
+        let span = if out_wide { text_cm } else { col_cm };
+        let avail = span / ncols.max(1) as f64 - 2.0 * TABCOLSEP_TINY_CM;
+        let mut chunks = Vec::new();
+        let mut n_rows = 0usize;
+        let mut cur_lines = 0.0;
+        for row in data.iter().skip(1) {
+            let l = row_lines(row, avail, TableLevel::Tiny);
+            if n_rows > 0 && (cur_lines + l) * 0.30 + 1.0 > chunk_budget {
+                chunks.push(n_rows);
+                n_rows = 0;
+                cur_lines = 0.0;
+            }
+            n_rows += 1;
+            cur_lines += l;
+        }
+        if n_rows > 0 {
+            chunks.push(n_rows);
+        }
+        let n = chunks.len().max(1);
+        let est = est_height_cm(&data, span, ncols, TableLevel::Tiny);
+        return TablePlan {
+            wide: out_wide,
+            level: TableLevel::Tiny,
+            data,
+            tall: true,
+            chunks: if n > 1 { Some(chunks) } else { None },
+            note: Some(format!(
+                "table estimated {est:.1}cm tall at {span:.1}cm width: exceeds the {chunk_budget:.1}cm page budget even at \\scriptsize, split across {n} floats with repeated header"
+            )),
+        };
+    };
+    // The vertical ladder may only make the table denser, never
+    // undo a width-ladder compaction that already exists.
+    if let Some(w) = width_level {
+        let rank = |l: TableLevel| match l {
+            TableLevel::Fit => 0,
+            TableLevel::Compact => 1,
+            TableLevel::Tiny => 2,
+            TableLevel::Rotate => 3,
+        };
+        if rank(w) > rank(level) {
+            level = w;
+        }
+    }
+    TablePlan {
+        wide: out_wide,
+        level,
         data,
-        tall,
-    )
+        tall: out_wide && !wide,
+        chunks: None,
+        note: note.or_else(|| {
+            if !out_wide {
+                return None;
+            }
+            match level {
+                TableLevel::Fit => None,
+                TableLevel::Compact => Some(format!(
+                    "table set \\footnotesize to fit the {span_cm:.1}cm span"
+                )),
+                TableLevel::Tiny => Some(format!(
+                    "table set \\scriptsize to fit the {span_cm:.1}cm span"
+                )),
+                TableLevel::Rotate => None,
+            }
+        }),
+    }
 }
 
 /// Full `table` float. First row is bolded; `spec` overrides the
@@ -292,6 +627,9 @@ pub fn table_block(
     text_cm: f64,
     compact: bool,
     here_max_cm: f64,
+    textheight_cm: f64,
+    auto_adapt: bool,
+    notes: &mut Vec<String>,
     line: usize,
 ) -> Result<(String, FloatNeeds), crate::error::Error> {
     use crate::error::Error;
@@ -314,11 +652,28 @@ pub fn table_block(
         .map(|(i, r)| (line + i, split_row(r)))
         .collect();
     let data: Vec<Vec<String>> = raws.iter().map(|(_, c)| c.clone()).collect();
-    // Single decision point (M7.5/M7.6): the engine mirrors this
-    // exact call on the same inputs, so suggestions and output
-    // agree before and after `--apply`.
-    let (wide, level, out, tall) =
-        decide_table(col_cm, text_cm, wide, n, data, compact, here_max_cm);
+    // Single decision point (M7.5/M7.6 + vertical ladder 0.13.6):
+    // the engine mirrors this exact call on the same inputs, so
+    // suggestions and output agree before and after `--apply`.
+    // A pinned table (`[H]`/`[!H]`) only has the in-flow budget; a
+    // floating one may take the whole page, so promotion to `wide`
+    // buys the full text height.
+    let page_budget = (textheight_cm - 1.0).max(1.0);
+    let budget = if matches!(pos, Pos::Here | Pos::Force) {
+        here_max_cm.max(1.0)
+    } else {
+        page_budget
+    };
+    let plan = plan_table(
+        col_cm, text_cm, wide, n, data, compact, budget, page_budget, auto_adapt,
+    );
+    let wide = plan.wide;
+    let level = plan.level;
+    let tall = plan.tall;
+    let out = &plan.data;
+    if let Some(note) = &plan.note {
+        notes.push(format!("table (line {line}): {note}"));
+    }
     // A height-promoted table cannot keep an in-flow pin: `here`
     // and `force` are column pins, illegal and unphysical on the
     // wide float — it floats top (same fail-soft as `here` -> `ht`).
@@ -378,69 +733,92 @@ pub fn table_block(
         }
         Some(abs) => abs.to_string(),
     };
-    let caption = format!("\\caption{{{cap}}}");
-    let mut lines = vec![
-        (if matches!(pos, Pos::Barrier) { "\\FloatBarrier\n" } else { "" }).to_string()
-            + &format!("\\begin{{{env}}}{placement}"),
-    ];
-    if caption_top {
-        lines.push(caption.clone());
-    }
-    // `Compact` steps one size down; `Tiny` steps two but stays
-    // portrait (PLOS-original density); `Rotate` steps two and turns
-    // sideways — a table that fails portrait even tiny needs the
-    // 23cm rotated width to avoid print-on-print.
-    lines.extend([
-        (match level {
-            TableLevel::Fit => "\\small",
-            TableLevel::Compact => "\\footnotesize",
-            TableLevel::Tiny | TableLevel::Rotate => "\\scriptsize",
-        })
-        .to_string(),
-        format!("\\begin{{tabularx}}{{{w}}}{{{}}}", spec.unwrap_or(&"X".repeat(n))),
-        "\\hline".to_string(),
-    ]);
-    if !matches!(level, TableLevel::Fit) {
-        // Ahead of the `tabularx` line: the preamble parses the
-        // padding when the environment opens, so a later setting
-        // would miss this table. `Tiny` and rotated tables pack
-        // tighter (2pt): at 13 columns the padding itself overflows.
-        let pad = if matches!(level, TableLevel::Tiny | TableLevel::Rotate) {
-            "2pt"
+    let caption = |suffix: &str| format!("\\caption{{{cap}{suffix}}}");
+    // Chunk plan: one float normally, N with the header repeated when
+    // the table could not be made to fit a page at any size.
+    let counts: Vec<usize> = plan.chunks.clone().unwrap_or_else(|| vec![raws.len()]);
+    let mut blocks: Vec<String> = Vec::new();
+    let mut cursor = 1usize; // row 0 is the header in split mode
+    for (ci, count) in counts.iter().enumerate() {
+        let idxs: Vec<usize> = if counts.len() == 1 {
+            (0..raws.len()).collect()
         } else {
-            "3pt"
+            let mut v = vec![0usize];
+            v.extend(cursor..(cursor + count).min(raws.len()));
+            cursor += count;
+            v
         };
-        lines.insert(lines.len() - 2, format!("\\setlength{{\\tabcolsep}}{{{pad}}}"));
-    }
-    let mut first = true;
-    for ((ln, _), cells) in raws.iter().zip(out.iter()) {
-        let mut cells = cells.clone();
-        cells.resize(n, String::new());
-        let mut rendered = Vec::new();
-        for c in &cells {
-            // Stack cells carry the split mark through `inline()`
-            // (a literal `\\newline` would not survive escaping)
-            // and it becomes the real break afterwards.
-            let mut cell = inline(c, keys, *ln)?;
-            cell = cell.replace(STACK_MARK, "\\newline ");
-            if first {
-                cell = format!("\\textbf{{{cell}}}");
+        let mut lines = vec![
+            (if matches!(pos, Pos::Barrier) { "\\FloatBarrier\n" } else { "" }).to_string()
+                + &format!("\\begin{{{env}}}{placement}"),
+        ];
+        // A continuation keeps the table number (`\addtocounter`
+        // -1) and says so in the caption.
+        if ci > 0 {
+            lines.push("\\addtocounter{table}{-1}".to_string());
+        }
+        let cont = if ci > 0 { " (continued)" } else { "" };
+        if caption_top {
+            lines.push(caption(cont));
+        }
+        // `Compact` steps one size down; `Tiny` steps two but stays
+        // portrait (PLOS-original density); `Rotate` steps two and turns
+        // sideways — a table that fails portrait even tiny needs the
+        // 23cm rotated width to avoid print-on-print.
+        lines.extend([
+            (match level {
+                TableLevel::Fit => "\\small",
+                TableLevel::Compact => "\\footnotesize",
+                TableLevel::Tiny | TableLevel::Rotate => "\\scriptsize",
+            })
+            .to_string(),
+            format!("\\begin{{tabularx}}{{{w}}}{{{}}}", spec.unwrap_or(&"X".repeat(n))),
+            "\\hline".to_string(),
+        ]);
+        if !matches!(level, TableLevel::Fit) {
+            // Ahead of the `tabularx` line: the preamble parses the
+            // padding when the environment opens, so a later setting
+            // would miss this table. `Tiny` and rotated tables pack
+            // tighter (2pt): at 13 columns the padding itself overflows.
+            let pad = if matches!(level, TableLevel::Tiny | TableLevel::Rotate) {
+                "2pt"
+            } else {
+                "3pt"
+            };
+            lines.insert(lines.len() - 2, format!("\\setlength{{\\tabcolsep}}{{{pad}}}"));
+        }
+        let mut first = true;
+        for ri in &idxs {
+            let (ln, _) = &raws[*ri];
+            let mut cells = out[*ri].clone();
+            cells.resize(n, String::new());
+            let mut rendered = Vec::new();
+            for c in &cells {
+                // Stack cells carry the split mark through `inline()`
+                // (a literal `\\newline` would not survive escaping)
+                // and it becomes the real break afterwards.
+                let mut cell = inline(c, keys, *ln)?;
+                cell = cell.replace(STACK_MARK, "\\newline ");
+                if first {
+                    cell = format!("\\textbf{{{cell}}}");
+                }
+                rendered.push(cell);
             }
-            rendered.push(cell);
+            lines.push(rendered.join(" & ") + " \\\\");
+            if first {
+                lines.push("\\hline".to_string());
+                first = false;
+            }
         }
-        lines.push(rendered.join(" & ") + " \\\\");
-        if first {
-            lines.push("\\hline".to_string());
-            first = false;
+        lines.push("\\hline".to_string());
+        lines.push("\\end{tabularx}".to_string());
+        if !caption_top {
+            lines.push(caption(cont));
         }
+        lines.push(format!("\\end{{{env}}}"));
+        blocks.push(lines.join("\n"));
     }
-    lines.push("\\hline".to_string());
-    lines.push("\\end{tabularx}".to_string());
-    if !caption_top {
-        lines.push(caption);
-    }
-    lines.push(format!("\\end{{{env}}}"));
-    Ok((lines.join("\n"), needs))
+    Ok((blocks.join("\n\n"), needs))
 }
 
 /// Every `@type{key,` entry key in a .bib source.
@@ -500,8 +878,9 @@ mod tests {
 
     #[test]
     fn block_shape() {
+        let mut notes = Vec::new();
         let rows = ["| A | B |".to_string(), "|--|--|".to_string(), "| `x_y` | 3 |".to_string()];
-        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
+        let (got, needs) = table_block(&rows, "Cap.", None, None, Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table}[t]"));
         assert!(got.contains("\\begin{tabularx}{\\columnwidth}{XX}"));
         assert!(got.contains("\\textbf{A} & \\textbf{B} \\\\"));
@@ -511,9 +890,10 @@ mod tests {
 
     #[test]
     fn wide_barrier_table() {
+        let mut notes = Vec::new();
         let rows = ["| A |".to_string()];
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8"), 8.9, 17.8, false, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Barrier, true, Some("0.8"), 8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\FloatBarrier\n\\begin{table*}[t]"));
         assert!(got.contains("\\begin{tabularx}{0.8\\textwidth}{X}"));
         assert!(needs.barrier);
@@ -521,14 +901,16 @@ mod tests {
 
     #[test]
     fn wide_force_table_is_an_error() {
+        let mut notes = Vec::new();
         let rows = ["| A |".to_string()];
-        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None, 8.9, 17.8, false, 7.0, 4).is_err());
+        assert!(table_block(&rows, "C.", None, None, Span::Wide, Pos::Force, true, None, 8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 4).is_err());
     }
 
     #[test]
     fn appendix_spec() {
+        let mut notes = Vec::new();
         let rows = ["| A | B | C |".to_string(), "| 1 | 2 | 3 |".to_string()];
-        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
+        let (got, _) = table_block(&rows, "C.", None, Some("Xcl"), Span::Column, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("{Xcl}"));
     }
 
@@ -579,12 +961,13 @@ mod tests {
 
     #[test]
     fn compact_table_shrinks_font_and_padding() {
+        let mut notes = Vec::new();
         // 13 data cols of unbreakable numbers: rotates.
         let mut rows = vec!["| L |".to_string() + &"| -0.319(0.224) |".repeat(12)];
         rows.insert(0, "| H |".to_string() + &"| (1) |".repeat(12));
         rows.insert(1, "|---|".to_string() + &"|---|".repeat(12));
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{sidewaystable*}[p]"), "rotates: {got}");
         assert!(got.contains("\\scriptsize"), "shrinks two steps");
         assert!(got.contains("\\setlength{\\tabcolsep}{2pt}"), "packs padding");
@@ -597,7 +980,7 @@ mod tests {
             "| L | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 | -0.1234567890123 |".to_string(),
         ];
         let (got, needs) =
-            table_block(&rows7, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+            table_block(&rows7, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait: {got}");
         assert!(got.contains("\\footnotesize"), "compacts");
         assert!(!got.contains(STACK_MARK), "no split without parens");
@@ -606,6 +989,7 @@ mod tests {
 
     #[test]
     fn stacked_cells_fit_portrait_at_full_size() {
+        let mut notes = Vec::new();
         // The PLOS-original trick: `0.080***(0.015)` (15 raw chars,
         // 2.4cm) stacks estimate over error, longest line 9 chars
         // (1.44cm) — fits a 7-col share (2.12cm) at full size.
@@ -613,7 +997,7 @@ mod tests {
             "| L | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) | -0.123456(0.1234) |".to_string(),
         ];
         let (got, _) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait");
         assert!(got.contains("\\small"), "full size kept");
         assert!(got.contains("\\newline "), "break emitted");
@@ -621,6 +1005,7 @@ mod tests {
 
     #[test]
     fn tiny_sets_scriptsize_portrait() {
+        let mut notes = Vec::new();
         // 13 cols with 10-char stacked heads, all narrow -> 8.5 eff
         // = 1.36cm: too wide for Compact (1.36*0.89 = 1.21 > 1.37
         // -0.22) but fits Tiny (1.36*0.78 = 1.06 <= 1.37-0.14):
@@ -629,7 +1014,7 @@ mod tests {
         rows.insert(0, "| H".to_string() + &" | (1)".repeat(12) + " |");
         rows.insert(1, "|---".to_string() + &"|---".repeat(12) + "|");
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, true, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "stays portrait: {got}");
         assert!(got.contains("\\scriptsize"), "two steps down");
         assert!(got.contains("\\setlength{\\tabcolsep}{2pt}"), "packs like rotated");
@@ -639,6 +1024,7 @@ mod tests {
 
     #[test]
     fn tall_stacked_column_promotes_to_wide_top() {
+        let mut notes = Vec::new();
         // A 4-col table that fits the column portrait (Compact)
         // but stacks 10 rows tall (~10cm over the 7cm in-flow
         // budget): pinning `[H]` would overflow the column, so it
@@ -646,7 +1032,7 @@ mod tests {
         let mut rows = vec!["| L | (1) | (2) | (3) |".to_string()];
         rows.extend((0..10).map(|_| "| Laboratory | 0.086***(0.016) |  |  |".to_string()));
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Column, Pos::Force, true, None, 8.9, 17.8, true, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Column, Pos::Force, true, None, 8.9, 17.8, true, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "floats wide top: {got}");
         assert!(!needs.float_h, "no in-flow pin kept");
         assert!(!needs.rotating);
@@ -654,13 +1040,14 @@ mod tests {
 
     #[test]
     fn ladder_off_by_default_stays_byte_identical() {
+        let mut notes = Vec::new();
         // 13 unbreakable columns with the knob off: plain table*,
         // full-size type — the pre-ladder output, byte for byte.
         let mut rows = vec!["| L |".to_string() + &"| -0.319(0.224) |".repeat(12)];
         rows.insert(0, "| H |".to_string() + &"| (1) |".repeat(12));
         rows.insert(1, "|---|".to_string() + &"|---|".repeat(12));
         let (got, needs) =
-            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 4).unwrap();
+            table_block(&rows, "C.", None, None, Span::Wide, Pos::Top, true, None, 8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 4).unwrap();
         assert!(got.contains("\\begin{table*}[t]"), "untouched: {got}");
         assert!(got.contains("\\small"), "full size");
         assert!(!got.contains("sideways"), "no rotation");
@@ -677,4 +1064,138 @@ mod tests {
         let keys = bib_keys_of(src);
         assert!(keys.contains("k"));
     }
+
+    // ── vertical ladder (0.13.6) ───────────────────────────────────
+    fn tall_rows(n: usize, text: &str) -> Vec<String> {
+        let mut rows = vec!["| # | Claim | Verdict | Evidence |".to_string()];
+        rows.push("|---|---|---|---|".to_string());
+        for i in 0..n {
+            rows.push(format!("| V{i} | {text} | Confirmed | D16 chunk {i} |"));
+        }
+        rows
+    }
+
+    #[test]
+    fn tall_prose_table_promotes_wide_instead_of_overflowing() {
+        // 24 prose rows in an 8.9cm column: no unbreakable token, so
+        // the width ladder says `Fit` and the pre-0.13.6 weaver
+        // emitted a float 520pt too tall for the page. The height
+        // ladder must promote it to `table*` and note the decision.
+        let rows = tall_rows(
+            12,
+            "TMM is fast and accurate in loop, which is why growth and selection both run on the exact model and every candidate is evaluated",
+        );
+        let mut notes = Vec::new();
+        let (got, _) = table_block(
+            &rows, "Ledger.", None, None, Span::Column, Pos::Top, true, None,
+            8.9, 17.8, false, 7.0, 23.0, true, &mut notes, 2,
+        )
+        .unwrap();
+        assert!(got.contains("\\begin{table*}[t]"), "promoted wide: {got}");
+        assert!(!got.contains("\\scriptsize"), "wide fits at full size");
+        assert!(!got.contains("continued"), "one float is enough");
+        assert!(
+            notes.iter().any(|n| n.contains("promoted to wide")),
+            "adaptation reported: {notes:?}"
+        );
+    }
+
+    #[test]
+    fn slightly_tall_table_shrinks_before_widening() {
+        // Too tall in-column, fine once smaller: step down, stay put.
+        let rows = tall_rows(
+            14,
+            "Needle insertion grows the stack one layer at a time and every candidate is evaluated exactly",
+        );
+        let mut notes = Vec::new();
+        let (got, _) = table_block(
+            &rows, "C.", None, None, Span::Column, Pos::Top, true, None,
+            8.9, 17.8, false, 7.0, 23.0, true, &mut notes, 2,
+        )
+        .unwrap();
+        assert!(
+            got.contains("\\begin{table}[t]") || got.contains("\\begin{table*}[t]"),
+            "emits a float: {got}"
+        );
+        assert!(
+            got.contains("\\footnotesize") || got.contains("\\scriptsize"),
+            "steps down: {got}"
+        );
+    }
+
+    #[test]
+    fn overlong_table_splits_with_repeated_header() {
+        // 120 rows cannot fit any page even at scriptsize: split into
+        // page-sized floats, header repeated, table number continued.
+        let rows = tall_rows(
+            120,
+            "TMM is fast and accurate in loop, so growth costs a few thousand exact evaluations per island and every one of them is exact",
+        );
+        let mut notes = Vec::new();
+        let (got, _) = table_block(
+            &rows, "Big.", None, None, Span::Column, Pos::Top, true, None,
+            8.9, 17.8, false, 7.0, 23.0, true, &mut notes, 2,
+        )
+        .unwrap();
+        assert!(got.matches("\\begin{table").count() >= 2, "split: {got}");
+        assert!(got.contains("(continued)"), "continuation caption");
+        assert!(got.contains("\\addtocounter{table}{-1}"), "same number");
+        assert!(got.matches("\\textbf{\\#}").count() >= 2, "header repeats");
+        assert!(
+            notes.iter().any(|n| n.contains("split across")),
+            "split reported: {notes:?}"
+        );
+    }
+
+    #[test]
+    fn auto_adapt_off_keeps_tables_as_before() {
+        // The kill switch restores the pre-0.13.6 shape: column
+        // float, full size, one block, no note.
+        let rows = tall_rows(24, "prose in a dense table that would otherwise be split or shrunk");
+        let mut notes = Vec::new();
+        let (got, _) = table_block(
+            &rows, "C.", None, None, Span::Column, Pos::Top, true, None,
+            8.9, 17.8, false, 7.0, 23.0, false, &mut notes, 2,
+        )
+        .unwrap();
+        assert!(got.contains("\\begin{table}[t]"));
+        assert!(got.contains("\\small"));
+        assert!(!got.contains("continued") && !got.contains("table*"));
+        assert!(notes.is_empty(), "silent when off: {notes:?}");
+    }
+
+    #[test]
+    fn width_overflowing_cell_widens_under_auto_adapt() {
+        // A 24-char unbreakable run cannot fit an 8.9cm/3 column at
+        // any size: auto-adapt promotes instead of printing on top of
+        // the next column (`stochastic/deterministic`).
+        let rows = vec![
+            "| Property | Answer | Witness |".to_string(),
+            "|---|---|---|".to_string(),
+            "| gradients | Derivative-free search | **C01** stochastic/deterministic taxonomy |".to_string(),
+        ];
+        let mut notes = Vec::new();
+        let (got, _) = table_block(
+            &rows, "C.", None, None, Span::Column, Pos::Top, true, None,
+            8.9, 17.8, false, 7.0, 23.0, true, &mut notes, 2,
+        )
+        .unwrap();
+        assert!(got.contains("\\begin{table*}"), "widened: {got}");
+        assert!(
+            notes.iter().any(|n| n.contains("wider than")),
+            "reported: {notes:?}"
+        );
+    }
+
+    #[test]
+    fn hyphenated_compounds_break_at_the_dash() {
+        // TeX breaks `Noise/multi-parent/island-framing` after each
+        // hyphen, so the width floor is the longest fragment, not the
+        // whole run — otherwise dense prose tables compact for nothing.
+        assert!(longest_segment("island-framing") < table_token_len("island-framing") as f64);
+        assert_eq!(longest_segment("framing"), 7.0);
+        // Numeric runs keep their sign: no hyphen breakpoint there.
+        assert_eq!(longest_segment("-0.319(0.224)"), table_token_len("-0.319(0.224)"));
+    }
 }
+
